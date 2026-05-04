@@ -3,163 +3,131 @@
 </p>
 
 <h1 align="center">Mosaic</h1>
-<p align="center"><em>Pieces Together</em></p>
+<p align="center"><em>拼图成画</em></p>
 
 <p align="center">
-  A pure static multimedia site generator.<br/>
-  Like Hexo, but built for <strong>photo &amp; video</strong> stories.
+  纯静态多媒体站点生成器。<br/>
+  像 Hexo，但专为<strong>照片和视频</strong>而生。
 </p>
 
 <p align="center">
-  <strong>Markdown in. Beautiful static site out. Zero backend.</strong>
+  <strong>Markdown 写进去，漂亮站点吐出来。零后端。</strong>
 </p>
 
 ---
 
-<p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-blue" />
-  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" />
-  <img src="https://img.shields.io/badge/static-ssg-4361ee" />
-</p>
+## 为什么选 Mosaic
 
-## Why Mosaic
+大多数静态站点生成器把图片当作附属品。Mosaic 把<strong>照片和视频放在核心位置</strong>——响应式图库、懒加载、沉浸式全屏浏览、底部缩略条导航、双指缩放、清晰度切换、自定义视频播放器支持多分辨率。一切只需要把 Markdown 文件丢进文件夹。
 
-Most static site generators treat images as an afterthought. Mosaic puts **photos and videos at the center** — responsive galleries with lazy loading, immersive fullscreen viewer with filmstrip navigation, pinch-to-zoom, quality switching, and a custom video player with multi-resolution support. All from plain Markdown files dropped into a folder.
-
-## Quick Start
+## 快速开始
 
 ```bash
-git clone https://github.com/example/mosaic.git
+git clone https://github.com/YupenBob/mosaic.git
 cd mosaic
 npm install
-npm run demo          # generate demo content
-npm run build         # build the site
-npx serve dist        # preview at http://localhost:3000
+npm run demo          # 生成示例内容
+npm run build         # 构建站点
+npx serve dist        # 预览 http://localhost:3000
 ```
 
-## Features
+## 功能
 
-<p align="center">
-  <table>
-    <tr>
-      <td width="50%">
-        <strong>Photo Gallery</strong><br/>
-        Responsive grid &middot; Lazy loading &middot; Fullscreen viewer &middot; Filmstrip navigation &middot; Pinch-to-zoom &middot; Quality switching (480p/720p/1080p)
-      </td>
-      <td width="50%">
-        <strong>Video Player</strong><br/>
-        Custom controls &middot; Multi-resolution &middot; Speed control &middot; Download &middot; Fullscreen &middot; Playlist mode
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <strong>Smart Covers</strong><br/>
-        Auto-detect from video poster, first photo, or explicit file. Original aspect ratio preserved.
-      </td>
-      <td>
-        <strong>Filtering &amp; Search</strong><br/>
-        Category &amp; tag filtering &middot; Full-text search &middot; Highlighted results &middot; Masonry card layout
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <strong>Dark Mode</strong><br/>
-        Automatic system preference detection. All components adapt seamlessly.
-      </td>
-      <td>
-        <strong>Responsive</strong><br/>
-        Mobile to desktop. CSS columns masonry. Adaptive images with srcset.
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <strong>Incremental Builds</strong><br/>
-        Only rebuild what changed. Typical build under 1 second.
-      </td>
-      <td>
-        <strong>i18n</strong><br/>
-        Chinese and English UI. Fully configurable interface strings.
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <strong>RSS &amp; Sitemap</strong><br/>
-        Auto-generated Atom feed. SEO-optimized sitemap with priority and lastmod.
-      </td>
-      <td>
-        <strong>Comments</strong><br/>
-        Giscus integration — GitHub Discussions powered, zero backend.
-      </td>
-    </tr>
-  </table>
-</p>
+| 功能 | 说明 |
+|------|------|
+| **照片图库** | 响应式网格 · 懒加载 · 全屏沉浸浏览 · 底部缩略条导航 · 双指缩放 · 清晰度切换 |
+| **视频播放器** | 自定义控件 · 多分辨率 · 倍速播放 · 下载 · 全屏 · 播放列表模式 |
+| **智能封面** | 自动检测：视频截帧 > 首张照片 > 显式指定，跟随原图比例 |
+| **搜索筛选** | 分类/标签筛选 · 全文搜索 · 关键词高亮 · 瀑布流卡片布局 |
+| **暗色模式** | 自动跟随系统偏好，所有组件无缝适配 |
+| **响应式** | 手机到桌面全适配，CSS 瀑布流，srcset 自适应图片 |
+| **增量构建** | 仅构建变化内容，典型耗时不到 1 秒 |
+| **国际化** | 中英文界面，可配置的界面文本 |
+| **RSS / Sitemap** | 自动生成 Atom Feed，含 priority/lastmod 的 SEO 优化站点地图 |
+| **评论** | Giscus 集成——GitHub Discussions 驱动，零后端 |
+| **增量构建** | 默认只重建有变化的内容，0.5 秒典型构建时间 |
+| **本地管理面板** | `cd admin && npm start`，可视化编辑帖子、上传媒体、一键构建部署 |
 
-## Writing a Post
+## 写一篇文章
 
 ```markdown
 ---
-title: "My Photo Story"
+title: "我的摄影故事"
 date: 2026-05-01
-category: photography
-tags: [landscape, travel]
-description: "A photo journey through the mountains."
+category: 摄影
+tags: [风光, 旅行]
+description: "一场穿越山峦的影像之旅。"
 cover: cover.jpg
 layout: default          # default | video-first | gallery-first
 ---
 
-## Day One
+## 第一天
 
-Write your story in Markdown. Drop photos into `photos/`,
-videos into `videos/`. Mosaic handles the rest.
+用 Markdown 写下你的故事。照片放进 `photos/`，
+视频放进 `videos/`。剩下的交给 Mosaic。
 ```
 
-## Project Structure
+## 项目结构
 
 ```
-content/posts/{slug}/     Your posts — one directory each
-  index.md                Markdown with YAML front matter
-  cover.jpg               Cover image (optional, auto-detected)
-  photos/                 Gallery images (jpg/png/webp)
-  videos/                 Video files (mp4/mov/avi)
+content/posts/{slug}/     你的文章——每篇一个目录
+  index.md                带 YAML 头信息的 Markdown
+  cover.jpg               封面图（可选，支持自动检测）
+  photos/                 图库图片（jpg/png/webp）
+  videos/                 视频文件（mp4/mov/avi）
 
-src/                      Templates, stylesheets, client JS
-scripts/                  Build pipeline (Node.js)
-dist/                     Generated static site → deploy this
-mosaic.config.json        Global configuration
+src/                      模板、样式、客户端 JS
+scripts/                  构建脚本（Node.js）
+dist/                     生成的静态站点 → 部署这个目录
+mosaic.config.json        全局配置文件
+admin/                    本地管理面板
 ```
 
-## Configuration
+## 配置
 
-Edit `mosaic.config.json` at the project root:
+编辑项目根目录的 `mosaic.config.json`：
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `title` | `"Mosaic"` | Site title |
-| `url` | — | Base URL for sitemap, RSS, OG tags |
-| `language` | `"zh-CN"` | UI language (`zh-CN` or `en`) |
-| `pageSize` | `50` | Posts per page |
-| `coverAspectMin` | `0.5625` | Min cover ratio (9:16) |
-| `coverAspectMax` | `999` | Max cover ratio (unlimited) |
-| `gallerySingleThreshold` | `5` | ≤ N photos → single column layout |
-| `enableBusuanzi` | `true` | Page view counter |
-| `enableVideoCompression` | `false` | FFmpeg multi-resolution transcode |
-| `giscus` | — | Comment system config |
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `title` | `"Mosaic"` | 站点名称 |
+| `url` | — | 站点 URL（RSS、Sitemap、OG 标签用） |
+| `language` | `"zh-CN"` | 界面语言 |
+| `pageSize` | `50` | 每页显示文章数 |
+| `coverAspectMin` | `0.5625` | 封面最小宽高比（9:16） |
+| `coverAspectMax` | `999` | 封面最大宽高比（无限制） |
+| `gallerySingleThreshold` | `5` | ≤ N 张图用竖排大图模式 |
+| `enableVideoCompression` | `false` | 开启 FFmpeg 多分辨率转码 |
+| `giscus` | — | 评论区配置 |
 
-## Commands
+## 命令
 
 ```bash
-npm run build          # incremental build (default)
-npm run clean          # full clean rebuild
-npm run dev            # watch mode with hot rebuild
-npm run demo           # generate placeholder content
+npm run build          # 增量构建（默认）
+npm run clean          # 全量清理重建
+npm run dev            # 监听模式，文件变化自动重建
+npm run demo           # 生成演示内容
 ```
 
-## Deploy
+## 部署
 
-Push to `main`. GitHub Actions auto-deploy to **GitHub Pages** or **Cloudflare Pages**.
+推送 `main` 分支，GitHub Actions 自动部署到 **GitHub Pages** 或 **Cloudflare Pages**。
 
-Or manually — upload `dist/` to any static host (Vercel, Netlify, Nginx).
+也可以手动上传 `dist/` 到任意静态托管（Vercel、Netlify、Nginx）。
 
-## License
+## 管理面板
+
+```bash
+cd admin
+npm install
+npm start              # 打开 http://localhost:4000
+```
+
+- 可视化帖子编辑器（Markdown + 实时预览 + 分屏）
+- 拖拽上传媒体、进度条
+- 一键构建 + 实时日志
+- 分类/标签管理、回收站
+- Git 提交推送、多平台部署
+
+## 协议
 
 <p align="center">MIT</p>
