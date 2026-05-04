@@ -20,6 +20,16 @@
 
 Most static site generators treat images as an afterthought. Mosaic puts **photos and videos at the center** — responsive galleries, immersive fullscreen viewer with filmstrip, pinch-to-zoom, quality switching, and a custom video player with multi-resolution support. All from plain Markdown files.
 
+## Demo
+
+<p align="center">
+  <a href="https://yupenbob.github.io/mosaic"><strong>yupenbob.github.io/mosaic</strong></a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/YupenBob/mosaic/main/src/assets/screenshot.png" alt="Mosaic Demo" width="800" />
+</p>
+
 ## Quick Start
 
 ```bash

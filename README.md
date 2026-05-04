@@ -20,6 +20,16 @@
 
 大多数静态站点生成器把图片当作附属品。Mosaic 把<strong>照片和视频放在核心位置</strong>——响应式图库、懒加载、沉浸式全屏浏览、底部缩略条导航、双指缩放、清晰度切换、自定义视频播放器支持多分辨率。一切只需要把 Markdown 文件丢进文件夹。
 
+## Demo
+
+<p align="center">
+  <a href="https://yupenbob.github.io/mosaic"><strong>yupenbob.github.io/mosaic</strong></a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/YupenBob/mosaic/main/src/assets/screenshot.png" alt="Mosaic Demo" width="800" />
+</p>
+
 ## 快速开始
 
 ```bash
