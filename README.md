@@ -110,11 +110,25 @@ npm run demo           # 生成演示内容
 
 ## 部署
 
-推送 `main` 分支，GitHub Actions 自动部署到 **GitHub Pages** 或 **Cloudflare Pages**。
+### GitHub Pages（推荐）
 
-也可以手动上传 `dist/` 到任意静态托管（Vercel、Netlify、Nginx）。
+推送 `main` 分支，GitHub Actions 自动构建并部署。无需任何配置，开箱即用。
+
+仓库 Settings → Pages → Source 选 **GitHub Actions**。
+
+### Cloudflare Pages
+
+1. 在 CF 控制台创建 Pages 项目，绑定 GitHub 仓库
+2. 或在 GitHub Actions 中配置 Secrets：`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`
+3. 推送即自动部署
+
+### 其他平台
+
+手动上传 `dist/` 到 Vercel、Netlify、Nginx 等任意静态托管。
 
 ## 管理面板
+
+Mosaic 附带本地 Web 管理后台，可视化编辑帖子，无需手写 Markdown 文件。
 
 ```bash
 cd admin
@@ -122,11 +136,20 @@ npm install
 npm start              # 打开 http://localhost:4000
 ```
 
-- 可视化帖子编辑器（Markdown + 实时预览 + 分屏）
-- 拖拽上传媒体、进度条
-- 一键构建 + 实时日志
-- 分类/标签管理、回收站
-- Git 提交推送、多平台部署
+| 页面 | 功能 |
+|------|------|
+| Dashboard | 帖子统计、磁盘用量、最近修改、快捷新建 |
+| Posts | 搜索筛选、排序、批量删除、缩略图预览、双击编辑 |
+| Editor | Markdown 分屏实时预览、拖拽/粘贴上传图片、自动保存草稿、字数统计 |
+| Media | 上传管理图片视频（集成在编辑器中） |
+| Build | 一键构建 + SSE 实时日志、构建历史查看 |
+| Config | 可视化编辑全部站点配置 |
+| Taxonomy | 分类/标签统一管理，重命名自动批量更新所有帖子 |
+| Trash | 回收站，删除可恢复 |
+| Git | 查看状态、一键 Commit & Push |
+| Deploy | 一键触发 GitHub Pages / Cloudflare Pages / Vercel 部署 |
+
+键盘快捷键：`Ctrl+S` 保存 · `Ctrl+P` 预览 · `Ctrl+N` 新建 · `Esc` 返回
 
 ## 协议
 

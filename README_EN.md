@@ -80,9 +80,45 @@ Edit `mosaic.config.json`:
 
 ## Deploy
 
-Push to `main` — GitHub Actions deploys to **GitHub Pages** or **Cloudflare Pages**.
+### GitHub Pages
 
-Or upload `dist/` to Vercel, Netlify, Nginx.
+Push to `main`. GitHub Actions auto-builds and deploys. Zero config.
+
+Enable in repo Settings → Pages → Source: **GitHub Actions**.
+
+### Cloudflare Pages
+
+1. Create a Pages project in CF dashboard, link to your GitHub repo
+2. Or set GitHub Actions secrets: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`
+3. Push → auto-deploy
+
+### Other Platforms
+
+Upload `dist/` to Vercel, Netlify, Nginx, or any static host.
+
+## Admin Panel
+
+Local web UI for content management. No CLI needed.
+
+```bash
+cd admin
+npm install
+npm start              # opens http://localhost:4000
+```
+
+| Page | Features |
+|------|----------|
+| Dashboard | Stats, disk usage, recent files, quick create |
+| Posts | Search, filter, sort, batch delete, thumbnails, double-click edit |
+| Editor | Split Markdown preview, drag-drop upload, autosave, word count |
+| Build | One-click build with SSE live logs, build history |
+| Config | Visual editor for all site settings |
+| Taxonomy | Category/tag management with batch rename |
+| Trash | Recoverable deletion |
+| Git | Status, commit & push from the UI |
+| Deploy | One-click deploy to GH Pages / CF / Vercel |
+
+Keyboard shortcuts: `Ctrl+S` save · `Ctrl+P` preview · `Ctrl+N` new · `Esc` back
 
 ## License
 
