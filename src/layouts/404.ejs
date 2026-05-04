@@ -1,0 +1,36 @@
+<%
+const rp = typeof relativePath !== 'undefined' ? relativePath : '';
+%>
+<!DOCTYPE html>
+<html lang="<%= site.language || 'zh-CN' %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="data-base" content="<%= rp %>data" />
+  <title>404 - <%= site.title %></title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
+</head>
+<body data-page="404">
+  <header class="header">
+    <div class="container">
+      <a href="<%= rp %>index.html" class="header-logo"><img src="<%= rp %>assets/logo.svg" alt="" class="header-logo-icon" width="28" height="28" /><%= site.title %></a>
+    </div>
+  </header>
+  <main class="main">
+    <div class="container" style="text-align:center;padding:var(--space-20) var(--space-4);">
+      <i class="ri-error-warning-line" style="font-size:4rem;color:var(--color-text-tertiary);display:block;margin-bottom:var(--space-6);"></i>
+      <h1 style="font-size:var(--font-size-3xl);margin-bottom:var(--space-4);">404</h1>
+      <p style="color:var(--color-text-secondary);font-size:var(--font-size-lg);margin-bottom:var(--space-8);"><%= t('page_not_found') %></p>
+      <a href="<%= rp %>index.html" style="color:var(--color-accent);font-weight:var(--font-weight-medium);"><%= t('back_home') %></a>
+    </div>
+  </main>
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
+    </div>
+  </footer>
+</body>
+</html>

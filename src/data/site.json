@@ -1,0 +1,24 @@
+{
+  "title": "Mosaic",
+  "subtitle": "Pieces Together",
+  "description": "A pure static multimedia site generator — share photos, videos, and stories with zero backend.",
+  "url": "https://example.github.io/mosaic",
+  "language": "zh-CN",
+  "author": {
+    "name": "Mosaic",
+    "email": "hello@example.com"
+  },
+  "social": {
+    "github": "https://github.com/example/mosaic"
+  },
+  "pageSize": 50,
+  "gallerySingleThreshold": 5,
+  "enableBusuanzi": true,
+  "enableVideoCompression": false,
+  "giscus": {
+    "repo": "",
+    "repoId": "",
+    "category": "Announcements",
+    "categoryId": ""
+  }
+}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Background: 8-segment mosaic aperture shape -->
+  <g transform="translate(32,32)">
+    <!-- Segment 1 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#4361ee" transform="rotate(0)"/>
+    <!-- Segment 2 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#3a7bd5" transform="rotate(45)"/>
+    <!-- Segment 3 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#4f8cff" transform="rotate(90)"/>
+    <!-- Segment 4 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#2ecc71" transform="rotate(135)"/>
+    <!-- Segment 5 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#27ae60" transform="rotate(180)"/>
+    <!-- Segment 6 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#f39c12" transform="rotate(225)"/>
+    <!-- Segment 7 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#e67e22" transform="rotate(270)"/>
+    <!-- Segment 8 -->
+    <path d="M0,-28 L8.7,-13.6 L18,-18 L10,-28 Z" fill="#e74c3c" transform="rotate(315)"/>
+    <!-- Center lens dot -->
+    <circle cx="0" cy="0" r="6" fill="#1d1d1f"/>
+    <circle cx="0" cy="0" r="3.5" fill="#2c2c2e"/>
+  </g>
+</svg>

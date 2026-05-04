@@ -1,0 +1,43 @@
+{
+  "_comment": "Mosaic Configuration — see README for full documentation",
+
+  "title": "Mosaic",
+  "subtitle": "Pieces Together",
+  "description": "A pure static multimedia site generator.",
+  "url": "https://example.github.io/mosaic",
+  "language": "zh-CN",
+
+  "author": {
+    "name": "Mosaic",
+    "email": "hello@example.com"
+  },
+
+  "dateFormat": "YYYY-MM-DD",
+  "pageSize": 50,
+  "gallerySingleThreshold": 5,
+  "favicon": "/assets/logo.svg",
+  "coverAspectMin": 0.5625,
+  "coverAspectMax": 999,
+
+  "theme": "auto",
+  "headerNav": [],
+  "footerText": "",
+
+  "searchMinChars": 2,
+
+  "imageQuality": { "480p": 75, "720p": 80, "1080p": 85 },
+  "videoQuality": { "crf": 23, "preset": "fast" },
+
+  "cardShowTags": true,
+  "cardShowStats": true,
+
+  "enableBusuanzi": true,
+  "enableVideoCompression": false,
+
+  "giscus": {
+    "repo": "",
+    "repoId": "",
+    "category": "Announcements",
+    "categoryId": ""
+  }
+}

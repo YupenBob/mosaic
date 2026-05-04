@@ -1,0 +1,34 @@
+/* === Responsive Overrides === */
+
+/* Tablet */
+@media (min-width: 640px) {
+  :root {
+    --header-height: 64px;
+  }
+
+  .post-title {
+    font-size: 2.25rem;
+  }
+
+  .post-content {
+    font-size: var(--font-size-lg);
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .post-page {
+    padding: var(--space-12) var(--space-4);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

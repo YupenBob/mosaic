@@ -1,0 +1,19 @@
+{
+  "home": { "zh-CN": "首页", "en": "Home" },
+  "search_placeholder": { "zh-CN": "搜索...", "en": "Search..." },
+  "categories_label": { "zh-CN": "分类", "en": "Categories" },
+  "tags_label": { "zh-CN": "标签", "en": "Tags" },
+  "no_posts": { "zh-CN": "还没有帖子。", "en": "No posts yet." },
+  "no_results": { "zh-CN": "没有找到", "en": "No results" },
+  "prev_page": { "zh-CN": "上一页", "en": "Prev" },
+  "next_page": { "zh-CN": "下一页", "en": "Next" },
+  "built_with": { "zh-CN": "由 Mosaic 构建", "en": "Built with Mosaic" },
+  "page_not_found": { "zh-CN": "页面未找到。", "en": "Page not found." },
+  "back_home": { "zh-CN": "返回首页", "en": "Back to Home" },
+  "failed_load": { "zh-CN": "内容加载失败，请稍后重试。", "en": "Failed to load content. Please try again later." },
+  "photos_title": { "zh-CN": "照片", "en": "Photos" },
+  "videos_title": { "zh-CN": "视频", "en": "Videos" },
+  "playlist_label": { "zh-CN": "播放列表", "en": "Playlist" },
+  "views": { "zh-CN": "浏览", "en": "views" },
+  "comments_title": { "zh-CN": "评论", "en": "Comments" }
+}

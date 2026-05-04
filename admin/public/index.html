@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+  <title>Mosaic Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-logo">Mosaic Admin</div>
+    <nav class="sidebar-nav">
+      <a href="#dashboard" class="nav-item active" data-page="dashboard"><i class="ri-dashboard-line"></i> Dashboard</a>
+      <a href="#posts" class="nav-item" data-page="posts"><i class="ri-article-line"></i> Posts</a>
+      <a href="#editor" class="nav-item" data-page="editor"><i class="ri-edit-line"></i> Editor</a>
+      <a href="#build" class="nav-item" data-page="build"><i class="ri-tools-line"></i> Build</a>
+              <div style="border-top:1px solid rgba(255,255,255,0.1);margin:8px 20px"></div>
+              <a href="#config" class="nav-item" data-page="config"><i class="ri-settings-line"></i> Config</a>
+              <a href="#taxonomy" class="nav-item" data-page="taxonomy"><i class="ri-price-tag-3-line"></i> Taxonomy</a>
+              <a href="#trash" class="nav-item" data-page="trash"><i class="ri-delete-bin-line"></i> Trash</a>
+              <a href="#git" class="nav-item" data-page="git"><i class="ri-git-branch-line"></i> Git</a>
+              <a href="#deploy" class="nav-item" data-page="deploy"><i class="ri-rocket-line"></i> Deploy</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <!-- Dashboard -->
+    <section id="page-dashboard" class="page active">
+      <h1>Dashboard</h1>
+      <div class="stats-grid" id="stats"></div>
+      <div style="margin-top:12px;font-size:13px" id="health-status"></div>
+      <h2 style="margin-top:24px">Recent Posts</h2>
+      <div id="recent-posts"></div>
+    </section>
+
+    <!-- Posts -->
+    <section id="page-posts" class="page">
+      <div class="page-header">
+        <h1>Posts</h1>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" onclick="newPost()"><i class="ri-add-line"></i> New</button>
+          <button class="btn-secondary" onclick="batchDelete()" style="color:#e74c3c"><i class="ri-delete-bin-line"></i> Delete Selected</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" placeholder="Search posts..." oninput="filterPosts(this.value)" style="flex:1;min-width:160px;padding:8px;border:1px solid #d2d2d7;border-radius:6px" />
+        <select id="filter-cat" onchange="filterCat(this.value)" style="padding:8px;border:1px solid #d2d2d7;border-radius:6px;font-size:13px"><option value="">All Categories</option></select>
+        <select id="filter-tag" onchange="filterTag(this.value)" style="padding:8px;border:1px solid #d2d2d7;border-radius:6px;font-size:13px"><option value="">All Tags</option></select>
+        <button class="btn-sm" onclick="sortPosts('date')">Date</button>
+        <button class="btn-sm" onclick="sortPosts('title')">Title</button>
+      </div>
+      <table class="data-table" id="posts-table">
+        <thead><tr><th><input type="checkbox" onclick="var c=this.checked;document.querySelectorAll('.post-check').forEach(function(b){b.checked=c})" /></th><th>Title</th><th>Category</th><th>Tags</th><th>P</th><th>V</th><th>Date</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Editor -->
+    <section id="page-editor" class="page">
+      <div class="page-header">
+        <h1 id="editor-title">New Post</h1>
+        <div>
+          <button class="btn-primary" onclick="savePost()"><i class="ri-save-line"></i> Save</button>
+          <button class="btn-secondary" onclick="previewPost()"><i class="ri-eye-line"></i> Preview</button>
+        </div>
+      </div>
+      <div class="editor-layout">
+        <div class="editor-fields">
+          <label>Slug <input type="text" id="fm-slug" placeholder="my-post-slug" /></label>
+          <label>Title <input type="text" id="fm-title" placeholder="Post title" /></label>
+          <label>Date <input type="date" id="fm-date" /></label>
+          <label>Category <input type="text" id="fm-category" placeholder="photography" /></label>
+          <label>Tags <input type="text" id="fm-tags" placeholder="tag1, tag2" /></label>
+          <label>Description <textarea id="fm-desc" rows="2" placeholder="Brief description"></textarea></label>
+          <label>Layout <select id="fm-layout"><option value="default">default</option><option value="video-first">video-first</option><option value="gallery-first">gallery-first</option></select></label>
+          <label>Cover <input type="text" id="fm-cover" placeholder="cover.jpg or video:0 or photo:0" /></label>
+        </div>
+        <div class="editor-body">
+          <div style="margin-bottom:8px"><button type="button" class="btn-secondary" onclick="togglePreview()"><i class="ri-layout-row-line"></i> Split View</button></div>
+          <div style="display:flex">
+          <textarea id="fm-body" placeholder="Write your Markdown here..." style="flex:1"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="editor-media">
+        <h3 style="margin-bottom:8px">Media</h3>
+        <div class="upload-zone" id="upload-zone">
+          <i class="ri-upload-cloud-2-line" style="font-size:32px;color:#4361ee"></i>
+          <p>Drag & drop images or videos here</p>
+          <p style="font-size:11px;color:#86868b">or click to select files</p>
+          <input type="file" id="editor-media-input" multiple accept="image/*,video/*" style="display:none" />
+        </div>
+        <div id="upload-progress" style="margin-top:8px"></div>
+        <div class="media-grid" id="editor-media-grid"><p style="color:#86868b">Save post first to manage media</p></div>
+      </div>
+    </section>
+
+    <!-- Build -->
+    <section id="page-build" class="page">
+      <h1>Build</h1>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn-primary" onclick="triggerBuild()"><i class="ri-play-fill"></i> Build</button>
+        <button class="btn-secondary" onclick="quickAction('clean-build')"><i class="ri-refresh-line"></i> Clean Build</button>
+        <button class="btn-secondary" onclick="quickAction('demo')"><i class="ri-magic-line"></i> Gen Demo</button>
+      </div>
+      <pre class="build-log" id="build-log"></pre>
+      <h3 style="margin-top:20px">Build History</h3>
+      <div id="build-history"></div>
+    </section>
+
+    <!-- Config -->
+    <section id="page-config" class="page">
+      <div class="page-header"><h1>Site Configuration</h1><button class="btn-primary" onclick="saveConfig()"><i class="ri-save-line"></i> Save</button></div>
+      <div id="config-editor"></div>
+    </section>
+
+    <!-- Taxonomy -->
+    <section id="page-taxonomy" class="page">
+      <h1>Categories & Tags</h1>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div>
+          <h2>Categories</h2>
+          <div id="tax-categories"></div>
+        </div>
+        <div>
+          <h2>Tags</h2>
+          <div id="tax-tags"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trash -->
+    <section id="page-trash" class="page">
+      <div class="page-header">
+        <h1>Trash</h1>
+        <button class="btn-secondary" onclick="emptyTrash()"><i class="ri-delete-bin-line"></i> Empty All</button>
+      </div>
+      <div id="trash-list"></div>
+    </section>
+
+    <!-- Git -->
+    <section id="page-git" class="page">
+      <h1>Git Status</h1>
+      <div id="git-status">Loading...</div>
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <input type="text" id="git-message" placeholder="Commit message" style="flex:1;padding:8px;border:1px solid #d2d2d7;border-radius:6px" />
+        <button class="btn-primary" onclick="gitCommit()"><i class="ri-git-commit-line"></i> Commit & Push</button>
+      </div>
+    </section>
+
+    <!-- Deploy -->
+    <section id="page-deploy" class="page">
+      <h1>Deploy</h1>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn-primary" onclick="deployTo('gh-pages')"><i class="ri-github-fill"></i> GitHub Pages</button>
+        <button class="btn-primary" onclick="deployTo('cf')"><i class="ri-cloud-fill"></i> Cloudflare Pages</button>
+        <button class="btn-primary" onclick="deployTo('vercel')"><i class="ri-vercel-fill"></i> Vercel</button>
+      </div>
+      <pre class="build-log" id="deploy-log"></pre>
+    </section>
+  </main>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>
