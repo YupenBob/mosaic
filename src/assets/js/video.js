@@ -264,13 +264,13 @@ class VideoPlayer {
       const targetH = parseInt(res);
       const levels = this.hls.levels || [];
       let idx = levels.findIndex(function(l) { return l.height === targetH; });
-      // Fallback: match by approximate height
-      if (idx < 0) {
+      if (idx < 0 && levels.length > 0) {
         idx = levels.findIndex(function(l) { return l.height >= targetH; });
       }
       if (idx >= 0) {
-        this.hls.nextLevel = idx;
         this.hls.loadLevel = idx;
+        this.hls.nextLevel = idx;
+        this.hls.autoLevelCapping = idx;
       }
       this._switching = false;
     } else {
@@ -479,6 +479,7 @@ class VideoPlayer {
     if (!v.duration) return;
     const pct = (v.currentTime / v.duration) * 100;
     if (this.progressFill) this.progressFill.style.width = pct + '%';
+    if (this.progressThumb) this.progressThumb.style.left = pct + '%';
     if (this.timeCur) this.timeCur.textContent = this.fmt(v.currentTime);
     // Buffered progress
     if (this.progressBuffer && v.buffered.length > 0) {
