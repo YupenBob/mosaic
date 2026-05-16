@@ -90,51 +90,44 @@ class VideoPlayer {
 
     // Parse sources (multi-res or single)
     this.sources = {};
-    this.isHLS = this.video.dataset.hls === 'true' || container.querySelector('source[type="application/x-mpegURL"]');
-    const sourceEls = container.querySelectorAll('source[data-res]');
-    sourceEls.forEach((s) => {
-      this.sources[s.dataset.res] = s.src;
-    });
-    if (!sourceEls.length && !this.isHLS && this.video.src) {
-      this.sources.single = this.video.src;
-    }
+    var sourceEls = container.querySelectorAll('source[data-res]');
+    sourceEls.forEach(function(s) { this.sources[s.dataset.res] = s.src; }.bind(this));
 
-    // HLS initialization
+    // Check for HLS
+    var hlsSource = container.querySelector('source[type="application/x-mpegURL"]');
+    this.isHLS = !!(hlsSource);
     this.hls = null;
-    if (this.isHLS && typeof Hls !== 'undefined' && Hls.isSupported()) {
-      const hlsSrc = container.querySelector('source[type="application/x-mpegURL"]');
-      if (hlsSrc) {
-        this.hls = new Hls();
-        this.hls.loadSource(hlsSrc.src);
+
+    if (this.isHLS && hlsSource && typeof window.Hls !== 'undefined') {
+      try {
+        this.hls = new window.Hls();
+        this.hls.loadSource(hlsSource.src);
         this.hls.attachMedia(this.video);
-        this.hls.on('hlsManifestParsed', () => {
-          // Fill sources from HLS levels for quality menu
-          this.sources = {};
-          var levels = this.hls.levels || [];
-          if (levels.length > 0) {
-            levels.forEach(function(level) {
-              var h = level.height || 0;
-              if (h === 0) h = level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
-              var label = h + 'p';
-              this.sources[label] = hlsSrc.src;
-            }.bind(this));
-          }
-          if (Object.keys(this.sources).length === 0) this.sources.single = hlsSrc.src;
-          this.currentRes = this.detectResolution();
-          // Rebuild quality menu now that sources are populated
-          if (this.qualityMenu) {
-            this.qualityMenu.innerHTML = '';
-            this.buildQualityMenu();
-          }
-        }.bind(this));
-      }
+        var self = this;
+        this.hls.on('hlsManifestParsed', function() {
+          self.sources = {};
+          var levels = self.hls.levels || [];
+          levels.forEach(function(level) {
+            var h = level.height || 0;
+            if (h === 0) h = level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
+            self.sources[h + 'p'] = hlsSource.src;
+          });
+          if (Object.keys(self.sources).length === 0) self.sources['720p'] = hlsSource.src;
+          self.currentRes = self.detectResolution();
+          if (self.qualityMenu) { self.qualityMenu.innerHTML = ''; self.buildQualityMenu(); }
+        });
+        this.hls.on('hlsError', function(event, data) {
+          if (data.fatal) { console.error('HLS fatal:', data.type, data.details); }
+        });
+      } catch(e) { console.error('HLS init failed:', e); this.isHLS = false; }
     }
 
-    // Set initial src for non-HLS
+    // Initialize sources for non-HLS or HLS fallback
     if (!this.isHLS) {
+      if (!sourceEls.length && this.video.src) this.sources.single = this.video.src;
       this.currentRes = this.detectResolution();
       if (sourceEls.length > 0 && this.sources[this.currentRes]) {
-        sourceEls.forEach((s) => s.remove());
+        sourceEls.forEach(function(s) { s.remove(); });
         this.video.src = this.sources[this.currentRes];
       }
     }
