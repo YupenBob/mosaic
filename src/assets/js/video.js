@@ -128,6 +128,8 @@ class VideoPlayer {
         });
         // Quality switch completion event
         this.hls.on('hlsLevelSwitched', function(event, data) {
+          clearTimeout(self._switchFailTimer);
+          self._switching = false;
           var level = self.hls.levels[data.level];
           if (level) {
             var h = level.height || 0;
@@ -296,6 +298,7 @@ class VideoPlayer {
 
   switchResolution(res) {
     if (res === this.currentRes || this._switching) return;
+    var prevRes = this.currentRes;
     this._switching = true;
     const time = this.video.currentTime;
     this.currentRes = res;
@@ -303,8 +306,18 @@ class VideoPlayer {
     var label = res === 'auto' ? 'Auto' : res;
     this.showSwitchToast('Switching to ' + label + '...');
 
+    // 3-second timeout: if switch doesn't complete, revert
+    clearTimeout(this._switchFailTimer);
+    var self = this;
+    this._switchFailTimer = setTimeout(function() {
+      if (self._switching || self.currentRes !== res) return;
+      self.currentRes = prevRes;
+      self.updateQualityActive();
+      self.showSwitchToast('Switch failed — reverted to ' + (prevRes === 'auto' ? 'Auto' : prevRes));
+      self._switching = false;
+    }, 15000);
+
     if (this.hls) {
-      // Clear old quality buffer by seeking to current position
       this.video.currentTime = time;
       if (res === 'auto') {
         this.hls.loadLevel = -1;
@@ -323,7 +336,6 @@ class VideoPlayer {
           this.hls.autoLevelCapping = idx;
         }
       }
-      this._switching = false;
     } else {
       // MP4: direct src change
       if (!this.sources[res]) { this._switching = false; return; }
