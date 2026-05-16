@@ -75,6 +75,7 @@ async function parsePosts(site) {
           videos.push({
             base,
             poster: `media/videos/${base}-poster.jpg`,
+            hls: `media/videos/master.m3u8`,
             sources: {
               '480p': `media/videos/${base}-480p.mp4`,
               '720p': `media/videos/${base}-720p.mp4`,

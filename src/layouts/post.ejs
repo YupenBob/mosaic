@@ -25,8 +25,13 @@ function videoControlsHTML(multiSrc, showNext, total) {
 
 function videoElementHTML(vid) {
   var multiSrc = !!(vid.sources);
+  var hasHLS = !!(vid.hls);
   var h = '<div class="video-player-overlay"><button class="video-big-play" aria-label="Play"><i class="ri-play-fill"></i></button></div>';
-  if (multiSrc) {
+  if (hasHLS) {
+    h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element" data-hls="true">';
+    h += '<source src="' + vid.hls + '" type="application/x-mpegURL" />';
+    h += '</video>';
+  } else if (multiSrc) {
     h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element">';
     h += '<source data-res="480p" src="' + vid.sources['480p'] + '" type="video/mp4" />';
     h += '<source data-res="720p" src="' + vid.sources['720p'] + '" type="video/mp4" />';
@@ -283,6 +288,7 @@ function renderGallery(photos, threshold) {
 </footer>
 
 <script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= lang || 'zh-CN' %>';</script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 <script type="module" src="<%= rp %>assets/js/app.js"></script>

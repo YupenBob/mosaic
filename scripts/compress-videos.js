@@ -90,6 +90,42 @@ function generatePoster(srcPath, outPath) {
   });
 }
 
+function hlsSegment(mp4Path, outputDir, baseName, resName) {
+  return new Promise((resolve, reject) => {
+    const playlistPath = path.join(outputDir, `${baseName}-${resName}.m3u8`);
+    const segmentPattern = path.join(outputDir, `${baseName}-${resName}-%03d.ts`);
+    const args = [
+      '-i', mp4Path,
+      '-c', 'copy',
+      '-hls_time', '6',
+      '-hls_list_size', '0',
+      '-hls_segment_filename', segmentPattern,
+      playlistPath,
+      '-y',
+    ];
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let errTail = '';
+    proc.stderr.on('data', (d) => { errTail = (errTail + d.toString()).slice(-500); });
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`HLS segment exit ${code}: ${errTail}`));
+    });
+    proc.on('error', reject);
+  });
+}
+
+function generateMasterPlaylist(outputDir, baseName, resolutions) {
+  const playlistPath = path.join(outputDir, `master.m3u8`);
+  let content = '#EXTM3U\n#EXT-X-VERSION:3\n';
+  const bwMap = { '480p': 800000, '720p': 2000000, '1080p': 5000000 };
+  const resMap = { '480p': '854x480', '720p': '1280x720', '1080p': '1920x1080' };
+  resolutions.forEach((res) => {
+    content += `#EXT-X-STREAM-INF:BANDWIDTH=${bwMap[res]},RESOLUTION=${resMap[res]}\n`;
+    content += `${baseName}-${res}.m3u8\n`;
+  });
+  fs.writeFileSync(playlistPath, content);
+}
+
 async function processVideo({ dir, videosDir, file }) {
   const baseName = path.parse(file).name;
   const outputDir = path.join(DIST_DIR, 'posts', dir, 'media', 'videos');
@@ -99,22 +135,40 @@ async function processVideo({ dir, videosDir, file }) {
 
   // Try transcoding, fall back to copy on failure
   let anySuccess = false;
+  const successRes = [];
   for (const res of RESOLUTIONS) {
     const outName = `${baseName}-${res.name}.mp4`;
     const outPath = path.join(outputDir, outName);
     const outMtime = getMtime(outPath);
-    if (outMtime > srcMtime) { anySuccess = true; continue; }
+    if (outMtime > srcMtime) { anySuccess = true; successRes.push(res.name); continue; }
     try {
       log(`Transcoding ${file} → ${res.name}...`);
       await transcode(srcPath, outPath, res.height);
       anySuccess = true;
+      // HLS packaging for each resolution
+      const hlsPlaylistPath = path.join(outputDir, `${baseName}-${res.name}.m3u8`);
+      if (getMtime(hlsPlaylistPath) <= srcMtime) {
+        try {
+          log(`  → HLS segment ${res.name}...`);
+          await hlsSegment(outPath, outputDir, baseName, res.name);
+        } catch (err) { warn(`HLS segment failed for ${res.name}: ${err.message}`); }
+      }
+      successRes.push(res.name);
     } catch (err) {
       warn(`Failed to transcode ${file} at ${res.name}: ${err.message}`);
-      break; // First failure likely means all will fail (OOM)
+      break;
     }
   }
 
-  // Fallback: copy source video if no transcode succeeded, so it's still playable
+  // Generate master HLS playlist
+  if (successRes.length > 1) {
+    const masterPath = path.join(outputDir, 'master.m3u8');
+    if (getMtime(masterPath) <= srcMtime) {
+      generateMasterPlaylist(outputDir, baseName, successRes);
+    }
+  }
+
+  // Fallback
   if (!anySuccess) {
     const destPath = path.join(outputDir, file);
     if (getMtime(destPath) <= srcMtime) {

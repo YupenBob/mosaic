@@ -90,19 +90,43 @@ class VideoPlayer {
 
     // Parse sources (multi-res or single)
     this.sources = {};
+    this.isHLS = this.video.dataset.hls === 'true' || container.querySelector('source[type="application/x-mpegURL"]');
     const sourceEls = container.querySelectorAll('source[data-res]');
     sourceEls.forEach((s) => {
       this.sources[s.dataset.res] = s.src;
     });
-    if (!sourceEls.length && this.video.src) {
+    if (!sourceEls.length && !this.isHLS && this.video.src) {
       this.sources.single = this.video.src;
     }
 
-    this.currentRes = this.detectResolution();
-    // Set initial src — remove source children first to avoid conflicts
-    if (sourceEls.length > 0 && this.sources[this.currentRes]) {
-      sourceEls.forEach((s) => s.remove());
-      this.video.src = this.sources[this.currentRes];
+    // HLS initialization
+    this.hls = null;
+    if (this.isHLS && typeof Hls !== 'undefined' && Hls.isSupported()) {
+      const hlsSrc = container.querySelector('source[type="application/x-mpegURL"]');
+      if (hlsSrc) {
+        this.hls = new Hls();
+        this.hls.loadSource(hlsSrc.src);
+        this.hls.attachMedia(this.video);
+        this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          // Fill sources from HLS levels for quality menu
+          this.sources = {};
+          (this.hls.levels || []).forEach((level) => {
+            const label = level.height + 'p';
+            this.sources[label] = hlsSrc.src;
+          });
+          if (Object.keys(this.sources).length === 0) this.sources.single = hlsSrc.src;
+          this.currentRes = this.detectResolution();
+        });
+      }
+    }
+
+    // Set initial src for non-HLS
+    if (!this.isHLS) {
+      this.currentRes = this.detectResolution();
+      if (sourceEls.length > 0 && this.sources[this.currentRes]) {
+        sourceEls.forEach((s) => s.remove());
+        this.video.src = this.sources[this.currentRes];
+      }
     }
 
     // Restore preferences
@@ -217,23 +241,35 @@ class VideoPlayer {
   }
 
   switchResolution(res) {
-    if (res === this.currentRes || !this.sources[res] || this._switching) return;
+    if (res === this.currentRes || this._switching) return;
     this._switching = true;
-    const wasPlaying = !this.video.paused;
     const time = this.video.currentTime;
     this.currentRes = res;
 
-    // Remove all <source> children first — they can conflict with direct src
-    this.video.querySelectorAll('source').forEach((s) => s.remove());
-    this.video.src = this.sources[res];
-    this.video.load();
-
-    const onReady = () => {
+    if (this.hls) {
+      // HLS: switch quality via hls.currentLevel
+      const height = parseInt(res);
+      const levels = this.hls.levels || [];
+      const idx = levels.findIndex((l) => l.height === height || (height === 1080 && l.height >= 1080) || (height === 720 && l.height >= 720 && l.height < 1080));
+      if (idx >= 0) {
+        this.hls.currentLevel = idx;
+        this.hls.loadLevel = idx;
+      }
       this._switching = false;
-      try { this.video.currentTime = time; } catch {}
-      if (wasPlaying) this.video.play()?.catch(() => {});
-    };
-    this.video.addEventListener('canplay', onReady, { once: true });
+    } else {
+      // MP4: direct src change
+      if (!this.sources[res]) { this._switching = false; return; }
+      this.video.querySelectorAll('source').forEach((s) => s.remove());
+      this.video.src = this.sources[res];
+      this.video.load();
+      const onReady = () => {
+        this._switching = false;
+        try { this.video.currentTime = time; } catch {}
+        const wasPlaying = !this.video.paused;
+        if (wasPlaying) this.video.play()?.catch(() => {});
+      };
+      this.video.addEventListener('canplay', onReady, { once: true });
+    }
     this.updateQualityActive();
     this.updateDownloadLink();
     try { localStorage.setItem('mosaic_video_quality', res); } catch {}
