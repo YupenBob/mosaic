@@ -300,17 +300,17 @@ class VideoPlayer {
     const time = this.video.currentTime;
     this.currentRes = res;
 
-    // Show switching toast
     var label = res === 'auto' ? 'Auto' : res;
     this.showSwitchToast('Switching to ' + label + '...');
 
     if (this.hls) {
+      // Clear old quality buffer by seeking to current position
+      this.video.currentTime = time;
       if (res === 'auto') {
         this.hls.loadLevel = -1;
         this.hls.nextLevel = -1;
         this.hls.autoLevelCapping = -1;
       } else {
-        // HLS: match by height to hls.js level index
         const targetH = parseInt(res);
         const levels = this.hls.levels || [];
         let idx = levels.findIndex(function(l) { return l.height === targetH; });
@@ -390,10 +390,25 @@ class VideoPlayer {
       if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration);
     });
 
-    // Loading spinner
-    v.addEventListener('waiting', () => { c.classList.add('buffering'); });
-    v.addEventListener('canplay', () => { c.classList.remove('buffering'); });
-    v.addEventListener('playing', () => { c.classList.remove('buffering'); });
+    // Loading spinner + auto-pause on stall
+    v.addEventListener('waiting', () => {
+      c.classList.add('buffering');
+      // Auto-pause after 8 seconds of continuous buffering
+      if (!this._stallTimer) {
+        this._stallTimer = setTimeout(() => {
+          v.pause();
+          this.showSwitchToast('Buffering too long — paused');
+        }, 8000);
+      }
+    });
+    v.addEventListener('canplay', () => {
+      c.classList.remove('buffering');
+      if (this._stallTimer) { clearTimeout(this._stallTimer); this._stallTimer = null; }
+    });
+    v.addEventListener('playing', () => {
+      c.classList.remove('buffering');
+      if (this._stallTimer) { clearTimeout(this._stallTimer); this._stallTimer = null; }
+    });
 
     // Progress & buffer
     v.addEventListener('timeupdate', () => this.updateProgress());
