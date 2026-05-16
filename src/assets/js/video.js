@@ -103,23 +103,39 @@ class VideoPlayer {
       this.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
       this.currentRes = 'auto'; // Default to ABR
       try {
-        this.hls = new window.Hls();
+        this.hls = new window.Hls({
+          maxBufferLength: 30,       // Only buffer 30s ahead
+          maxMaxBufferLength: 60,    // Max 60s for fast connections
+          startLevel: -1,            // Start from lowest quality
+          capLevelToPlayerSize: true,  // Don't load 4K on small screens
+        });
         this.hls.loadSource(hlsSource.src);
         this.hls.attachMedia(this.video);
         var self = this;
         this.hls.on('hlsManifestParsed', function() {
-          // Update sources with real level data
           self.sources = {};
           var levels = self.hls.levels || [];
           levels.forEach(function(level) {
             var h = level.height || 0;
-            if (h === 0) h = level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
-            self.sources[h + 'p'] = hlsSource.src;
+            if (h === 0) h = level.bitrate > 12000000 ? 2160 : level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
+            var label = h >= 2160 ? '4K' : h + 'p';
+            self.sources[label] = hlsSource.src;
           });
           if (Object.keys(self.sources).length === 0) {
             self.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
           }
           if (self.qualityMenu) { self.qualityMenu.innerHTML = ''; self.buildQualityMenu(); }
+        });
+        // Quality switch completion event
+        this.hls.on('hlsLevelSwitched', function(event, data) {
+          var level = self.hls.levels[data.level];
+          if (level) {
+            var h = level.height || 0;
+            var label = h >= 2160 ? '4K' : h + 'p';
+            self.currentRes = self.isAuto() ? 'auto' : label;
+            self.updateQualityActive();
+            self.showSwitchToast('Switched to ' + label);
+          }
         });
         this.hls.on('hlsError', function(event, data) {
           if (data.fatal) { console.error('HLS fatal:', data.type, data.details); }
@@ -263,11 +279,30 @@ class VideoPlayer {
     this.downloadBtn.href = url;
   }
 
+  isAuto() { return this.currentRes === 'auto'; }
+
+  showSwitchToast(msg) {
+    var el = this.container.querySelector('.vc-switch-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'vc-switch-toast';
+      this.container.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+  }
+
   switchResolution(res) {
     if (res === this.currentRes || this._switching) return;
     this._switching = true;
     const time = this.video.currentTime;
     this.currentRes = res;
+
+    // Show switching toast
+    var label = res === 'auto' ? 'Auto' : res;
+    this.showSwitchToast('Switching to ' + label + '...');
 
     if (this.hls) {
       if (res === 'auto') {
