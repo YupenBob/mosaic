@@ -107,16 +107,26 @@ class VideoPlayer {
         this.hls = new Hls();
         this.hls.loadSource(hlsSrc.src);
         this.hls.attachMedia(this.video);
-        this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        this.hls.on('hlsManifestParsed', () => {
           // Fill sources from HLS levels for quality menu
           this.sources = {};
-          (this.hls.levels || []).forEach((level) => {
-            const label = level.height + 'p';
-            this.sources[label] = hlsSrc.src;
-          });
+          var levels = this.hls.levels || [];
+          if (levels.length > 0) {
+            levels.forEach(function(level) {
+              var h = level.height || 0;
+              if (h === 0) h = level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
+              var label = h + 'p';
+              this.sources[label] = hlsSrc.src;
+            }.bind(this));
+          }
           if (Object.keys(this.sources).length === 0) this.sources.single = hlsSrc.src;
           this.currentRes = this.detectResolution();
-        });
+          // Rebuild quality menu now that sources are populated
+          if (this.qualityMenu) {
+            this.qualityMenu.innerHTML = '';
+            this.buildQualityMenu();
+          }
+        }.bind(this));
       }
     }
 
@@ -248,12 +258,11 @@ class VideoPlayer {
 
     if (this.hls) {
       // HLS: switch quality via hls.currentLevel
-      const height = parseInt(res);
       const levels = this.hls.levels || [];
-      const idx = levels.findIndex((l) => l.height === height || (height === 1080 && l.height >= 1080) || (height === 720 && l.height >= 720 && l.height < 1080));
-      if (idx >= 0) {
+      const labels = Object.keys(this.sources).filter(k => k !== 'single');
+      const idx = labels.indexOf(res);
+      if (idx >= 0 && idx < levels.length) {
         this.hls.currentLevel = idx;
-        this.hls.loadLevel = idx;
       }
       this._switching = false;
     } else {
