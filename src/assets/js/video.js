@@ -152,7 +152,12 @@ class VideoPlayer {
     this.timeCur = container.querySelector('.vc-time-current');
     this.timeDur = container.querySelector('.vc-time-duration');
     this.progressFill = container.querySelector('.vc-progress-fill');
+    this.progressBuffer = container.querySelector('.vc-progress-buffer');
     this.progressTrack = container.querySelector('.vc-progress-track');
+    this.progressThumb = container.querySelector('.vc-progress-thumb');
+    this.progressTooltip = container.querySelector('.vc-progress-hover');
+    this.volumeBtn = container.querySelector('.vc-volume-btn');
+    this.volumeRange = container.querySelector('.vc-volume-range');
     this.speedBtn = container.querySelector('.vc-speed-btn');
     this.speedMenu = container.querySelector('.vc-speed-menu');
     this.qualityBtn = container.querySelector('.vc-quality-btn');
@@ -327,20 +332,65 @@ class VideoPlayer {
     });
     v.addEventListener('volumechange', () => {
       try { localStorage.setItem('mosaic_video_volume', v.volume); } catch {}
+      if (this.volumeBtn) this.volumeBtn.innerHTML = v.muted || v.volume === 0 ? '<i class="ri-volume-mute-line"></i>' : v.volume < 0.5 ? '<i class="ri-volume-down-line"></i>' : '<i class="ri-volume-up-line"></i>';
+      if (this.volumeRange) this.volumeRange.value = v.muted ? 0 : Math.round(v.volume * 100);
     });
     v.addEventListener('loadedmetadata', () => {
       if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration);
     });
 
-    // Progress
-    v.addEventListener('timeupdate', () => this.updateProgress());
+    // Loading spinner
+    v.addEventListener('waiting', () => { c.classList.add('buffering'); });
+    v.addEventListener('canplay', () => { c.classList.remove('buffering'); });
+    v.addEventListener('playing', () => { c.classList.remove('buffering'); });
 
+    // Progress & buffer
+    v.addEventListener('timeupdate', () => this.updateProgress());
     if (this.progressTrack) {
+      // Click to seek
       this.progressTrack.addEventListener('click', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
-        const pct = (e.clientX - rect.left) / rect.width;
-        v.currentTime = pct * v.duration;
+        v.currentTime = ((e.clientX - rect.left) / rect.width) * v.duration;
       });
+      // Hover time preview
+      this.progressTrack.addEventListener('mousemove', (e) => {
+        const rect = this.progressTrack.getBoundingClientRect();
+        const pct = (e.clientX - rect.left) / rect.width;
+        const t = v.duration * pct;
+        if (this.progressTooltip) {
+          this.progressTooltip.textContent = this.fmt(t);
+          this.progressTooltip.style.left = (pct * 100) + '%';
+          this.progressTooltip.style.opacity = '1';
+        }
+      });
+      this.progressTrack.addEventListener('mouseleave', () => {
+        if (this.progressTooltip) this.progressTooltip.style.opacity = '0';
+      });
+      // Drag to seek
+      var drag = false;
+      var self = this;
+      this.progressTrack.addEventListener('mousedown', function(e) {
+        drag = true;
+        var rect = self.progressTrack.getBoundingClientRect();
+        self.video.currentTime = ((e.clientX - rect.left) / rect.width) * self.video.duration;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', onEnd);
+      });
+      function onDrag(e) {
+        if (!drag) return;
+        var rect = self.progressTrack.getBoundingClientRect();
+        var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        self.video.currentTime = pct * self.video.duration;
+      }
+      function onEnd() { drag = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd); }
+    }
+
+    // Volume
+    if (this.volumeBtn) {
+      this.volumeBtn.addEventListener('click', (e) => { e.stopPropagation(); v.muted = !v.muted; });
+    }
+    if (this.volumeRange) {
+      this.volumeRange.addEventListener('input', (e) => { e.stopPropagation(); v.volume = e.target.value / 100; v.muted = false; });
     }
 
     // Speed button toggle
@@ -430,6 +480,11 @@ class VideoPlayer {
     const pct = (v.currentTime / v.duration) * 100;
     if (this.progressFill) this.progressFill.style.width = pct + '%';
     if (this.timeCur) this.timeCur.textContent = this.fmt(v.currentTime);
+    // Buffered progress
+    if (this.progressBuffer && v.buffered.length > 0) {
+      const bufEnd = v.buffered.end(v.buffered.length - 1);
+      this.progressBuffer.style.width = (bufEnd / v.duration) * 100 + '%';
+    }
   }
 
   showControls() {

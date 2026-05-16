@@ -7,8 +7,9 @@ const ly = post.layout || 'default';
 function videoControlsHTML(multiSrc, showNext, total) {
   var h = '<div class="video-controls">';
   h += '<button class="vc-play" aria-label="Play/Pause"><i class="ri-play-fill"></i></button>';
+  h += '<div class="vc-volume"><button class="vc-volume-btn" aria-label="Volume"><i class="ri-volume-up-line"></i></button><div class="vc-volume-slider"><input type="range" class="vc-volume-range" min="0" max="100" value="100" /></div></div>';
   h += '<span class="vc-time-current">0:00</span>';
-  h += '<div class="vc-progress"><div class="vc-progress-track"><div class="vc-progress-fill"></div><div class="vc-progress-thumb"></div></div></div>';
+  h += '<div class="vc-progress"><div class="vc-progress-hover" id="vc-time-tooltip">0:00</div><div class="vc-progress-track"><div class="vc-progress-buffer"></div><div class="vc-progress-fill"></div><div class="vc-progress-thumb"></div></div></div>';
   h += '<span class="vc-time-duration">0:00</span>';
   h += '<div class="vc-speed"><button class="vc-speed-btn">1x <i class="ri-arrow-down-s-line"></i></button><div class="vc-speed-menu"></div></div>';
   if (multiSrc) {
