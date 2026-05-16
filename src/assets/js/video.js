@@ -104,10 +104,9 @@ class VideoPlayer {
       this.currentRes = 'auto'; // Default to ABR
       try {
         this.hls = new window.Hls({
-          maxBufferLength: 30,       // Only buffer 30s ahead
-          maxMaxBufferLength: 60,    // Max 60s for fast connections
-          startLevel: -1,            // Start from lowest quality
-          capLevelToPlayerSize: true,  // Don't load 4K on small screens
+          maxBufferLength: 60,
+          maxMaxBufferLength: 120,
+          startLevel: -1,
         });
         this.hls.loadSource(hlsSource.src);
         this.hls.attachMedia(this.video);
@@ -416,8 +415,20 @@ class VideoPlayer {
     v.addEventListener('canplay', () => { c.classList.remove('buffering'); });
     v.addEventListener('playing', () => { c.classList.remove('buffering'); });
 
-    // Progress & buffer
+    // Progress & buffer + frame freeze detection
     v.addEventListener('timeupdate', () => this.updateProgress());
+    // Detect frozen frames: if 3 timeupdate events pass without a new frame, show the spinner
+    var _lastReadyState = 0;
+    var _stuckCount = 0;
+    v.addEventListener('timeupdate', () => {
+      if (v.readyState < 3 && !v.paused) {
+        _stuckCount++;
+        if (_stuckCount >= 5) c.classList.add('buffering');
+      } else {
+        _stuckCount = 0;
+        c.classList.remove('buffering');
+      }
+    });
     if (this.progressTrack) {
       // Click to seek
       this.progressTrack.addEventListener('click', (e) => {
