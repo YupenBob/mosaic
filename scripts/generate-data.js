@@ -72,15 +72,18 @@ async function parsePosts(site) {
         if (!vidExts.includes(ext)) continue;
         const base = path.parse(f).name;
         if (compressVideos) {
+          const resNames = ['1080p', '720p', '480p'];
+          const sources = {};
+          const hasHLS = await fs.pathExists(path.join(DIST_DIR, 'posts', slug, 'media', 'videos', 'master.m3u8'));
+          resNames.forEach((res) => {
+            const mp4Path = path.join(DIST_DIR, 'posts', slug, 'media', 'videos', `${base}-${res}.mp4`);
+            if (fs.existsSync(mp4Path)) sources[res] = `media/videos/${base}-${res}.mp4`;
+          });
           videos.push({
             base,
             poster: `media/videos/${base}-poster.jpg`,
-            hls: `media/videos/master.m3u8`,
-            sources: {
-              '480p': `media/videos/${base}-480p.mp4`,
-              '720p': `media/videos/${base}-720p.mp4`,
-              '1080p': `media/videos/${base}-1080p.mp4`,
-            },
+            ...(hasHLS ? { hls: 'media/videos/master.m3u8' } : {}),
+            ...(Object.keys(sources).length > 0 ? { sources } : {}),
           });
         } else {
           videos.push({

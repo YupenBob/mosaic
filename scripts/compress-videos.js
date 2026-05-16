@@ -3,11 +3,18 @@ import path from 'path';
 import { execSync, spawn } from 'child_process';
 import { CONTENT_DIR, DIST_DIR, ensureDir, getMtime, log, warn } from './utils.js';
 
-const RESOLUTIONS = [
-  { name: '480p', scale: -2, height: 480 },
-  { name: '720p', scale: -2, height: 720 },
-  { name: '1080p', scale: -2, height: 1080 },
+const ALL_RESOLUTIONS = [
+  { name: '480p', height: 480 },
+  { name: '720p', height: 720 },
+  { name: '1080p', height: 1080 },
 ];
+
+function getSourceHeight(srcPath) {
+  try {
+    const out = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "${srcPath}"`, { encoding: 'utf-8' });
+    return parseInt(out.trim()) || 0;
+  } catch { return 0; }
+}
 
 const VIDEO_EXTS = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
 
@@ -132,6 +139,16 @@ async function processVideo({ dir, videosDir, file }) {
   await ensureDir(outputDir);
   const srcPath = path.join(videosDir, file);
   const srcMtime = getMtime(srcPath);
+
+  // Only transcode at or below source resolution
+  const srcHeight = getSourceHeight(srcPath);
+  const RESOLUTIONS = ALL_RESOLUTIONS.filter(r => !srcHeight || r.height <= srcHeight);
+  if (RESOLUTIONS.length === 0) {
+    warn(`Source video ${file} resolution (${srcHeight}p) below minimum, skipping transcode`);
+    const destPath = path.join(outputDir, file);
+    if (getMtime(destPath) <= srcMtime) await fs.copy(srcPath, destPath);
+    return;
+  }
 
   // Try transcoding, fall back to copy on failure
   let anySuccess = false;
