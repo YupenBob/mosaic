@@ -145,14 +145,6 @@ async function processVideo({ dir, videosDir, file }) {
       log(`Transcoding ${file} → ${res.name}...`);
       await transcode(srcPath, outPath, res.height);
       anySuccess = true;
-      // HLS packaging for each resolution
-      const hlsPlaylistPath = path.join(outputDir, `${baseName}-${res.name}.m3u8`);
-      if (getMtime(hlsPlaylistPath) <= srcMtime) {
-        try {
-          log(`  → HLS segment ${res.name}...`);
-          await hlsSegment(outPath, outputDir, baseName, res.name);
-        } catch (err) { warn(`HLS segment failed for ${res.name}: ${err.message}`); }
-      }
       successRes.push(res.name);
     } catch (err) {
       warn(`Failed to transcode ${file} at ${res.name}: ${err.message}`);
@@ -160,11 +152,28 @@ async function processVideo({ dir, videosDir, file }) {
     }
   }
 
-  // Generate master HLS playlist
-  if (successRes.length > 1) {
+  // HLS packaging — always run for each existing MP4 (separate from transcode)
+  for (const res of RESOLUTIONS) {
+    const outPath = path.join(outputDir, `${baseName}-${res.name}.mp4`);
+    if (!fs.existsSync(outPath)) continue;
+    const hlsPlaylistPath = path.join(outputDir, `${baseName}-${res.name}.m3u8`);
+    if (getMtime(hlsPlaylistPath) <= getMtime(outPath)) {
+      try {
+        log(`HLS segment ${file} → ${res.name}...`);
+        await hlsSegment(outPath, outputDir, baseName, res.name);
+        successRes.push(res.name);
+      } catch (err) { warn(`HLS segment failed for ${res.name}: ${err.message}`); }
+    } else {
+      successRes.push(res.name);
+    }
+  }
+
+  // Generate master HLS playlist (dedupe successRes)
+  const uniqueRes = [...new Set(successRes)];
+  if (uniqueRes.length > 1) {
     const masterPath = path.join(outputDir, 'master.m3u8');
     if (getMtime(masterPath) <= srcMtime) {
-      generateMasterPlaylist(outputDir, baseName, successRes);
+      generateMasterPlaylist(outputDir, baseName, uniqueRes);
     }
   }
 
