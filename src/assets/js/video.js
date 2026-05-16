@@ -269,7 +269,7 @@ class VideoPlayer {
         idx = levels.findIndex(function(l) { return l.height >= targetH; });
       }
       if (idx >= 0) {
-        this.hls.currentLevel = idx;
+        this.hls.nextLevel = idx;
         this.hls.loadLevel = idx;
       }
       this._switching = false;
