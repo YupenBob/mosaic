@@ -155,12 +155,20 @@ class VideoPlayer {
       }
     }
 
-    // Restore preferences
+    // Restore preferences + position
     try {
       const storedSpeed = parseFloat(localStorage.getItem('mosaic_video_speed'));
       if (storedSpeed && SPEEDS.includes(storedSpeed)) this.video.playbackRate = storedSpeed;
       const storedVol = parseFloat(localStorage.getItem('mosaic_video_volume'));
       if (!isNaN(storedVol)) this.video.volume = Math.max(0, Math.min(1, storedVol));
+    } catch {}
+    // Restore playback position
+    try {
+      const posKey = 'mosaic_video_pos_' + (this.video.src || container.querySelector('source')?.src || '').slice(-40);
+      const savedPos = parseFloat(localStorage.getItem(posKey));
+      if (savedPos > 1 && savedPos < (this.video.duration || Infinity)) {
+        this.video.currentTime = savedPos;
+      }
     } catch {}
 
     // Cache elements
@@ -182,6 +190,7 @@ class VideoPlayer {
     this.qualityMenu = container.querySelector('.vc-quality-menu');
     this.downloadBtn = container.querySelector('.vc-download');
     this.nextBtn = container.querySelector('.vc-next');
+    this.pipBtn = container.querySelector('.vc-pip');
     this.fsBtn = container.querySelector('.vc-fullscreen');
 
     // Build speed menu
@@ -402,25 +411,10 @@ class VideoPlayer {
       if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration);
     });
 
-    // Loading spinner + auto-pause on stall
-    v.addEventListener('waiting', () => {
-      c.classList.add('buffering');
-      // Auto-pause after 8 seconds of continuous buffering
-      if (!this._stallTimer) {
-        this._stallTimer = setTimeout(() => {
-          v.pause();
-          this.showSwitchToast('Buffering too long — paused');
-        }, 8000);
-      }
-    });
-    v.addEventListener('canplay', () => {
-      c.classList.remove('buffering');
-      if (this._stallTimer) { clearTimeout(this._stallTimer); this._stallTimer = null; }
-    });
-    v.addEventListener('playing', () => {
-      c.classList.remove('buffering');
-      if (this._stallTimer) { clearTimeout(this._stallTimer); this._stallTimer = null; }
-    });
+    // Loading spinner (no auto-pause — allow stuttering)
+    v.addEventListener('waiting', () => { c.classList.add('buffering'); });
+    v.addEventListener('canplay', () => { c.classList.remove('buffering'); });
+    v.addEventListener('playing', () => { c.classList.remove('buffering'); });
 
     // Progress & buffer
     v.addEventListener('timeupdate', () => this.updateProgress());
@@ -498,6 +492,41 @@ class VideoPlayer {
         }
       });
     }
+
+    // Picture-in-Picture
+    if (this.pipBtn && 'pictureInPictureEnabled' in document) {
+      this.pipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (document.pictureInPictureElement) {
+          document.exitPictureInPicture();
+        } else {
+          v.requestPictureInPicture()?.catch(() => {});
+        }
+      });
+    }
+
+    // Save position periodically
+    v.addEventListener('timeupdate', () => {
+      try {
+        const posKey = 'mosaic_video_pos_' + (v.src || '').slice(-40);
+        if (v.currentTime > 1) localStorage.setItem(posKey, v.currentTime);
+      } catch {}
+    });
+
+    // Mobile double-tap to seek
+    var tapTimer = null;
+    c.addEventListener('touchend', function(e) {
+      if (e.target.closest('.video-controls')) return;
+      if (tapTimer) {
+        clearTimeout(tapTimer); tapTimer = null;
+        var rect = c.getBoundingClientRect();
+        var x = (e.changedTouches[0].clientX - rect.left) / rect.width;
+        v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + (x < 0.5 ? -10 : 10)));
+        self.showSwitchToast(x < 0.5 ? '-10s' : '+10s');
+      } else {
+        tapTimer = setTimeout(function() { tapTimer = null; }, 300);
+      }
+    });
 
     // Next video
     if (this.nextBtn && this.total > 1) {
