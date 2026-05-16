@@ -101,7 +101,7 @@ class VideoPlayer {
     if (this.isHLS && hlsSource && typeof window.Hls !== 'undefined') {
       // Pre-set sources so quality menu shows immediately
       this.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
-      this.currentRes = this.detectResolution();
+      this.currentRes = 'auto'; // Default to ABR
       try {
         this.hls = new window.Hls();
         this.hls.loadSource(hlsSource.src);
@@ -214,6 +214,15 @@ class VideoPlayer {
   }
 
   buildQualityMenu() {
+    if (!this.qualityMenu) return;
+    this.qualityMenu.innerHTML = '';
+    // Auto option for HLS
+    if (this.hls) {
+      const abtn = document.createElement('button');
+      abtn.textContent = 'Auto'; abtn.dataset.res = 'auto';
+      abtn.addEventListener('click', (e) => { e.stopPropagation(); this.switchResolution('auto'); this.qualityMenu.classList.remove('open'); });
+      this.qualityMenu.appendChild(abtn);
+    }
     Object.keys(this.sources).forEach((res) => {
       if (res === 'single') return;
       const btn = document.createElement('button');
@@ -243,7 +252,8 @@ class VideoPlayer {
       b.classList.toggle('active', b.dataset.res === this.currentRes);
     });
     if (this.qualityBtn) {
-      this.qualityBtn.innerHTML = this.currentRes + ' <i class="ri-arrow-down-s-line"></i>';
+      var label = this.currentRes === 'auto' ? 'Auto' : this.currentRes;
+      this.qualityBtn.innerHTML = label + ' <i class="ri-arrow-down-s-line"></i>';
     }
   }
 
@@ -260,17 +270,23 @@ class VideoPlayer {
     this.currentRes = res;
 
     if (this.hls) {
-      // HLS: match by height to hls.js level index
-      const targetH = parseInt(res);
-      const levels = this.hls.levels || [];
-      let idx = levels.findIndex(function(l) { return l.height === targetH; });
-      if (idx < 0 && levels.length > 0) {
-        idx = levels.findIndex(function(l) { return l.height >= targetH; });
-      }
-      if (idx >= 0) {
-        this.hls.loadLevel = idx;
-        this.hls.nextLevel = idx;
-        this.hls.autoLevelCapping = idx;
+      if (res === 'auto') {
+        this.hls.loadLevel = -1;
+        this.hls.nextLevel = -1;
+        this.hls.autoLevelCapping = -1;
+      } else {
+        // HLS: match by height to hls.js level index
+        const targetH = parseInt(res);
+        const levels = this.hls.levels || [];
+        let idx = levels.findIndex(function(l) { return l.height === targetH; });
+        if (idx < 0 && levels.length > 0) {
+          idx = levels.findIndex(function(l) { return l.height >= targetH; });
+        }
+        if (idx >= 0) {
+          this.hls.loadLevel = idx;
+          this.hls.nextLevel = idx;
+          this.hls.autoLevelCapping = idx;
+        }
       }
       this._switching = false;
     } else {
