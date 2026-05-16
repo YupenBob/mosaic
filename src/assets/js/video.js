@@ -255,12 +255,17 @@ class VideoPlayer {
     this.currentRes = res;
 
     if (this.hls) {
-      // HLS: switch quality via hls.currentLevel
+      // HLS: match by height to hls.js level index
+      const targetH = parseInt(res);
       const levels = this.hls.levels || [];
-      const labels = Object.keys(this.sources).filter(k => k !== 'single');
-      const idx = labels.indexOf(res);
-      if (idx >= 0 && idx < levels.length) {
+      let idx = levels.findIndex(function(l) { return l.height === targetH; });
+      // Fallback: match by approximate height
+      if (idx < 0) {
+        idx = levels.findIndex(function(l) { return l.height >= targetH; });
+      }
+      if (idx >= 0) {
         this.hls.currentLevel = idx;
+        this.hls.loadLevel = idx;
       }
       this._switching = false;
     } else {
