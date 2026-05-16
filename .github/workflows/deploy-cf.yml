@@ -34,6 +34,11 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Strip large MP4 files (keep HLS ts/m3u8)
+        run: |
+          find dist -name "*.mp4" -size +25M -delete
+          echo "Removed large MP4s, kept HLS segments"
+
       - name: Ensure CF Pages project exists
         run: |
           PROJECT=$(curl -s -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
