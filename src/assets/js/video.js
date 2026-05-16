@@ -99,12 +99,16 @@ class VideoPlayer {
     this.hls = null;
 
     if (this.isHLS && hlsSource && typeof window.Hls !== 'undefined') {
+      // Pre-set sources so quality menu shows immediately
+      this.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
+      this.currentRes = this.detectResolution();
       try {
         this.hls = new window.Hls();
         this.hls.loadSource(hlsSource.src);
         this.hls.attachMedia(this.video);
         var self = this;
         this.hls.on('hlsManifestParsed', function() {
+          // Update sources with real level data
           self.sources = {};
           var levels = self.hls.levels || [];
           levels.forEach(function(level) {
@@ -112,8 +116,9 @@ class VideoPlayer {
             if (h === 0) h = level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
             self.sources[h + 'p'] = hlsSource.src;
           });
-          if (Object.keys(self.sources).length === 0) self.sources['720p'] = hlsSource.src;
-          self.currentRes = self.detectResolution();
+          if (Object.keys(self.sources).length === 0) {
+            self.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
+          }
           if (self.qualityMenu) { self.qualityMenu.innerHTML = ''; self.buildQualityMenu(); }
         });
         this.hls.on('hlsError', function(event, data) {
