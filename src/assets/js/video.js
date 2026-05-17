@@ -115,6 +115,7 @@ class VideoPlayer {
           maxBufferLength: 60,
           maxMaxBufferLength: 120,
           startLevel: -1,
+          enableWorker: true,
         });
         vlog('info', 'HLS init: loading ' + hlsSource.src);
         this.hls.loadSource(hlsSource.src);
@@ -213,6 +214,12 @@ class VideoPlayer {
     if (this.qualityMenu) this.buildQualityMenu();
     // Set download link
     this.updateDownloadLink();
+
+    // Pause RAF when tab hidden
+    var self = this;
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden && self._rafId) { cancelAnimationFrame(self._rafId); self._rafId = null; }
+    });
 
     // Events
     this.bindEvents();
@@ -501,23 +508,26 @@ class VideoPlayer {
   updateProgress() {
     const v = this.video;
     if (!v.duration) return;
-    const pct = (v.currentTime / v.duration) * 100;
-    if (this.progressFill) this.progressFill.style.width = pct + '%';
-    if (this.progressThumb) this.progressThumb.style.left = pct + '%';
+    // Only update time text + buffer here — RAF handles the smooth fill/thumb
     if (this.timeCur) this.timeCur.textContent = this.fmt(v.currentTime);
     if (this.progressBuffer && v.buffered.length > 0) {
       const bufEnd = v.buffered.end(v.buffered.length - 1);
       this.progressBuffer.style.width = (bufEnd / v.duration) * 100 + '%';
     }
-    // RAF-based smooth interpolation (skips during drag seek)
+    // RAF smooth interpolation (skips during drag)
     if (!v.paused && v.duration && !this._dragSeek) {
       if (!this._rafId) {
-        const lastTime = v.currentTime;
-        const lastWall = performance.now();
         const self = this;
+        let _lastTime = v.currentTime;
+        let _lastWall = performance.now();
         const step = () => {
           if (self.video.paused || self._dragSeek) { self._rafId = null; return; }
-          const estimated = Math.min(v.duration, lastTime + (performance.now() - lastWall) / 1000);
+          // Sync anchor point every ~250ms from actual currentTime to avoid drift
+          if (performance.now() - _lastWall > 250) {
+            _lastTime = self.video.currentTime;
+            _lastWall = performance.now();
+          }
+          const estimated = Math.min(v.duration, _lastTime + (performance.now() - _lastWall) / 1000);
           const rpct = (estimated / v.duration) * 100;
           if (self.progressFill) self.progressFill.style.width = rpct + '%';
           if (self.progressThumb) self.progressThumb.style.left = rpct + '%';
@@ -527,6 +537,12 @@ class VideoPlayer {
       }
     } else {
       if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+      // Show exact position when paused
+      if (v.paused && v.duration) {
+        const pct = (v.currentTime / v.duration) * 100;
+        if (this.progressFill) this.progressFill.style.width = pct + '%';
+        if (this.progressThumb) this.progressThumb.style.left = pct + '%';
+      }
     }
   }
 
