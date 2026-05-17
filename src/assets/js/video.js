@@ -138,18 +138,18 @@ class VideoPlayer {
         // Quality switch completion event
         this.hls.on('hlsLevelSwitched', function(event, data) {
           clearTimeout(self._switchFailTimer);
+          var wasSwitching = self._switching;
           self._switching = false;
           var level = self.hls.levels[data.level];
           if (level) {
             var h = level.height || 0;
             var label = h >= 2160 ? '4K' : h + 'p';
-            vlog('info', 'Level switched to ' + label + ' (h='+h+' bw='+(level.bitrate||0)+')');
-            // Only update currentRes for Auto ABR; manual switches are set by switchResolution
-            if (self.isAuto()) {
-              self.currentRes = 'auto';
-              self.updateQualityActive();
+            // Only log/show toast for manual switches (not ABR auto)
+            if (wasSwitching || self.isAuto()) {
+              vlog('info', 'Level switched to ' + label + ' (h='+h+' bw='+(level.bitrate||0)+')');
+              if (self.isAuto()) { self.currentRes = 'auto'; self.updateQualityActive(); }
+              self.showSwitchToast('Switched to ' + label);
             }
-            self.showSwitchToast('Switched to ' + label);
           }
         });
         this.hls.on('hlsError', function(event, data) {
@@ -385,222 +385,109 @@ class VideoPlayer {
   bindEvents() {
     const v = this.video;
     const c = this.container;
+    const self = this;
 
-    // Play/pause via big button
-    if (this.bigPlay) {
-      this.bigPlay.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.togglePlay();
-      });
-    }
+    // === Core playback events (merged) ===
+    if (this.bigPlay) { this.bigPlay.addEventListener('click', (e) => { e.stopPropagation(); this.togglePlay(); }); }
+    c.addEventListener('click', (e) => { if (!e.target.closest('.video-controls, .video-big-play')) this.togglePlay(); });
+    if (this.playBtn) { this.playBtn.addEventListener('click', (e) => { e.stopPropagation(); this.togglePlay(); }); }
 
-    // Click video area to toggle play (on container, not video element,
-    // to ensure clicks are captured even through the overlay)
-    c.addEventListener('click', (e) => {
-      if (e.target.closest('.video-controls') || e.target.closest('.video-big-play')) return;
-      this.togglePlay();
+    v.addEventListener('play', () => { c.classList.add('playing'); c.classList.remove('paused'); if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-pause-fill"></i>'; });
+    v.addEventListener('pause', () => { c.classList.add('paused'); c.classList.remove('playing'); if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-play-fill"></i>'; });
+    v.addEventListener('loadedmetadata', () => { if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration); });
+
+    // Merged timeupdate: progress + freeze detect + position save
+    var _stuckCount = 0;
+    v.addEventListener('timeupdate', () => {
+      this.updateProgress();
+      // Freeze detection
+      if (v.readyState < 3 && !v.paused) { _stuckCount++; if (_stuckCount >= 5) c.classList.add('buffering'); }
+      else { _stuckCount = 0; c.classList.remove('buffering'); }
+      // Save position
+      try { if (v.currentTime > 1) localStorage.setItem('mosaic_video_pos_' + (v.src||'').slice(-40), v.currentTime); } catch {}
     });
 
-    // Play/pause button
-    if (this.playBtn) {
-      this.playBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.togglePlay();
-      });
-    }
+    // Merged waiting: spinner + adaptive downgrade
+    var _waitingTimer = null;
+    v.addEventListener('waiting', () => {
+      c.classList.add('buffering'); vlog('warn', 'Buffering...');
+      // Adaptive downgrade for MP4 (not HLS — hls.js handles ABR)
+      if (!this.isHLS && !this._switching) {
+        _waitingTimer = setTimeout(() => {
+          const idx = RES_ORDER.indexOf(this.currentRes);
+          if (idx < RES_ORDER.length - 1 && !self._switching) {
+            const lower = RES_ORDER[idx + 1];
+            if (self.sources[lower]) self.switchResolution(lower);
+          }
+        }, 3000);
+      }
+    });
+    v.addEventListener('canplay', () => { c.classList.remove('buffering'); });
+    v.addEventListener('playing', () => { c.classList.remove('buffering'); _waitingTimer && clearTimeout(_waitingTimer); });
+    v.addEventListener('ended', () => { c.dispatchEvent(new CustomEvent('video-ended', { bubbles: true })); });
 
-    // Update playback UI
-    v.addEventListener('play', () => {
-      c.classList.add('playing');
-      c.classList.remove('paused');
-      if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-pause-fill"></i>';
-    });
-    v.addEventListener('pause', () => {
-      c.classList.add('paused');
-      c.classList.remove('playing');
-      if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-play-fill"></i>';
-    });
+    // Volume
     v.addEventListener('volumechange', () => {
       try { localStorage.setItem('mosaic_video_volume', v.volume); } catch {}
       if (this.volumeBtn) this.volumeBtn.innerHTML = v.muted || v.volume === 0 ? '<i class="ri-volume-mute-line"></i>' : v.volume < 0.5 ? '<i class="ri-volume-down-line"></i>' : '<i class="ri-volume-up-line"></i>';
-      if (this.volumeRange) this.volumeRange.value = v.muted ? 0 : Math.round(v.volume * 100);
+      if (this.volumeRange) this.volumeRange.value = Math.round(v.volume * 100);
     });
-    v.addEventListener('loadedmetadata', () => {
-      if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration);
-    });
+    if (this.volumeBtn) { this.volumeBtn.addEventListener('click', (e) => { e.stopPropagation(); v.muted = !v.muted; }); }
+    if (this.volumeRange) { this.volumeRange.addEventListener('input', (e) => { e.stopPropagation(); v.volume = e.target.value / 100; v.muted = false; }); }
 
-    // Loading spinner (no auto-pause — allow stuttering)
-    v.addEventListener('waiting', () => { c.classList.add('buffering'); vlog('warn', 'Buffering...'); });
-    v.addEventListener('canplay', () => { c.classList.remove('buffering'); vlog('debug', 'Canplay'); });
-    v.addEventListener('playing', () => { c.classList.remove('buffering'); vlog('debug', 'Playing'); });
-
-    // Progress & buffer + frame freeze detection
-    v.addEventListener('timeupdate', () => this.updateProgress());
-    // Detect frozen frames: if 3 timeupdate events pass without a new frame, show the spinner
-    var _lastReadyState = 0;
-    var _stuckCount = 0;
-    v.addEventListener('timeupdate', () => {
-      if (v.readyState < 3 && !v.paused) {
-        _stuckCount++;
-        if (_stuckCount >= 5) c.classList.add('buffering');
-      } else {
-        _stuckCount = 0;
-        c.classList.remove('buffering');
-      }
-    });
+    // === Progress bar (click, hover, drag) ===
     if (this.progressTrack) {
-      // Click to seek
       this.progressTrack.addEventListener('click', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
         v.currentTime = ((e.clientX - rect.left) / rect.width) * v.duration;
       });
-      // Hover time preview
       this.progressTrack.addEventListener('mousemove', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
-        const t = v.duration * pct;
-        if (this.progressTooltip) {
-          this.progressTooltip.textContent = this.fmt(t);
-          this.progressTooltip.style.left = (pct * 100) + '%';
-          this.progressTooltip.style.opacity = '1';
-        }
+        if (this.progressTooltip) { this.progressTooltip.textContent = this.fmt(v.duration * pct); this.progressTooltip.style.left = (pct * 100) + '%'; this.progressTooltip.style.opacity = '1'; }
       });
       this.progressTrack.addEventListener('mouseleave', () => {
         if (this.progressTooltip) this.progressTooltip.style.opacity = '0';
       });
-      // Drag to seek
-      var drag = false;
-      var self = this;
+      // Drag seek — supresses RAF smooth animation during drag
+      var _drag = false;
       this.progressTrack.addEventListener('mousedown', function(e) {
-        drag = true;
+        _drag = true; self._dragSeek = true;
         var rect = self.progressTrack.getBoundingClientRect();
         self.video.currentTime = ((e.clientX - rect.left) / rect.width) * self.video.duration;
-        document.addEventListener('mousemove', onDrag);
-        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('mousemove', onDrag); document.addEventListener('mouseup', onEnd);
       });
       function onDrag(e) {
-        if (!drag) return;
         var rect = self.progressTrack.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         self.video.currentTime = pct * self.video.duration;
       }
-      function onEnd() { drag = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd); }
+      function onEnd() { _drag = false; self._dragSeek = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd); }
     }
 
-    // Volume
-    if (this.volumeBtn) {
-      this.volumeBtn.addEventListener('click', (e) => { e.stopPropagation(); v.muted = !v.muted; });
-    }
-    if (this.volumeRange) {
-      this.volumeRange.addEventListener('input', (e) => { e.stopPropagation(); v.volume = e.target.value / 100; v.muted = false; });
-    }
+    // === Menus, Fullscreen, PiP, Doubl-tap, Keyboard, Controls hide ===
+    if (this.speedBtn && this.speedMenu) { this.speedBtn.addEventListener('click', (e) => { e.stopPropagation(); this.toggleMenu(this.speedMenu); }); }
+    if (this.qualityBtn && this.qualityMenu) { this.qualityBtn.addEventListener('click', (e) => { e.stopPropagation(); this.toggleMenu(this.qualityMenu); }); }
+    if (this.fsBtn) { this.fsBtn.addEventListener('click', (e) => { e.stopPropagation(); document.fullscreenElement ? document.exitFullscreen() : c.requestFullscreen()?.catch(()=>{}); }); }
+    if (this.pipBtn && 'pictureInPictureEnabled' in document) { this.pipBtn.addEventListener('click', (e) => { e.stopPropagation(); document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture()?.catch(()=>{}); }); }
+    if (this.nextBtn && this.total > 1) { this.nextBtn.addEventListener('click', (e) => { e.stopPropagation(); this.switchToNextVideo(); }); }
 
-    // Speed button toggle
-    if (this.speedBtn && this.speedMenu) {
-      this.speedBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleMenu(this.speedMenu);
-      });
-    }
-
-    // Quality button toggle
-    if (this.qualityBtn && this.qualityMenu) {
-      this.qualityBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleMenu(this.qualityMenu);
-      });
-    }
-
-    // Fullscreen
-    if (this.fsBtn) {
-      this.fsBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
-        } else {
-          c.requestFullscreen()?.catch(() => {});
-        }
-      });
-    }
-
-    // Picture-in-Picture
-    if (this.pipBtn && 'pictureInPictureEnabled' in document) {
-      this.pipBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (document.pictureInPictureElement) {
-          document.exitPictureInPicture();
-        } else {
-          v.requestPictureInPicture()?.catch(() => {});
-        }
-      });
-    }
-
-    // Save position periodically
-    v.addEventListener('timeupdate', () => {
-      try {
-        const posKey = 'mosaic_video_pos_' + (v.src || '').slice(-40);
-        if (v.currentTime > 1) localStorage.setItem(posKey, v.currentTime);
-      } catch {}
-    });
-
-    // Mobile double-tap to seek
-    var tapTimer = null;
+    // Mobile double-tap
+    var _tap = null;
     c.addEventListener('touchend', function(e) {
       if (e.target.closest('.video-controls')) return;
-      if (tapTimer) {
-        clearTimeout(tapTimer); tapTimer = null;
-        var rect = c.getBoundingClientRect();
-        var x = (e.changedTouches[0].clientX - rect.left) / rect.width;
+      if (_tap) { clearTimeout(_tap); _tap = null;
+        var x = (e.changedTouches[0].clientX - c.getBoundingClientRect().left) / c.getBoundingClientRect().width;
         v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + (x < 0.5 ? -10 : 10)));
         self.showSwitchToast(x < 0.5 ? '-10s' : '+10s');
-      } else {
-        tapTimer = setTimeout(function() { tapTimer = null; }, 300);
-      }
+      } else { _tap = setTimeout(function() { _tap = null; }, 300); }
     });
 
-    // Next video
-    if (this.nextBtn && this.total > 1) {
-      this.nextBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.switchToNextVideo();
-      });
-    }
-
-    // Keyboard
     c.addEventListener('keydown', (e) => this.handleKeyboard(e));
 
-    // Auto-hide controls timer
-    let hideTimer;
-    c.addEventListener('mousemove', () => {
-      this.showControls();
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => this.hideControls(), 2500);
-    });
-    c.addEventListener('mouseleave', () => {
-      if (!v.paused) this.hideControls();
-    });
-
-    // Video ended → dispatch event for playlist auto-advance
-    v.addEventListener('ended', () => {
-      c.dispatchEvent(new CustomEvent('video-ended', { bubbles: true }));
-    });
-
-    // Adaptive quality: only auto-downgrade if NOT during manual switch
-    // and only after 3 seconds of continuous waiting (not just buffering)
-    let waitingTimer = null;
-    v.addEventListener('waiting', () => {
-      if (this._switching) return;
-      waitingTimer = setTimeout(() => {
-        const idx = RES_ORDER.indexOf(this.currentRes);
-        if (idx < RES_ORDER.length - 1 && !this._switching) {
-          const lower = RES_ORDER[idx + 1];
-          if (this.sources[lower]) this.switchResolution(lower);
-        }
-      }, 3000);
-    });
-    v.addEventListener('playing', () => {
-      if (waitingTimer) { clearTimeout(waitingTimer); waitingTimer = null; }
-    });
+    let _hideTimer;
+    c.addEventListener('mousemove', () => { this.showControls(); clearTimeout(_hideTimer); _hideTimer = setTimeout(() => this.hideControls(), 2500); });
+    c.addEventListener('mouseleave', () => { if (!v.paused) this.hideControls(); });
   }
 
   togglePlay() {
@@ -622,16 +509,15 @@ class VideoPlayer {
       const bufEnd = v.buffered.end(v.buffered.length - 1);
       this.progressBuffer.style.width = (bufEnd / v.duration) * 100 + '%';
     }
-    // RAF-based smooth interpolation
-    if (!v.paused && v.duration) {
-      const self = this;
+    // RAF-based smooth interpolation (skips during drag seek)
+    if (!v.paused && v.duration && !this._dragSeek) {
       if (!this._rafId) {
         const lastTime = v.currentTime;
         const lastWall = performance.now();
+        const self = this;
         const step = () => {
-          if (self.video.paused) { self._rafId = null; return; }
-          const elapsed = (performance.now() - lastWall) / 1000;
-          const estimated = Math.min(v.duration, lastTime + elapsed);
+          if (self.video.paused || self._dragSeek) { self._rafId = null; return; }
+          const estimated = Math.min(v.duration, lastTime + (performance.now() - lastWall) / 1000);
           const rpct = (estimated / v.duration) * 100;
           if (self.progressFill) self.progressFill.style.width = rpct + '%';
           if (self.progressThumb) self.progressThumb.style.left = rpct + '%';
