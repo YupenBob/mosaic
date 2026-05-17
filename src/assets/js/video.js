@@ -8,6 +8,14 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const RES_ORDER = ['1080p', '720p', '480p'];
 
 let allPlayers = [];
+let _logLevel = 'info'; // debug | info | warn | error
+
+function vlog(level, msg) {
+  const order = { debug:0, info:1, warn:2, error:3 };
+  if ((order[level] || 0) >= (order[_logLevel] || 0)) {
+    console.log('[Video ' + level.toUpperCase() + '] ' + msg);
+  }
+}
 
 let _globalClickBound = false;
 
@@ -108,10 +116,12 @@ class VideoPlayer {
           maxMaxBufferLength: 120,
           startLevel: -1,
         });
+        vlog('info', 'HLS init: loading ' + hlsSource.src);
         this.hls.loadSource(hlsSource.src);
         this.hls.attachMedia(this.video);
         var self = this;
         this.hls.on('hlsManifestParsed', function() {
+          vlog('info', 'HLS manifest loaded: ' + (self.hls.levels||[]).length + ' levels, ' + ((self.hls.levels||[]).map(function(l){ return l.height + 'p'; }).join(', ')));
           self.sources = {};
           var levels = self.hls.levels || [];
           levels.forEach(function(level) {
@@ -133,13 +143,15 @@ class VideoPlayer {
           if (level) {
             var h = level.height || 0;
             var label = h >= 2160 ? '4K' : h + 'p';
+            vlog('info', 'Level switched to ' + label + ' (height='+h+', bitrate='+(level.bitrate||0)+')');
             self.currentRes = self.isAuto() ? 'auto' : label;
             self.updateQualityActive();
             self.showSwitchToast('Switched to ' + label);
           }
         });
         this.hls.on('hlsError', function(event, data) {
-          if (data.fatal) { console.error('HLS fatal:', data.type, data.details); }
+          vlog('error', 'HLS error: ' + data.type + ' - ' + (data.details||''));
+          if (data.fatal) { vlog('error', 'HLS FATAL — playback may stop'); }
         });
       } catch(e) { console.error('HLS init failed:', e); this.isHLS = false; }
     }
@@ -312,6 +324,7 @@ class VideoPlayer {
     this.currentRes = res;
 
     var label = res === 'auto' ? 'Auto' : res;
+    vlog('info', 'Switching quality: ' + prevRes + ' -> ' + res);
     this.showSwitchToast('Switching to ' + label + '...');
 
     // 3-second timeout: if switch doesn't complete, revert
@@ -411,9 +424,9 @@ class VideoPlayer {
     });
 
     // Loading spinner (no auto-pause — allow stuttering)
-    v.addEventListener('waiting', () => { c.classList.add('buffering'); });
-    v.addEventListener('canplay', () => { c.classList.remove('buffering'); });
-    v.addEventListener('playing', () => { c.classList.remove('buffering'); });
+    v.addEventListener('waiting', () => { c.classList.add('buffering'); vlog('warn', 'Buffering...'); });
+    v.addEventListener('canplay', () => { c.classList.remove('buffering'); vlog('debug', 'Canplay'); });
+    v.addEventListener('playing', () => { c.classList.remove('buffering'); vlog('debug', 'Playing'); });
 
     // Progress & buffer + frame freeze detection
     v.addEventListener('timeupdate', () => this.updateProgress());
@@ -599,10 +612,29 @@ class VideoPlayer {
     if (this.progressFill) this.progressFill.style.width = pct + '%';
     if (this.progressThumb) this.progressThumb.style.left = pct + '%';
     if (this.timeCur) this.timeCur.textContent = this.fmt(v.currentTime);
-    // Buffered progress
     if (this.progressBuffer && v.buffered.length > 0) {
       const bufEnd = v.buffered.end(v.buffered.length - 1);
       this.progressBuffer.style.width = (bufEnd / v.duration) * 100 + '%';
+    }
+    // RAF-based smooth interpolation
+    if (!v.paused && v.duration) {
+      const self = this;
+      if (!this._rafId) {
+        const lastTime = v.currentTime;
+        const lastWall = performance.now();
+        const step = () => {
+          if (self.video.paused) { self._rafId = null; return; }
+          const elapsed = (performance.now() - lastWall) / 1000;
+          const estimated = Math.min(v.duration, lastTime + elapsed);
+          const rpct = (estimated / v.duration) * 100;
+          if (self.progressFill) self.progressFill.style.width = rpct + '%';
+          if (self.progressThumb) self.progressThumb.style.left = rpct + '%';
+          self._rafId = requestAnimationFrame(step);
+        };
+        this._rafId = requestAnimationFrame(step);
+      }
+    } else {
+      if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
     }
   }
 
