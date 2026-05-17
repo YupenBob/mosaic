@@ -337,16 +337,12 @@ class VideoPlayer {
     vlog('info', 'Switching quality: ' + prevRes + ' -> ' + res);
     this.showSwitchToast('Switching to ' + label + '...');
 
-    // 3-second timeout: if switch doesn't complete, revert
+    // Safety: force-unlock after 5s even if hlsLevelSwitched never fires
     clearTimeout(this._switchFailTimer);
     var self = this;
-    this._switchFailTimer = setTimeout(function() {
-      if (self._switching || self.currentRes !== res) return;
-      self.currentRes = prevRes;
-      self.updateQualityActive();
-      self.showSwitchToast('Switch failed — reverted to ' + (prevRes === 'auto' ? 'Auto' : prevRes));
-      self._switching = false;
-    }, 15000);
+    this._switchUnlockTimer = setTimeout(function() {
+      if (self._switching) { vlog('warn', 'Switch unlock timed out'); self._switching = false; }
+    }, 5000);
 
     if (this.hls) {
       this.video.currentTime = time;
@@ -366,12 +362,12 @@ class VideoPlayer {
           this.hls.loadLevel = idx;
           this.hls.nextLevel = idx;
           this.hls.autoLevelCapping = idx;
-          vlog('info', 'loadLevel=' + idx + ', waiting for hlsLevelSwitched...');
+          // Force-disable ABR to prevent auto-switching away from manual selection
+          if (this.hls.autoLevelEnabled !== false) { this.hls.autoLevelEnabled = false; this.hls.autoLevelEnabled = true; this.hls.autoLevelEnabled = false; }
+          vlog('info', 'loadLevel=' + idx + ', ABR disabled');
         }
       }
-      // Don't unlock here — wait for hlsLevelSwitched event
     } else {
-      // MP4: direct src change
       if (!this.sources[res]) { this._switching = false; return; }
       this.video.querySelectorAll('source').forEach((s) => s.remove());
       this.video.src = this.sources[res];
@@ -379,8 +375,7 @@ class VideoPlayer {
       const onReady = () => {
         this._switching = false;
         try { this.video.currentTime = time; } catch {}
-        const wasPlaying = !this.video.paused;
-        if (wasPlaying) this.video.play()?.catch(() => {});
+        if (!this.video.paused) this.video.play()?.catch(() => {});
       };
       this.video.addEventListener('canplay', onReady, { once: true });
     }
