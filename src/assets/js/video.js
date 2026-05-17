@@ -143,9 +143,12 @@ class VideoPlayer {
           if (level) {
             var h = level.height || 0;
             var label = h >= 2160 ? '4K' : h + 'p';
-            vlog('info', 'Level switched to ' + label + ' (height='+h+', bitrate='+(level.bitrate||0)+')');
-            self.currentRes = self.isAuto() ? 'auto' : label;
-            self.updateQualityActive();
+            vlog('info', 'Level switched to ' + label + ' (h='+h+' bw='+(level.bitrate||0)+')');
+            // Only update currentRes for Auto ABR; manual switches are set by switchResolution
+            if (self.isAuto()) {
+              self.currentRes = 'auto';
+              self.updateQualityActive();
+            }
             self.showSwitchToast('Switched to ' + label);
           }
         });
@@ -344,6 +347,7 @@ class VideoPlayer {
         this.hls.loadLevel = -1;
         this.hls.nextLevel = -1;
         this.hls.autoLevelCapping = -1;
+        this._switching = false;
       } else {
         const targetH = parseInt(res);
         const levels = this.hls.levels || [];
@@ -355,8 +359,10 @@ class VideoPlayer {
           this.hls.loadLevel = idx;
           this.hls.nextLevel = idx;
           this.hls.autoLevelCapping = idx;
+          vlog('info', 'loadLevel=' + idx + ', waiting for hlsLevelSwitched...');
         }
       }
+      // Don't unlock here — wait for hlsLevelSwitched event
     } else {
       // MP4: direct src change
       if (!this.sources[res]) { this._switching = false; return; }
