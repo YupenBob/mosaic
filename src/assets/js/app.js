@@ -2,8 +2,14 @@
  * App bootstrap - determines page type and initializes modules
  */
 import { $ } from './utils.js';
+import { setPosts, t } from './data.js';
 
 const DATA_BASE = document.querySelector('meta[name="data-base"]')?.content || '/data';
+
+// Initialize i18n from injected globals (set by EJS templates)
+if (window.__I18N && window.__LANG) {
+  import('./data.js').then(function(m) { m.initI18n(window.__I18N, window.__LANG); });
+}
 
 async function init() {
   const pageType = document.body.dataset.page;
@@ -21,22 +27,19 @@ async function init() {
 }
 
 async function initListPage() {
-  // Fetch posts data
   try {
     const resp = await fetch(`${DATA_BASE}/posts.json?t=${Date.now()}`, { cache: 'no-cache' });
     const posts = await resp.json();
-    window.__POSTS = posts;
+    setPosts(posts);
 
-    // Load filter module
     const { initFilter } = await import('./filter.js');
     initFilter(posts);
 
-    // Load search module
     const { initSearch } = await import('./search.js');
     initSearch(posts);
   } catch (err) {
     console.error('Failed to load posts:', err);
-    showEmptyState(window.__I18N?.failed_load?.[window.__LANG] || 'Failed to load content.');
+    showEmptyState(t('failed_load'));
   }
 }
 
@@ -70,13 +73,13 @@ async function initPostPage() {
 function showEmptyState(message) {
   const grid = $('.card-grid');
   if (grid) {
-    grid.innerHTML = `<div class="empty-state"><i class="ri-inbox-line"></i><p>${message}</p></div>`;
+    grid.innerHTML = '<div class="empty-state"><i class="ri-inbox-line"></i><p>' + message + '</p></div>';
   }
 }
 
 // Start
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => init().catch((err) => console.error('App init failed:', err)));
+  document.addEventListener('DOMContentLoaded', function() { init().catch(function(err) { console.error('App init failed:', err); }); });
 } else {
-  init().catch((err) => console.error('App init failed:', err));
+  init().catch(function(err) { console.error('App init failed:', err); });
 }

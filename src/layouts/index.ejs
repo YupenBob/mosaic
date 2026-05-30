@@ -145,6 +145,10 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
 </footer>
 
 <script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
+<script type="module">
+import { initI18n } from '<%= rp %>assets/js/data.js';
+initI18n(<%- JSON.stringify(i18n || {}) %>, '<%= site.language || 'zh-CN' %>');
+</script>
 <script type="module" src="<%= rp %>assets/js/app.js"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@
  */
 import { $, debounce, escapeHTML, highlightTerm } from './utils.js';
 import { updateFilterState, renderCards } from './filter.js';
+import { getPosts } from './data.js';
 
 const DATA_BASE = document.querySelector('meta[name="data-base"]')?.content || '/data';
 
@@ -65,7 +66,7 @@ function renderSearchResults(posts, query) {
   const base = dataBase === 'data' ? '' : dataBase.replace(/\/?data$/, '');
 
   if (posts.length === 0) {
-    dropdown.innerHTML = '<div class="search-result-item"><span style="color:var(--color-text-tertiary)">' + (window.__I18N?.no_results?.[window.__LANG] || 'No results') + '</span></div>';
+    dropdown.innerHTML = '<div class="search-result-item"><span style="color:var(--color-text-tertiary)">' + 'No results' + '</span></div>';
   } else {
     dropdown.innerHTML = posts.map((p) =>
       '<a href="' + base + 'posts/' + p.slug + '/" class="search-result-item">' +

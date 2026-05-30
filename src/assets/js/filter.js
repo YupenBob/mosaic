@@ -2,6 +2,7 @@
  * Category and tag filtering for list pages
  */
 import { $, $$, formatNumber, escapeHTML } from './utils.js';
+import { getPosts } from './data.js';
 
 let filterState = {
   activeCategory: '',
@@ -32,7 +33,7 @@ export function initFilter(posts) {
       const cat = pill.dataset.category;
       filterState.activeCategory = filterState.activeCategory === cat ? '' : cat;
       updateFilterUI();
-      renderCards(window.__POSTS || posts);
+      renderCards(getPosts() || posts);
     });
   }
 
@@ -43,7 +44,7 @@ export function initFilter(posts) {
       const tag = pill.dataset.tag;
       filterState.activeTags.has(tag) ? filterState.activeTags.delete(tag) : filterState.activeTags.add(tag);
       updateFilterUI();
-      renderCards(window.__POSTS || posts);
+      renderCards(getPosts() || posts);
     });
   }
 
@@ -84,7 +85,7 @@ export function renderCards(posts) {
   const base = dataBase === 'data' ? '' : dataBase.replace(/\/?data$/, '');
 
   if (filtered.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><i class="ri-inbox-line"></i><p>' + (window.__I18N?.no_results?.[window.__LANG] || 'No results') + '</p></div>';
+    grid.innerHTML = '<div class="empty-state"><i class="ri-inbox-line"></i><p>' + (getPosts().length ? 'No results' : 'No posts') + '</p></div>';
     return;
   }
 

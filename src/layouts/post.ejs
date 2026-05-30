@@ -289,6 +289,10 @@ function renderGallery(photos, threshold) {
 </footer>
 
 <script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= lang || 'zh-CN' %>';</script>
+<script type="module">
+import { initI18n } from '<%= rp %>assets/js/data.js';
+initI18n(<%- JSON.stringify(i18n || {}) %>, '<%= lang || 'zh-CN' %>');
+</script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
