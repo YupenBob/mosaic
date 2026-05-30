@@ -34,6 +34,22 @@
   "enableBusuanzi": true,
   "enableVideoCompression": true,
 
+  "plugins": {
+    "compress-images": { "enabled": true },
+    "compress-videos": { "enabled": true },
+    "generate-feed": { "enabled": true },
+    "generate-sitemap": { "enabled": true }
+  },
+
+  "components": {
+    "gallery": { "enabled": true, "zoom": true, "lazyLoad": true },
+    "video": { "enabled": true, "quality": ["480p","720p","1080p","4K"] },
+    "comments": { "enabled": false, "provider": "giscus" },
+    "search": { "enabled": true },
+    "likes": { "enabled": true },
+    "stats": { "enabled": true }
+  },
+
   "giscus": {
     "repo": "",
     "repoId": "",
