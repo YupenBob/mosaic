@@ -139,18 +139,15 @@ class VideoPlayer {
         // Quality switch completion event
         this.hls.on('hlsLevelSwitched', function(event, data) {
           clearTimeout(self._switchFailTimer);
-          var wasSwitching = self._switching;
           self._switching = false;
           var level = self.hls.levels[data.level];
           if (level) {
             var h = level.height || 0;
             var label = h >= 2160 ? '4K' : h + 'p';
-            // Only log/show toast for manual switches (not ABR auto)
-            if (wasSwitching || self.isAuto()) {
-              vlog('info', 'Level switched to ' + label + ' (h='+h+' bw='+(level.bitrate||0)+')');
-              if (self.isAuto()) { self.currentRes = 'auto'; self.updateQualityActive(); }
-              self.showSwitchToast('Switched to ' + label);
-            }
+            vlog('info', 'Level switched to ' + label + ' (h='+h+')');
+            // Always update quality display to match actual level
+            if (!self.isAuto()) { self.currentRes = label; }
+            self.updateQualityActive();
           }
         });
         this.hls.on('hlsError', function(event, data) {
@@ -297,7 +294,7 @@ class VideoPlayer {
       b.classList.toggle('active', b.dataset.res === this.currentRes);
     });
     if (this.qualityBtn) {
-      var label = this.currentRes === 'auto' ? 'Auto' : this.currentRes;
+      var label = (this.currentRes === 'auto' || !this.currentRes) ? 'Auto' : this.currentRes;
       this.qualityBtn.innerHTML = label + ' <i class="ri-arrow-down-s-line"></i>';
     }
   }
@@ -329,16 +326,14 @@ class VideoPlayer {
     vlog('info', 'Switching quality: ' + prevRes + ' -> ' + res);
     this.showSwitchToast('Switching to ' + label + '...');
 
-    // Safety: force-unlock after 5s even if hlsLevelSwitched never fires
-    clearTimeout(this._switchFailTimer);
+    // Safety unlock after 3s
     var self = this;
-    this._switchUnlockTimer = setTimeout(function() {
-      if (self._switching) { vlog('warn', 'Switch unlock timed out'); self._switching = false; }
-    }, 5000);
+    this._unlockTimer = setTimeout(function() { self._switching = false; }, 3000);
 
     if (this.hls) {
       this.video.currentTime = time;
       if (res === 'auto') {
+        this._switching = false;
         this.hls.loadLevel = -1;
         this.hls.nextLevel = -1;
         this.hls.autoLevelCapping = -1;
