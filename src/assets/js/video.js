@@ -1,6 +1,6 @@
 /**
  * Custom video player with full control UI.
- * Controls: play/pause, progress bar, time, speed, quality, download, next, fullscreen.
+ * Controls: play/pause, progress bar, time, speed, quality, next, fullscreen.
  */
 import { $, $$ } from './utils.js';
 
@@ -203,7 +203,6 @@ class VideoPlayer {
     this.speedMenu = container.querySelector('.vc-speed-menu');
     this.qualityBtn = container.querySelector('.vc-quality-btn');
     this.qualityMenu = container.querySelector('.vc-quality-menu');
-    this.downloadBtn = container.querySelector('.vc-download');
     this.nextBtn = container.querySelector('.vc-next');
     this.pipBtn = container.querySelector('.vc-pip');
     this.fsBtn = container.querySelector('.vc-fullscreen');
@@ -212,8 +211,6 @@ class VideoPlayer {
     if (this.speedMenu) this.buildSpeedMenu();
     // Build quality menu
     if (this.qualityMenu) this.buildQualityMenu();
-    // Set download link
-    this.updateDownloadLink();
 
     // Pause RAF when tab hidden
     var self = this;
@@ -305,11 +302,6 @@ class VideoPlayer {
     }
   }
 
-  updateDownloadLink() {
-    if (!this.downloadBtn) return;
-    const url = this.sources[this.currentRes] || this.video.src;
-    this.downloadBtn.href = url;
-  }
 
   isAuto() { return this.currentRes === 'auto'; }
 
@@ -380,7 +372,6 @@ class VideoPlayer {
       this.video.addEventListener('canplay', onReady, { once: true });
     }
     this.updateQualityActive();
-    this.updateDownloadLink();
     try { localStorage.setItem('mosaic_video_quality', res); } catch {}
   }
 
