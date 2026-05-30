@@ -112,8 +112,8 @@ class VideoPlayer {
       this.currentRes = 'auto'; // Default to ABR
       try {
         this.hls = new window.Hls({
-          maxBufferLength: 60,
-          maxMaxBufferLength: 120,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
           startLevel: -1,
           enableWorker: true,
         });
@@ -331,7 +331,7 @@ class VideoPlayer {
     this._unlockTimer = setTimeout(function() { self._switching = false; }, 3000);
 
     if (this.hls) {
-      this.video.currentTime = time;
+      // Don't seek — hls.js handles level switch seamlessly with old buffer
       if (res === 'auto') {
         this._switching = false;
         this.hls.loadLevel = -1;
