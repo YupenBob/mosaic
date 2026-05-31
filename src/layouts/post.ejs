@@ -49,7 +49,7 @@ function renderVideos(vids, mode) {
   var html = '<section class="video-section">';
 
   if (mode === 'playlist' && vids.length > 1) {
-    // Playlist mode: all containers rendered, only active one visible
+    // Playlist mode: containers rendered, only active visible; side panel handled by layout
     html += '<div class="video-playlist-wrap" data-total="' + vids.length + '">';
     vids.forEach(function(vid, i) {
       html += '<div class="video-container" data-video-index="' + i + '"' + (i > 0 ? ' style="display:none"' : '') + '>';
@@ -57,20 +57,7 @@ function renderVideos(vids, mode) {
       html += videoControlsHTML(!!vid.sources, false, vids.length);
       html += '</div>';
     });
-    html += '<div class="playlist-bar">';
-    html += '<button class="playlist-bar-toggle" aria-label="Toggle playlist">';
-    html += '<i class="ri-play-list-2-line"></i> ' + t('playlist_label') + ' (' + vids.length + ')';
-    html += '<i class="ri-arrow-up-s-line playlist-arrow"></i>';
-    html += '</button>';
-    html += '<div class="playlist-list">';
-    vids.forEach(function(vid, i) {
-      html += '<div class="pl-item' + (i === 0 ? ' active' : '') + '" data-index="' + i + '">';
-      html += '<span class="pl-num">' + (i + 1) + '</span>';
-      html += '<span class="pl-title">' + (vid.base || 'Video ' + (i + 1)) + '</span>';
-      html += '<i class="ri-play-fill pl-playing"></i>';
-      html += '</div>';
-    });
-    html += '</div></div></div>';
+    html += '</div>';
   } else {
     // Stacked mode: each video has its own player
     vids.forEach(function(vid, i) {
@@ -280,6 +267,21 @@ function renderGallery(photos, threshold) {
     </div>
     <% } %>
   </article>
+
+  <% if (post.videoMode === 'playlist' && post.videos && post.videos.length > 1) { %>
+  <aside class="post-playlist-panel" data-total="<%= post.videos.length %>">
+    <div class="playlist-header"><i class="ri-play-list-2-line"></i> Playlist (<%= post.videos.length %>)</div>
+    <div class="playlist-list">
+      <% post.videos.forEach(function(vid, i) { %>
+      <div class="pl-item<%= i === 0 ? ' active' : '' %>" data-index="<%= i %>">
+        <span class="pl-num"><%= i + 1 %></span>
+        <span class="pl-title"><%= vid.base || 'Video ' + (i + 1) %></span>
+        <i class="ri-play-fill pl-playing"></i>
+      </div>
+      <% }); %>
+    </div>
+  </aside>
+  <% } %>
 </main>
 
 <footer class="footer">

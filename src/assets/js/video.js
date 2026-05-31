@@ -145,9 +145,9 @@ class VideoPlayer {
             var h = level.height || 0;
             var label = h >= 2160 ? '4K' : h + 'p';
             vlog('info', 'Level switched to ' + label + ' (h='+h+')');
-            // Always update quality display to match actual level
             if (!self.isAuto()) { self.currentRes = label; }
             self.updateQualityActive();
+            self.showSwitchToast('Switched to ' + label);
           }
         });
         this.hls.on('hlsError', function(event, data) {
@@ -302,6 +302,13 @@ class VideoPlayer {
 
   isAuto() { return this.currentRes === 'auto'; }
 
+  _relockQuality() {
+    const targetH = parseInt(this.currentRes);
+    if (isNaN(targetH)) return;
+    const idx = (this.hls.levels||[]).findIndex(function(l){return l.height === targetH || l.height >= targetH;});
+    if (idx >= 0) { this.hls.loadLevel = idx; this.hls.nextLevel = idx; this.hls.autoLevelCapping = idx; }
+  }
+
   showSwitchToast(msg) {
     var el = this.container.querySelector('.vc-switch-toast');
     if (!el) {
@@ -429,9 +436,10 @@ class VideoPlayer {
         const rect = this.progressTrack.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
         v.currentTime = pct * v.duration;
-        // Immediately update progress bar for instant feedback
         if (this.progressFill) this.progressFill.style.width = (pct * 100) + '%';
         if (this.progressThumb) this.progressThumb.style.left = (pct * 100) + '%';
+        // Re-lock quality after click-seek
+        if (self.hls && !self.isAuto()) self._relockQuality();
       });
       this.progressTrack.addEventListener('mousemove', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
@@ -455,12 +463,7 @@ class VideoPlayer {
         self.video.currentTime = pct * self.video.duration;
       }
       function onEnd() { _drag = false; self._dragSeek = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd);
-        // Re-lock quality after seek
-        if (self.hls && !self.isAuto()) {
-          const targetH = parseInt(self.currentRes);
-          const idx = (self.hls.levels||[]).findIndex(function(l){return l.height === targetH || l.height >= targetH;});
-          if (idx >= 0) { self.hls.loadLevel = idx; self.hls.nextLevel = idx; self.hls.autoLevelCapping = idx; }
-        }
+        if (self.hls && !self.isAuto()) self._relockQuality();
       }
     }
 
