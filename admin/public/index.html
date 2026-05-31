@@ -74,8 +74,8 @@
           <label>Category <input type="text" id="fm-category" placeholder="photography" /></label>
           <label>Tags <input type="text" id="fm-tags" placeholder="tag1, tag2" /></label>
           <label>Description <textarea id="fm-desc" rows="2" placeholder="Brief description"></textarea></label>
-          <label>Layout <select id="fm-layout"><option value="default">default</option><option value="video-first">video-first</option><option value="gallery-first">gallery-first</option></select></label>
-          <label>Cover <input type="text" id="fm-cover" placeholder="cover.jpg or video:0 or photo:0" /></label>
+          <label>Layout <select id="fm-layout"><option value="default">default (text→gallery→video)</option><option value="video-first">video-first (video first)</option><option value="gallery-first">gallery-first (photos first)</option></select></label>
+          <label>Cover <input type="text" id="fm-cover" placeholder="cover.jpg / video:0 / photo:0 / empty=auto" /><small style="color:var(--text2)">Card cover: filename, video:N, photo:N, or empty for auto-detect</small></label>
         </div>
         <div class="editor-body">
           <div style="margin-bottom:8px"><button type="button" class="btn-secondary" onclick="togglePreview()"><i class="ri-layout-row-line"></i> Split View</button></div>

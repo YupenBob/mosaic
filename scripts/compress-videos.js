@@ -123,8 +123,8 @@ function hlsSegment(mp4Path, outputDir, baseName, resName) {
   });
 }
 
-function generateMasterPlaylist(outputDir, baseName, resolutions) {
-  const playlistPath = path.join(outputDir, `master.m3u8`);
+function generateMasterPlaylist(outputDir, baseName, resolutions, playlistPath) {
+  if (!playlistPath) playlistPath = path.join(outputDir, `${baseName}-master.m3u8`);
   let content = '#EXTM3U\n#EXT-X-VERSION:3\n';
   const bwMap = { '480p': 800000, '720p': 2000000, '1080p': 5000000, '4K': 15000000 };
   const resMap = { '480p': '854x480', '720p': '1280x720', '1080p': '1920x1080', '4K': '3840x2160' };
@@ -187,12 +187,12 @@ async function processVideo({ dir, videosDir, file }) {
     }
   }
 
-  // Generate master HLS playlist (dedupe successRes)
+  // Generate per-video master HLS playlist (not shared between videos)
   const uniqueRes = [...new Set(successRes)];
   if (uniqueRes.length > 1) {
-    const masterPath = path.join(outputDir, 'master.m3u8');
+    const masterPath = path.join(outputDir, `${baseName}-master.m3u8`);
     if (getMtime(masterPath) <= srcMtime) {
-      generateMasterPlaylist(outputDir, baseName, uniqueRes);
+      generateMasterPlaylist(outputDir, baseName, uniqueRes, masterPath);
     }
   }
 

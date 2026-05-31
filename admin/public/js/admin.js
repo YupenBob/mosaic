@@ -261,7 +261,9 @@ async function savePost() {
 }
 
 function previewPost() {
-  window.open('http://localhost:3000/posts/' + (currentSlug || document.getElementById('fm-slug').value) + '/', '_blank');
+  var slug = currentSlug || document.getElementById('fm-slug').value;
+  if (!slug) return toast('Save post first');
+  window.open('http://localhost:3000/posts/' + slug + '/', '_blank');
 }
 
 async function deletePost(slug) {

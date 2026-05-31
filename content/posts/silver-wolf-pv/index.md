@@ -6,7 +6,7 @@ tags: [崩坏星穹铁道, PV, 像素风, 赛博朋克]
 description: "《崩坏：星穹铁道》银狼角色PV。像素美术风格，高能电子配乐，独白满级美学。"
 cover: cover.jpg
 layout: video-first
-video_mode: stacked
+video_mode: playlist
 views: 4200
 likes: 312
 dwell_time: 900

@@ -427,7 +427,11 @@ class VideoPlayer {
     if (this.progressTrack) {
       this.progressTrack.addEventListener('click', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
-        v.currentTime = ((e.clientX - rect.left) / rect.width) * v.duration;
+        const pct = (e.clientX - rect.left) / rect.width;
+        v.currentTime = pct * v.duration;
+        // Immediately update progress bar for instant feedback
+        if (this.progressFill) this.progressFill.style.width = (pct * 100) + '%';
+        if (this.progressThumb) this.progressThumb.style.left = (pct * 100) + '%';
       });
       this.progressTrack.addEventListener('mousemove', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
@@ -450,7 +454,14 @@ class VideoPlayer {
         var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         self.video.currentTime = pct * self.video.duration;
       }
-      function onEnd() { _drag = false; self._dragSeek = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd); }
+      function onEnd() { _drag = false; self._dragSeek = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd);
+        // Re-lock quality after seek
+        if (self.hls && !self.isAuto()) {
+          const targetH = parseInt(self.currentRes);
+          const idx = (self.hls.levels||[]).findIndex(function(l){return l.height === targetH || l.height >= targetH;});
+          if (idx >= 0) { self.hls.loadLevel = idx; self.hls.nextLevel = idx; self.hls.autoLevelCapping = idx; }
+        }
+      }
     }
 
     // === Menus, Fullscreen, PiP, Doubl-tap, Keyboard, Controls hide ===
