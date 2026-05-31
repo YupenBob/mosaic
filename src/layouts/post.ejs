@@ -153,6 +153,7 @@ function renderGallery(photos, threshold) {
 </header>
 
 <main class="main">
+  <<%= post.videoMode === 'playlist' && post.videos && post.videos.length > 1 ? 'div class="post-page-wrapper"' : 'div' %>>
   <article class="post-page">
     <!-- Breadcrumb -->
     <nav class="post-breadcrumb">
@@ -282,6 +283,7 @@ function renderGallery(photos, threshold) {
     </div>
   </aside>
   <% } %>
+  </div>
 </main>
 
 <footer class="footer">

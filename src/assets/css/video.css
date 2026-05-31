@@ -296,9 +296,8 @@
   height: calc(100vh - 44px);
 }
 
-/* === Page-level Playlist Panel (outside video) === */
+/* === Page-level Playlist Panel === */
 .post-playlist-panel {
-  position: sticky; top: 80px;
   width: 240px; flex-shrink: 0;
   background: var(--color-surface);
   border-radius: var(--card-radius);
@@ -306,6 +305,7 @@
   overflow: hidden;
   max-height: calc(100vh - 120px);
   display: flex; flex-direction: column;
+  margin-left: var(--space-3);
 }
 
 .post-playlist-panel .playlist-header {
@@ -369,4 +369,12 @@
     height: 52px;
     font-size: 1.5rem;
   }
+}
+
+/* Playlist layout: article + panel in flex row */
+.post-page-wrapper { display: flex; align-items: flex-start; gap: var(--space-4); max-width: 1200px; margin: 0 auto; padding: 0 var(--space-4); }
+.post-page-wrapper .post-page { flex: 1; min-width: 0; }
+@media (max-width: 1024px) {
+  .post-page-wrapper { flex-direction: column; }
+  .post-playlist-panel { width: 100%; margin-left: 0; margin-top: 16px; max-height: 200px; }
 }

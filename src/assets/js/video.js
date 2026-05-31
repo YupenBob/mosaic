@@ -50,7 +50,8 @@ export function initVideoPlayers() {
 
 function initPlaylistMode(wrap) {
   const containers = wrap.querySelectorAll('.video-container');
-  const items = wrap.querySelectorAll('.pl-item');
+  // Items may be in wrap (old inline) or in page-level .post-playlist-panel
+  const items = document.querySelectorAll('.post-playlist-panel .pl-item, .video-playlist-wrap .pl-item');
   const toggle = wrap.querySelector('.playlist-bar-toggle');
   const bar = wrap.querySelector('.playlist-bar');
   const total = containers.length;
