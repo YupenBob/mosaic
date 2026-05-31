@@ -12,9 +12,10 @@ const ALL_RESOLUTIONS = [
 
 function getSourceHeight(srcPath) {
   try {
-    const out = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "${srcPath}"`, { encoding: 'utf-8' });
-    return parseInt(out.trim()) || 0;
-  } catch { return 0; }
+    const out = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 "${srcPath}"`, { encoding: 'utf-8', timeout: 10000 });
+    const h = parseInt(out.trim());
+    return h > 0 ? h : 2160; // Default to 4K if detection fails
+  } catch { return 2160; } // Default to 4K — safer to transcode than skip
 }
 
 const VIDEO_EXTS = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
@@ -145,7 +146,7 @@ async function processVideo({ dir, videosDir, file }) {
   const srcHeight = getSourceHeight(srcPath);
   const RESOLUTIONS = ALL_RESOLUTIONS.filter(r => !srcHeight || r.height <= srcHeight);
   if (RESOLUTIONS.length === 0) {
-    warn(`Source video ${file} resolution (${srcHeight}p) below minimum, skipping transcode`);
+    warn(`Video ${file}: all resolutions above source, using source as-is`);
     const destPath = path.join(outputDir, file);
     if (getMtime(destPath) <= srcMtime) await fs.copy(srcPath, destPath);
     return;
