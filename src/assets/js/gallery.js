@@ -375,13 +375,13 @@ function setupGestures(overlay) {
     img.addEventListener('mousedown', (e) => {
       if (zoomState.scale <= 1) return;
       e.preventDefault();
-      dragStart = { x: e.clientX - zoomState.panX, y: e.clientY - zoomState.panY };
+      dragStart = { x: e.clientX - zoomState.panX * zoomState.scale, y: e.clientY - zoomState.panY * zoomState.scale };
       img.style.cursor = 'grabbing';
     });
     document.addEventListener('mousemove', (e) => {
       if (!dragStart) return;
-      zoomState.panX = e.clientX - dragStart.x;
-      zoomState.panY = e.clientY - dragStart.y;
+      zoomState.panX = (e.clientX - dragStart.x) / zoomState.scale;
+      zoomState.panY = (e.clientY - dragStart.y) / zoomState.scale;
       applyTransform();
     });
     document.addEventListener('mouseup', () => {
