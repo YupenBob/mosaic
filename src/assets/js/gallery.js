@@ -368,6 +368,27 @@ function setupGestures(overlay) {
     applyTransform();
   }, { passive: false });
 
+  // --- Free drag when zoomed ---
+  let dragStart = null;
+  const img = $('#gallery-current-img');
+  if (img) {
+    img.addEventListener('mousedown', (e) => {
+      if (zoomState.scale <= 1) return;
+      e.preventDefault();
+      dragStart = { x: e.clientX - zoomState.panX, y: e.clientY - zoomState.panY };
+      img.style.cursor = 'grabbing';
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragStart) return;
+      zoomState.panX = e.clientX - dragStart.x;
+      zoomState.panY = e.clientY - dragStart.y;
+      applyTransform();
+    });
+    document.addEventListener('mouseup', () => {
+      if (dragStart) { dragStart = null; img.style.cursor = 'grab'; }
+    });
+  }
+
   // --- Double tap zoom ---
   overlay.addEventListener('dblclick', (e) => {
     e.preventDefault();

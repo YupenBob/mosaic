@@ -372,8 +372,9 @@
 }
 
 /* Playlist layout: article + panel in flex row */
-.post-page-wrapper { display: flex; align-items: flex-start; gap: var(--space-4); max-width: 1200px; margin: 0 auto; padding: 0 var(--space-4); }
+.post-page-wrapper { display: flex; align-items: flex-start; gap: var(--space-6); }
 .post-page-wrapper .post-page { flex: 1; min-width: 0; }
+.post-page-wrapper + .post-playlist-panel { display: none; } /* Panel is inside wrapper */
 @media (max-width: 1024px) {
   .post-page-wrapper { flex-direction: column; }
   .post-playlist-panel { width: 100%; margin-left: 0; margin-top: 16px; max-height: 200px; }
