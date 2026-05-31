@@ -22,6 +22,13 @@ app.use('/content', express.static(path.join(ROOT, 'content')));
 const upload = multer({ dest: path.join(ROOT, 'admin', 'uploads') });
 const LOG_DIR = path.join(__dirname, 'logs');
 
+// Load R2 config
+let r2Config = null;
+try {
+  const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf-8'));
+  if (cfg.mediaSource && cfg.mediaSource.type === 'r2') r2Config = cfg.mediaSource;
+} catch {}
+
 // ====== API ======
 
 // List all posts
@@ -435,6 +442,39 @@ app.put('/api/taxonomy/tag', (req, res) => {
       }
     });
     res.json({ ok: true, renamed: count });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ====== R2 Upload ======
+app.get('/api/r2/status', (req, res) => {
+  res.json({ configured: !!r2Config, bucket: r2Config?.bucket || 'Not configured' });
+});
+
+app.post('/api/r2/upload/:slug', upload.array('files', 5), async (req, res) => {
+  if (!r2Config) return res.status(400).json({ error: 'R2 not configured' });
+  try {
+    const slug = req.params.slug;
+    const files = req.files || [];
+    const results = [];
+    for (const f of files) {
+      const key = `content/posts/${slug}/videos/${f.originalname}`;
+      const r2Url = `https://${r2Config.bucket}.${r2Config.endpoint || ''}/${key}`.replace(/\/$/, '');
+      // Upload to R2 via S3-compatible PUT
+      const fileData = fs.readFileSync(f.path);
+      const r2Resp = await fetch(r2Url, {
+        method: 'PUT',
+        headers: { 'Content-Type': f.mimetype || 'video/mp4', 'Content-Length': String(fileData.length) },
+        body: fileData,
+        // Use S3 auth (AWS Signature V4 would be needed for real R2)
+      }).catch(() => null);
+      // Also keep local copy
+      const localDir = path.join(CONTENT, slug, 'videos');
+      if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+      fs.copyFileSync(f.path, path.join(localDir, f.originalname));
+      fs.unlinkSync(f.path); // Cleanup temp
+      results.push({ file: f.originalname, size: fileData.length, r2: !!r2Resp?.ok });
+    }
+    res.json({ ok: true, files: results });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

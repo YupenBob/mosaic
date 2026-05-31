@@ -622,3 +622,19 @@ showPage = function(page) {
   if (page === 'taxonomy') loadTaxonomyPage();
   if (page === 'trash') loadTrashPage();
 };
+
+// ====== R2 Status ======
+async function loadR2Status() {
+  var r = await fetch(API + '/r2/status').then(function(r){ return r.json(); }).catch(function(){ return {}; });
+  var el = document.getElementById('r2-status');
+  if (!el) return;
+  if (r.configured) el.innerHTML = '<span style="color:#2ecc71">R2: ' + r.bucket + '</span>';
+  else el.innerHTML = '<span style="color:#e74c3c">R2 not configured</span>';
+}
+
+// Update showPage to load R2
+var _origShowPage2 = showPage;
+showPage = function(page) {
+  _origShowPage2(page);
+  if (page === 'deploy' || page === 'dashboard') loadR2Status();
+};
