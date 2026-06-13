@@ -1,0 +1,332 @@
+<%
+/* Post detail page */
+const rp = typeof relativePath !== 'undefined' ? relativePath : '../../';
+const pageDataTitle = post.title + ' - ' + site.title;
+const ly = post.layout || 'default';
+
+function videoControlsHTML(multiSrc, showNext, total) {
+  var h = '<div class="video-controls">';
+  h += '<button class="vc-play" aria-label="Play/Pause"><i class="ri-play-fill"></i></button>';
+  h += '<div class="vc-volume"><button class="vc-volume-btn" aria-label="Volume"><i class="ri-volume-up-line"></i></button><div class="vc-volume-slider"><input type="range" class="vc-volume-range" min="0" max="100" value="100" /></div></div>';
+  h += '<span class="vc-time-current">0:00</span>';
+  h += '<div class="vc-progress"><div class="vc-progress-hover" id="vc-time-tooltip">0:00</div><div class="vc-progress-track"><div class="vc-progress-buffer"></div><div class="vc-progress-fill"></div><div class="vc-progress-thumb"></div></div></div>';
+  h += '<span class="vc-time-duration">0:00</span>';
+  h += '<div class="vc-speed"><button class="vc-speed-btn">1x <i class="ri-arrow-down-s-line"></i></button><div class="vc-speed-menu"></div></div>';
+  if (multiSrc) {
+    h += '<div class="vc-quality"><button class="vc-quality-btn">Auto <i class="ri-arrow-down-s-line"></i></button><div class="vc-quality-menu"></div></div>';
+  }
+  if (showNext && total > 1) {
+    h += '<button class="vc-next" title="Next video"><i class="ri-skip-forward-line"></i></button>';
+  }
+  h += '<button class="vc-pip" title="Picture-in-Picture"><i class="ri-picture-in-picture-line"></i></button>';
+  h += '<button class="vc-fullscreen" title="Fullscreen"><i class="ri-fullscreen-line"></i></button>';
+  h += '</div>';
+  return h;
+}
+
+function videoElementHTML(vid) {
+  var multiSrc = !!(vid.sources);
+  var hasHLS = !!(vid.hls);
+  var h = '<div class="video-player-overlay"><button class="video-big-play" aria-label="Play"><i class="ri-play-fill"></i></button></div>';
+  if (hasHLS) {
+    h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element" data-hls="true">';
+    h += '<source src="' + vid.hls + '" type="application/x-mpegURL" />';
+    h += '</video>';
+  } else if (multiSrc) {
+    h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element">';
+    h += '<source data-res="480p" src="' + vid.sources['480p'] + '" type="video/mp4" />';
+    h += '<source data-res="720p" src="' + vid.sources['720p'] + '" type="video/mp4" />';
+    h += '<source data-res="1080p" src="' + vid.sources['1080p'] + '" type="video/mp4" />';
+    h += '</video>';
+  } else if (vid.src) {
+    h += '<video preload="metadata" poster="' + (vid.poster || '') + '" src="' + vid.src + '" class="video-element"></video>';
+  }
+  return h;
+}
+
+function renderVideos(vids, mode) {
+  if (!vids || vids.length === 0) return '';
+  var html = '<section class="video-section">';
+
+  if (mode === 'playlist' && vids.length > 1) {
+    // Playlist mode: all containers rendered, only active one visible
+    html += '<div class="video-playlist-wrap" data-total="' + vids.length + '">';
+    vids.forEach(function(vid, i) {
+      html += '<div class="video-container" data-video-index="' + i + '"' + (i > 0 ? ' style="display:none"' : '') + '>';
+      html += videoElementHTML(vid);
+      html += videoControlsHTML(!!vid.sources, false, vids.length);
+      html += '</div>';
+    });
+    html += '<div class="playlist-bar">';
+    html += '<button class="playlist-bar-toggle" aria-label="Toggle playlist">';
+    html += '<i class="ri-play-list-2-line"></i> ' + t('playlist_label') + ' (' + vids.length + ')';
+    html += '<i class="ri-arrow-up-s-line playlist-arrow"></i>';
+    html += '</button>';
+    html += '<div class="playlist-list">';
+    vids.forEach(function(vid, i) {
+      html += '<div class="pl-item' + (i === 0 ? ' active' : '') + '" data-index="' + i + '">';
+      html += '<span class="pl-num">' + (i + 1) + '</span>';
+      html += '<span class="pl-title">' + (vid.base || 'Video ' + (i + 1)) + '</span>';
+      html += '<i class="ri-play-fill pl-playing"></i>';
+      html += '</div>';
+    });
+    html += '</div></div></div>';
+  } else {
+    // Stacked mode: each video has its own player
+    vids.forEach(function(vid, i) {
+      html += '<div class="video-container" data-video-index="' + i + '" data-total="' + vids.length + '">';
+      html += videoElementHTML(vid);
+      html += videoControlsHTML(!!vid.sources, true, vids.length);
+      html += '</div>';
+    });
+  }
+
+  html += '</section>';
+  return html;
+}
+
+function renderGallery(photos, threshold) {
+  if (!photos || photos.length === 0) return '';
+  var single = threshold && photos.length <= threshold;
+  var cls = single ? 'gallery-single' : 'gallery-grid';
+  var h = '<section class="gallery-section">';
+  h += '<div class="' + cls + '" data-total="' + photos.length + '">';
+  photos.forEach(function(p) {
+    if (single) {
+      h += '<div class="gallery-single-item">';
+      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" ';
+      h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
+      h += 'sizes="100vw" ';
+      h += 'src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'1920\' height=\'1080\'%3E%3C/svg%3E" alt="Photo" loading="lazy" />';
+      h += '</div>';
+    } else {
+      h += '<div class="gallery-item">';
+      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" ';
+      h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
+      h += 'sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" ';
+      h += 'src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\'%3E%3C/svg%3E" alt="Photo" loading="lazy" />';
+      h += '</div>';
+    }
+  });
+  h += '</div></section>';
+  return h;
+}
+
+function renderMusic(tracks) {
+  if (!tracks || tracks.length === 0) return '';
+  var h = '<section class="music-section">';
+  h += '<h2 class="section-title">' + t('music_title') + '</h2>';
+  h += '<div class="music-tracks">';
+  tracks.forEach(function(track, i) {
+    var dur = track.duration || 0;
+    var mins = Math.floor(dur / 60);
+    var secs = Math.floor(dur % 60);
+    var durStr = dur > 0 ? mins + ':' + (secs < 10 ? '0' : '') + secs : '--:--';
+    h += '<div class="music-track" data-index="' + i + '">';
+    h += '<span class="music-track-num">' + (i + 1) + '</span>';
+    if (track.cover) {
+      h += '<div class="music-track-cover"><img src="' + track.cover + '" alt="" loading="lazy" /></div>';
+    }
+    h += '<div class="music-track-info">';
+    h += '<span class="music-track-title">' + (track.title || track.file) + '</span>';
+    h += '<span class="music-track-artist">' + (track.artist || '') + '</span>';
+    h += '</div>';
+    h += '<span class="music-track-duration">' + durStr + '</span>';
+    h += '</div>';
+  });
+  h += '</div></section>';
+  h += '<script>window.__MUSIC_TRACKS = ' + JSON.stringify(tracks) + ';</script>';
+  return h;
+}
+%>
+<!DOCTYPE html>
+<html lang="<%= site.language || 'zh-CN' %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="<%= post.description %>" />
+  <meta name="data-base" content="<%= rp %>data" />
+  <title><%= pageDataTitle %></title>
+  <link rel="icon" type="image/svg+xml" href="<%= rp %>assets/logo.svg" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/card.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/post.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/gallery.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/video.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/music.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/filter.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/responsive.css" />
+  <meta property="og:title" content="<%= pageDataTitle %>" />
+  <meta property="og:description" content="<%= post.description %>" />
+    <% var postUrl = (site.url || '') + '/posts/' + post.slug + '/'; %>
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="<%= postUrl %>" />
+  <% if (post.cover) { %><meta property="og:image" content="<%= (site.url || '') + '/posts/' + post.slug + '/' + post.cover %>" /><% } %>
+  <meta property="og:site_name" content="<%= site.title %>" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="<%= pageDataTitle %>" />
+  <% if (post.cover) { %><meta name="twitter:image" content="<%= (site.url || '') + '/posts/' + post.slug + '/' + post.cover %>" /><% } %>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"BlogPosting","headline":"<%= post.title %>","description":"<%= post.description %>","datePublished":"<%= post.date %>","url":"<%= postUrl %>"}
+  </script>
+  <% if (site.enableBusuanzi) { %>
+  <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+  <% } %>
+</head>
+<body data-page="post" data-slug="<%= post.slug %>">
+
+<header class="header">
+  <div class="container">
+    <a href="<%= rp %>index.html" class="header-logo"><img src="<%= rp %>assets/logo.svg" alt="" class="header-logo-icon" width="28" height="28" /><%= site.title %></a>
+    <nav class="header-nav">
+      <a href="<%= rp %>index.html"><%= t('home') %></a>
+      <% if (categories && categories.length) { %>
+        <% categories.slice(0, 5).forEach(function(cat) { %>
+        <a href="<%= rp %>categories/<%= cat.slug %>/"><%= cat.name %></a>
+        <% }); %>
+      <% } %>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  <article class="post-page">
+    <!-- Breadcrumb -->
+    <nav class="post-breadcrumb">
+      <a href="<%= rp %>index.html"><%= t('home') %></a>
+      <i class="ri-arrow-right-s-line"></i>
+      <a href="<%= rp %>categories/<%= post.category.toLowerCase().replace(/\s+/g, '-') %>/"><%= post.category %></a>
+      <i class="ri-arrow-right-s-line"></i>
+      <span><%= post.title %></span>
+    </nav>
+    <!-- Header -->
+    <header class="post-header">
+      <a href="<%= rp %>categories/<%= post.category.toLowerCase().replace(/\s+/g, '-') %>/" class="post-category"><%= post.category %></a>
+      <h1 class="post-title"><%= post.title %></h1>
+      <div class="post-meta">
+        <% if (post.date) { %>
+        <span class="post-meta-item"><i class="ri-calendar-line"></i> <%= post.date.split('T')[0] %></span>
+        <% } %>
+        <a href="<%= rp %>categories/<%= post.category.toLowerCase().replace(/\s+/g, '-') %>/" class="post-meta-item"><i class="ri-folder-line"></i> <%= post.category %></a>
+      </div>
+      <% if (post.tags && post.tags.length > 0) { %>
+      <div class="post-tags">
+        <% post.tags.forEach(function(t) { %>
+        <a href="<%= rp %>tags/<%= t.toLowerCase().replace(/\s+/g, '-') %>/" class="post-tag">#<%= t %></a>
+        <% }); %>
+      </div>
+      <% } %>
+    </header>
+
+    <!-- Layout: video-first -->
+    <% if (ly === 'video-first') { %>
+      <%- renderVideos(post.videos, post.videoMode || 'stacked') %>
+      <div class="post-content"><%- post.bodyHTML %></div>
+      <%- renderGallery(post.photos, (site.gallerySingleThreshold || 5)) %>
+      <%- renderMusic(post.music) %>
+    <% } else if (ly === 'gallery-first') { %>
+      <%- renderGallery(post.photos, (site.gallerySingleThreshold || 5)) %>
+      <div class="post-content"><%- post.bodyHTML %></div>
+      <%- renderVideos(post.videos, post.videoMode || 'stacked') %>
+      <%- renderMusic(post.music) %>
+    <% } else { %>
+      <!-- Default: body -> gallery -> videos -> music -->
+      <div class="post-content"><%- post.bodyHTML %></div>
+      <%- renderGallery(post.photos, (site.gallerySingleThreshold || 5)) %>
+      <%- renderVideos(post.videos, post.videoMode || 'stacked') %>
+      <%- renderMusic(post.music) %>
+    <% } %>
+
+    <!-- Footer: Stats + Likes -->
+    <footer class="post-footer">
+      <div class="post-stats">
+        <span class="post-stat-item">
+          <i class="ri-eye-line"></i>
+          <% if (site.enableBusuanzi) { %>
+            <span id="busuanzi_value_page_pv">-</span> views
+          <% } else { %>
+            <%= post.stats.views %> views
+          <% } %>
+        </span>
+        <span class="post-stat-item">
+          <i class="ri-time-line"></i>
+          <span id="dwell-time-display">-</span>
+        </span>
+        <span class="post-stat-item">
+          <i class="ri-heart-line"></i>
+          <span id="like-count-display"><%= post.stats.likes %></span>
+        </span>
+      </div>
+      <button class="like-button"
+              data-slug="<%= post.slug %>"
+              data-count="<%= post.stats.likes %>">
+        <i class="ri-heart-line"></i>
+        <span class="like-count"><%= post.stats.likes %></span>
+      </button>
+    </footer>
+
+    <% if (prev || next) { %>
+    <nav class="post-navigation">
+      <% if (prev) { %><a href="<%= rp %>posts/<%= prev.slug %>/" class="post-nav-link post-nav-prev"><i class="ri-arrow-left-line"></i> <%= prev.title %></a><% } %>
+      <% if (next) { %><a href="<%= rp %>posts/<%= next.slug %>/" class="post-nav-link post-nav-next"><%= next.title %> <i class="ri-arrow-right-line"></i></a><% } %>
+    </nav>
+    <% } %>
+
+    <% if (related && related.length > 0) { %>
+    <section class="related-posts">
+      <h2 class="section-title">Related</h2>
+      <div class="related-grid">
+        <% related.forEach(function(r) { %>
+        <a href="<%= rp %>posts/<%= r.slug %>/" class="related-card">
+          <% if (r.cover) { %><div class="related-cover"><img src="<%= rp %>posts/<%= r.slug %>/<%= r.cover %>" alt="" loading="lazy" /></div><% } %>
+          <span class="related-title"><%= r.title %></span>
+        </a>
+        <% }); %>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (site.giscus && site.giscus.repo) { %>
+    <div class="comments-section">
+      <h2 class="section-title"><%= t('comments_title') %></h2>
+      <script src="https://giscus.app/client.js"
+        data-repo="<%= site.giscus.repo %>"
+        data-repo-id="<%= site.giscus.repoId %>"
+        data-category="<%= site.giscus.category %>"
+        data-category-id="<%= site.giscus.categoryId %>"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="preferred_color_scheme"
+        data-lang="<%= site.language || 'zh-CN' %>"
+        crossorigin="anonymous"
+        async>
+      </script>
+    </div>
+    <% } %>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
+  </div>
+</footer>
+
+<script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= lang || 'zh-CN' %>';</script>
+<script type="module">
+import { initI18n } from '<%= rp %>assets/js/data.js';
+initI18n(<%- JSON.stringify(i18n || {}) %>, '<%= lang || 'zh-CN' %>');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script type="module" src="<%= rp %>assets/js/app.js"></script>
+</body>
+</html>

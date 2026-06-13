@@ -1,0 +1,43 @@
+# ── Build output ─────────────────────────────
+dist/
+.cache-manifest.json
+
+# ── Dependencies ─────────────────────────────
+node_modules/
+admin/node_modules/
+worker/node_modules/
+cloud-admin/node_modules/
+
+# ── OS files ─────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs & temp ──────────────────────────────
+*.log
+admin/logs/
+admin/uploads/
+admin/package-lock.json
+
+# ── Media files (managed by R2, not Git) ─────
+content/posts/*/photos/
+content/posts/*/videos/
+content/posts/*/music/
+content/posts/*/cover.*
+*.mp4
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.mp3
+*.flac
+*.wav
+*.aiff
+*.m4a
+
+# ── Worker build artifacts ───────────────────
+worker/.wrangler/
+worker/dist/
+
+# ── Environment ──────────────────────────────
+.env
+.env.local

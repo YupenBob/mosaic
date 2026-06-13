@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+  <title>Mosaic Cloud Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+  <script>
+    // Config injected at build time
+    window.__API_BASE__ = 'https://api.example.com';
+  </script>
+</head>
+<body class="admin-body">
+
+<!-- Login Screen -->
+<div id="login-screen" class="login-overlay">
+  <div class="login-box">
+    <h1>Mosaic Admin</h1>
+    <p>Enter your admin password to continue</p>
+    <input type="password" id="login-password" placeholder="Password" autofocus />
+    <button id="login-btn" class="btn-primary">Sign In</button>
+    <p id="login-error" style="color:#e74c3c;font-size:13px;display:none;margin-top:8px"></p>
+  </div>
+</div>
+
+<!-- Main App (hidden until login) -->
+<div id="app" style="display:none">
+  <aside class="sidebar">
+    <div class="sidebar-logo">Mosaic Cloud</div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <a href="#dashboard" class="nav-item" data-page="dashboard"><i class="ri-dashboard-line"></i> Dashboard</a>
+      <a href="#posts" class="nav-item" data-page="posts"><i class="ri-article-line"></i> Posts</a>
+      <a href="#editor" class="nav-item" data-page="editor"><i class="ri-edit-line"></i> Editor</a>
+      <a href="#media" class="nav-item" data-page="media"><i class="ri-image-line"></i> Media</a>
+      <a href="#build" class="nav-item" data-page="build"><i class="ri-tools-line"></i> Build</a>
+      <div class="sidebar-divider"></div>
+      <a href="#config" class="nav-item" data-page="config"><i class="ri-settings-line"></i> Config</a>
+      <a href="#taxonomy" class="nav-item" data-page="taxonomy"><i class="ri-price-tag-3-line"></i> Taxonomy</a>
+      <a href="#trash" class="nav-item" data-page="trash"><i class="ri-delete-bin-line"></i> Trash</a>
+      <a href="#deploy" class="nav-item" data-page="deploy"><i class="ri-rocket-line"></i> Deploy</a>
+      <div class="sidebar-divider"></div>
+      <a href="#" id="logout-btn" class="nav-item"><i class="ri-logout-box-line"></i> Sign Out</a>
+    </nav>
+  </aside>
+
+  <main class="main-content" id="main-content">
+    <!-- Pages will be rendered here dynamically -->
+  </main>
+</div>
+
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+{
+  "_comment": "Mosaic v0.8 Configuration — see docs/configuration.md for full documentation",
+  "_version": "0.8.0",
+
+  "title": "Mosaic",
+  "subtitle": "Pieces Together",
+  "description": "A pure static multimedia site generator for personal creators.",
+  "url": "https://yupenbob.github.io/mosaic",
+  "language": "zh-CN",
+
+  "author": {
+    "name": "Mosaic",
+    "email": "hello@example.com"
+  },
+
+  "dateFormat": "YYYY-MM-DD",
+  "pageSize": 50,
+  "gallerySingleThreshold": 5,
+  "favicon": "/assets/logo.svg",
+  "coverAspectMin": 0.5625,
+  "coverAspectMax": 999,
+
+  "theme": "default",
+  "themeOverrides": {},
+  "headerNav": [],
+  "footerText": "",
+
+  "searchMinChars": 2,
+
+  "imageQuality": { "480p": 75, "720p": 80, "1080p": 85 },
+  "videoQuality": { "crf": 23, "preset": "fast" },
+  "musicQuality": {
+    "mp3_320k": { "bitrate": "320k" },
+    "mp3_128k": { "bitrate": "128k" }
+  },
+
+  "cardShowTags": true,
+  "cardShowStats": true,
+
+  "enableBusuanzi": true,
+  "enableVideoCompression": true,
+  "enableMusicProcessing": true,
+
+  "mediaSource": {
+    "type": "r2",
+    "bucket": "mosaic-media",
+    "endpoint": "",
+    "publicUrl": "",
+    "description": "Cloudflare R2 as unified media center. Set R2_ACCESS_KEY, R2_SECRET_KEY, R2_ENDPOINT, R2_PUBLIC_URL in GitHub Secrets."
+  },
+
+  "plugins": {
+    "compress-images": { "enabled": true },
+    "compress-videos": { "enabled": true },
+    "extract-music-meta": { "enabled": true },
+    "generate-feed": { "enabled": true },
+    "generate-sitemap": { "enabled": true }
+  },
+
+  "components": {
+    "gallery": { "enabled": true, "zoom": true, "lazyLoad": true },
+    "video": { "enabled": true, "quality": ["480p","720p","1080p","4K"] },
+    "music": { "enabled": true, "defaultQuality": "320k" },
+    "comments": { "enabled": false, "provider": "giscus" },
+    "search": { "enabled": true },
+    "likes": { "enabled": true },
+    "stats": { "enabled": true }
+  },
+
+  "giscus": {
+    "repo": "",
+    "repoId": "",
+    "category": "Announcements",
+    "categoryId": ""
+  },
+
+  "worker": {
+    "apiUrl": "",
+    "description": "Cloudflare Worker API endpoint for Cloud Admin."
+  }
+}

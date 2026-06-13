@@ -1,0 +1,162 @@
+/* === Layout === */
+.container {
+  width: 100%;
+  max-width: var(--max-width-content);
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  height: var(--header-height);
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border-light);
+  display: flex;
+  align-items: center;
+}
+
+.header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.header-logo {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.header-logo-icon {
+  flex-shrink: 0;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.header-nav a {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--button-radius);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.header-nav a:hover,
+.header-nav a.active {
+  color: var(--color-text-primary);
+  background: var(--color-tag-bg);
+}
+
+/* Main */
+.main {
+  min-height: calc(100vh - var(--header-height));
+  padding: var(--space-8) 0 var(--space-16);
+}
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--color-border-light);
+  padding: var(--space-8) 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.footer a {
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.footer a:hover {
+  color: var(--color-accent);
+}
+
+/* Card Grid — masonry via CSS columns */
+.card-grid {
+  column-count: 1;
+  column-gap: var(--space-6);
+}
+
+.card-grid > * {
+  break-inside: avoid;
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 640px) {
+  .card-grid { column-count: 2; }
+}
+
+@media (min-width: 1024px) {
+  .card-grid { column-count: 3; }
+}
+
+@media (min-width: 1440px) {
+  .container { padding: 0 var(--space-8); }
+  .card-grid { column-count: 4; }
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: var(--space-20) var(--space-4);
+  color: var(--color-text-tertiary);
+}
+
+.empty-state i {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: var(--space-4);
+}
+
+.empty-state p {
+  font-size: var(--font-size-lg);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-12);
+}
+
+.pagination button {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--button-radius);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+.pagination button:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination .page-info {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  padding: 0 var(--space-3);
+}

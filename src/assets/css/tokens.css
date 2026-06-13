@@ -1,0 +1,108 @@
+/* === Design Tokens === */
+:root {
+  /* Color palette */
+  --color-bg: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f8f8fa;
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #86868b;
+  --color-text-tertiary: #aeaeb2;
+  --color-accent: #4361ee;
+  --color-accent-hover: #3651d4;
+  --color-border: #d2d2d7;
+  --color-border-light: #e5e5ea;
+  --color-overlay: rgba(0, 0, 0, 0.88);
+  --color-card-shadow: rgba(0, 0, 0, 0.06);
+  --color-tag-bg: #f0f0f5;
+  --color-tag-text: #515154;
+  --color-stat-icon: #86868b;
+  --color-like-active: #e74c3c;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-size-3xl: 2.5rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Spacing (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* Layout */
+  --max-width-content: 1200px;
+  --max-width-post: 840px;
+  --header-height: 56px;
+  --card-radius: 12px;
+  --card-radius-sm: 8px;
+  --button-radius: 8px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 2px 12px var(--color-card-shadow);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition-normal: 300ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition-slow: 500ms cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Z-index */
+  --z-header: 100;
+  --z-overlay: 1000;
+  --z-modal: 1100;
+
+  /* Search highlight */
+  --color-search-highlight: #ffe066;
+  --color-search-highlight-text: #1d1d1f;
+}
+
+.search-highlight {
+  background: var(--color-search-highlight);
+  color: var(--color-search-highlight-text);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-search-highlight: #ffd43b;
+    --color-search-highlight-text: #1d1d1f;
+    --color-bg: #1c1c1e;
+    --color-surface: #2c2c2e;
+    --color-surface-hover: #3a3a3c;
+    --color-text-primary: #f5f5f7;
+    --color-text-secondary: #98989d;
+    --color-text-tertiary: #6e6e73;
+    --color-border: #48484a;
+    --color-border-light: #38383a;
+    --color-tag-bg: #3a3a3c;
+    --color-tag-text: #d1d1d6;
+    --color-card-shadow: rgba(0, 0, 0, 0.3);
+    --color-overlay: rgba(0, 0, 0, 0.92);
+    --shadow-card: 0 2px 12px var(--color-card-shadow);
+  }
+}

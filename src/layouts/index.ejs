@@ -1,0 +1,155 @@
+<%
+/* List page: shows card grid with filter bar */
+const rp = typeof relativePath !== 'undefined' ? relativePath : '';
+const pageDataTitle = typeof pageTitle !== 'undefined' ? pageTitle : site.title;
+const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site.description;
+%>
+<!DOCTYPE html>
+<html lang="<%= site.language || 'zh-CN' %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="<%= pageDesc %>" />
+  <meta name="data-base" content="<%= rp %>data" />
+  <title><%= pageDataTitle %></title>
+  <link rel="icon" type="image/svg+xml" href="<%= rp %>assets/logo.svg" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/card.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/post.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/gallery.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/video.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/music.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/filter.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/responsive.css" />
+  <meta property="og:title" content="<%= pageDataTitle %>" />
+  <meta property="og:description" content="<%= pageDesc %>" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="<%= site.url || '' %>" />
+  <meta property="og:site_name" content="<%= site.title %>" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="<%= pageDataTitle %>" />
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebSite","name":"<%= site.title %>","description":"<%= site.description %>","url":"<%= site.url || '' %>"}
+  </script>
+</head>
+<body data-page="list" data-category="<%= activeCategory || '' %>" data-tag="<%= activeTag || '' %>">
+
+<header class="header">
+  <div class="container">
+    <a href="<%= rp %>index.html" class="header-logo"><img src="<%= rp %>assets/logo.svg" alt="" class="header-logo-icon" width="28" height="28" /><%= site.title %></a>
+    <nav class="header-nav">
+      <a href="<%= rp %>index.html" class="<% if (!activeCategory && !activeTag) { %>active<% } %>"><%= t('home') %></a>
+      <% if (categories && categories.length) { %>
+        <% categories.slice(0, 5).forEach(function(cat) { %>
+        <a href="<%= rp %>categories/<%= cat.slug %>/"><%= cat.name %></a>
+        <% }); %>
+      <% } %>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  <div class="container">
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <!-- Search -->
+      <div class="search-container">
+        <div class="search-input-wrapper">
+          <i class="ri-search-line"></i>
+          <input type="text" class="search-input" placeholder="<%= t('search_placeholder') %>" autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- Categories -->
+      <% if (categories && categories.length > 1) { %>
+      <div class="filter-categories">
+        <span class="filter-label"><%= t('categories_label') %>:</span>
+        <% categories.forEach(function(cat) { %>
+        <button class="filter-pill<% if (activeCategory === cat.name) { %> active<% } %>"
+                data-category="<%= cat.name %>">
+          <%= cat.name %><span class="count"><%= cat.count %></span>
+        </button>
+        <% }); %>
+      </div>
+      <% } %>
+
+      <!-- Tags -->
+      <% if (tags && tags.length > 0) { %>
+      <div class="filter-tags">
+        <span class="filter-label"><%= t('tags_label') %>:</span>
+        <% tags.slice(0, 20).forEach(function(tag) { %>
+        <button class="filter-pill<% if (activeTag === tag.name) { %> active<% } %>"
+                data-tag="<%= tag.name %>">
+          #<%= tag.name %><span class="count"><%= tag.count %></span>
+        </button>
+        <% }); %>
+      </div>
+      <% } %>
+    </div>
+
+    <!-- Card Grid -->
+    <div class="card-grid">
+      <% if (posts && posts.length > 0) { %>
+        <% posts.forEach(function(post) { %>
+        <a href="<%= rp %>posts/<%= post.slug %>/" class="post-card<% if (!post.cover) { %> post-card-text<% } %>">
+          <% if (post.cover) { %>
+          <div class="post-card-cover" style="padding-top:<%= (100 / (post.coverAspect || 1.778)).toFixed(2) %>%">
+            <img src="<%= rp %>posts/<%= post.slug %>/<%= post.cover %>"
+                 <% if (post.coverSrcset) { %>srcset="<%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['480'] %> 480w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['720'] %> 720w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['1080'] %> 1080w"
+                 sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"<% } %>
+                 alt="<%= post.title %>" loading="lazy" />
+          </div>
+          <% } %>
+          <div class="post-card-body">
+            <span class="post-card-category"><%= post.category %></span>
+            <h3 class="post-card-title"><%= post.title %></h3>
+            <p class="post-card-desc"><%= post.description %></p>
+            <div class="post-card-tags">
+              <% post.tags.forEach(function(t) { %>
+              <span class="post-card-tag"><%= t %></span>
+              <% }); %>
+            </div>
+          </div>
+          <div class="post-card-footer">
+            <span class="post-card-stat"><i class="ri-eye-line"></i><%= post.stats.views %></span>
+            <span class="post-card-stat"><i class="ri-time-line"></i><%= post.stats.dwell_time %>s</span>
+            <span class="post-card-stat"><i class="ri-heart-line"></i><%= post.stats.likes %></span>
+          </div>
+        </a>
+        <% }); %>
+      <% } else { %>
+        <div class="empty-state">
+          <i class="ri-inbox-line"></i>
+          <p><%= t('no_posts') %></p>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- Pagination -->
+    <% if (totalPages > 1) { %>
+    <div class="pagination">
+      <% if (currentPage <= 1) { %><button disabled><%= t('prev_page') %></button><% } else { %><a href="<%= rp %><%= prevPage %>"><%= t('prev_page') %></a><% } %>
+      <span class="page-info"><%= currentPage %> / <%= totalPages %></span>
+      <% if (currentPage >= totalPages) { %><button disabled><%= t('next_page') %></button><% } else { %><a href="<%= rp %><%= nextPage %>"><%= t('next_page') %></a><% } %>
+    </div>
+    <% } %>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
+  </div>
+</footer>
+
+<script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
+<script type="module">
+import { initI18n } from '<%= rp %>assets/js/data.js';
+initI18n(<%- JSON.stringify(i18n || {}) %>, '<%= site.language || 'zh-CN' %>');
+</script>
+<script type="module" src="<%= rp %>assets/js/app.js"></script>
+</body>
+</html>
