@@ -98,6 +98,82 @@ app.put('/api/config', async (c) => {
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 
+// Auth refresh
+app.post('/api/auth/refresh', async (c) => {
+  // Client already has valid JWT (verified by middleware), just return success
+  return c.json({ ok: true });
+});
+
+// Duplicate post
+app.post('/api/posts/:slug/duplicate', async (c) => {
+  try {
+    const post = await getPost(c, c.req.param('slug'));
+    if (!post) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404);
+    const { newSlug } = await c.req.json().catch(() => ({}));
+    const slug = newSlug || `${c.req.param('slug')}-copy`;
+    await createOrUpdatePost(c, slug, post.frontMatter, post.body, `Duplicate ${c.req.param('slug')} → ${slug}`);
+    return c.json({ ok: true, slug });
+  } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
+});
+
+// Media list
+app.get('/api/media/:slug/list', async (c) => {
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${c.env.GITHUB_REPO}/contents/content/posts/${c.req.param('slug')}`, {
+      headers: { Authorization: `Bearer ${c.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'Mosaic/0.8' },
+    });
+    if (!resp.ok) return c.json({ photos: [], videos: [], music: [] });
+    const files = await resp.json();
+    const result = { photos: [], videos: [], music: [] };
+    (Array.isArray(files) ? files : [files]).forEach(f => {
+      if (!f.name || f.name === 'index.md') return;
+      if (/\.(jpg|jpeg|png|webp)$/i.test(f.name)) result.photos.push(f.name);
+      if (/\.(mp4|mov|mkv|webm)$/i.test(f.name)) result.videos.push(f.name);
+      if (/\.(mp3|flac|wav)$/i.test(f.name)) result.music.push(f.name);
+    });
+    return c.json(result);
+  } catch (e) { return c.json({ photos: [], videos: [], music: [] }); }
+});
+
+// Stats
+app.get('/api/stats', async (c) => {
+  try {
+    const posts = await listPosts(c);
+    const cats = new Set(), tags = new Set();
+    posts.forEach(p => { if (p.category) cats.add(p.category); (p.tags||[]).forEach(t => tags.add(t)); });
+    return c.json({ posts: posts.length, categories: cats.size, tags: tags.size });
+  } catch { return c.json({ posts: 0, categories: 0, tags: 0 }); }
+});
+
+// Taxonomy
+app.get('/api/taxonomy', async (c) => {
+  try {
+    const posts = await listPosts(c);
+    const cats = {}, tags = {};
+    posts.forEach(p => {
+      const c = p.category || 'uncategorized';
+      cats[c] = (cats[c]||0) + 1;
+      (p.tags||[]).forEach(t => { tags[t] = (tags[t]||0) + 1; });
+    });
+    return c.json({
+      categories: Object.entries(cats).map(([n, c]) => ({ name: n, count: c })),
+      tags: Object.entries(tags).map(([n, c]) => ({ name: n, count: c })),
+    });
+  } catch { return c.json({ categories: [], tags: [] }); }
+});
+
+// Trash (stub — GitHub doesn't have trash, return empty)
+app.get('/api/trash', (c) => c.json([]));
+
+// Disk usage (stub)
+app.get('/api/disk', (c) => c.json({ content: 0, contentMB: '0' }));
+
+// Recent files (stub)
+app.get('/api/recent-files', (c) => c.json([]));
+
+// Build logs (stub)
+app.get('/api/logs', (c) => c.json([]));
+
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', version: '0.8.0' }));
 
