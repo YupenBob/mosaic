@@ -3,11 +3,11 @@
 </p>
 
 <h1 align="center">Mosaic</h1>
-<p align="center"><em>拼图成画</em></p>
+<p align="center"><em>你的个人B站 —— 不是挂 MP4 的 Hexo 博客</em></p>
 
 <p align="center">
-  纯静态多媒体站点生成器。<br/>
-  Markdown 写进去，漂亮站点吐出来。云端管理，零运维。
+  Markdown 写故事，照片视频做主角。<br/>
+  云端管理 · 零运维 · 纯静态。
 </p>
 
 <p align="center">

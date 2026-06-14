@@ -2,7 +2,7 @@
   "_comment": "Mosaic Configuration — see README for full documentation",
 
   "title": "Mosaic",
-  "subtitle": "Pieces Together",
+  "subtitle": "你的个人B站",
   "description": "A pure static multimedia site generator.",
   "url": "https://mosaic-b3z.pages.dev",
   "apiBase": "https://mosaic-api.yupenbob.workers.dev/api",
