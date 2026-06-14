@@ -7,7 +7,7 @@
 
 <p align="center">
   Markdown 写故事，照片视频做主角。<br/>
-  云端管理 · 零运维 · 纯静态。
+  0成本 · 云端管理 · 零运维 · 纯静态。
 </p>
 
 <p align="center">
