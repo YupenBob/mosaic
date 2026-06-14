@@ -10,6 +10,8 @@ import { CONTENT_DIR, DIST_DIR, ensureDir, computeScore, writeJSON, readJSON, re
 //   neither set         → relative paths (media in CF Pages, backward compat)
 const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
 const USE_PROXY = !process.env.R2_PUBLIC_URL && !!process.env.WORKER_API_BASE;
+if (MEDIA_BASE) console.log(`[generate-data] Media base: ${MEDIA_BASE} (proxy: ${USE_PROXY})`);
+else console.log('[generate-data] No media base configured — using relative paths');
 
 function rewriteMediaPaths(post, photos, videos, cover) {
   if (!MEDIA_BASE) return { photos, videos, cover };

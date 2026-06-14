@@ -21,44 +21,58 @@ export async function uploadDirect(c) {
   return c.json({ ok: true, key, filename, folder });
 }
 
-// List media from R2 (not GitHub — shows uploaded files immediately)
+// List media from R2 — searches both originals/ and processed/
 export async function listMedia(c) {
   const slug = c.req.param('slug');
+  const seen = new Set();
   const result = { photos: [], videos: [], music: [] };
+
+  const add = (name, url, size) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    const ext = name.split('.').pop()?.toLowerCase();
+    if (['jpg','jpeg','png','webp','gif','svg'].includes(ext)) result.photos.push({ name, url, size });
+    else if (['mp4','mov','mkv','webm'].includes(ext)) result.videos.push({ name, url, size });
+    else if (['mp3','flac','wav','ogg'].includes(ext)) result.music.push({ name, url, size });
+  };
+
   try {
-    const list = await c.env.MEDIA.list({ prefix: `originals/${slug}/` });
-    for (const obj of (list.objects || [])) {
-      const name = obj.key.split('/').pop();
-      if (!name || name.startsWith('.')) continue;
-      const ext = name.split('.').pop()?.toLowerCase();
-      if (['jpg','jpeg','png','webp','gif','svg'].includes(ext)) {
-        result.photos.push({ name, url: `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`, size: obj.size });
-      } else if (['mp4','mov','mkv','webm'].includes(ext)) {
-        result.videos.push({ name, url: `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`, size: obj.size });
-      } else if (['mp3','flac','wav','ogg'].includes(ext)) {
-        result.music.push({ name, url: `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`, size: obj.size });
+    for (const prefix of ['processed', 'originals']) {
+      const list = await c.env.MEDIA.list({ prefix: `${prefix}/${slug}/` });
+      for (const obj of (list.objects || [])) {
+        const name = obj.key.split('/').pop();
+        if (!name || name.startsWith('.')) continue;
+        add(name, `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`, obj.size);
       }
     }
   } catch (e) { /* return empty */ }
   return c.json(result);
 }
 
-// Serve a media file from R2
+// Serve a media file from R2 (searches both originals/ and processed/)
 export async function serveMediaFile(c) {
   const slug = c.req.param('slug');
   const filename = c.req.param('filename');
-  // Try common folders
-  for (const folder of ['photos', 'videos', 'music', 'others']) {
-    const key = `originals/${slug}/${folder}/${filename}`;
-    const obj = await c.env.MEDIA.get(key);
-    if (obj) {
-      return new Response(obj.body, {
-        headers: {
-          'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
-          'Cache-Control': 'public, max-age=31536000',
-          'ETag': obj.httpEtag || '',
-        },
-      });
+
+  // Search order: processed (compressed) first, then originals
+  const prefixes = ['processed', 'originals'];
+  const folders = ['photos', 'videos', 'music', 'covers', 'others'];
+
+  for (const prefix of prefixes) {
+    for (const folder of folders) {
+      const key = `${prefix}/${slug}/${folder}/${filename}`;
+      try {
+        const obj = await c.env.MEDIA.get(key);
+        if (obj) {
+          return new Response(obj.body, {
+            headers: {
+              'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+              'Cache-Control': 'public, max-age=31536000',
+              'ETag': obj.httpEtag || '',
+            },
+          });
+        }
+      } catch {}
     }
   }
   return c.json({ error: 'File not found', code: 'NOT_FOUND' }, 404);

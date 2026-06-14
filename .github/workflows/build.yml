@@ -100,7 +100,15 @@ jobs:
           WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
           NODE_ENV: production
 
-      # ── 6b. Strip media from dist (served via R2) ──
+      # ── 6b. Rewrite media URLs in HTML to R2/Worker ──
+      - name: Rewrite media URLs to R2/Worker
+        if: ${{ secrets.R2_PUBLIC_URL != '' || secrets.WORKER_API_BASE != '' }}
+        run: node scripts/rewrite-media-urls.js
+        env:
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
+
+      # ── 6c. Strip media from dist (served from R2) ──
       - name: Strip media from dist (served from R2/Worker)
         if: ${{ secrets.R2_PUBLIC_URL != '' || secrets.WORKER_API_BASE != '' }}
         run: |
