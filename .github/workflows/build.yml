@@ -1,0 +1,175 @@
+name: Mosaic Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [publish]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  deployments: write
+
+concurrency:
+  group: mosaic-build
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+  R2_BUCKET: mosaic-media
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ─────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Setup FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg rclone
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 2. Sync media from R2 ───────────────
+      - name: Sync media from R2
+        run: |
+          if [ -n "$R2_ACCESS_KEY" ]; then
+            mkdir -p ~/.config/rclone
+            cat > ~/.config/rclone/rclone.conf << EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${{ secrets.R2_ACCESS_KEY }}
+          secret_access_key = ${{ secrets.R2_SECRET_KEY }}
+          endpoint = ${{ secrets.R2_ENDPOINT }}
+          acl = private
+          EOF
+            # Pull originals for processing
+            rclone copy r2:${R2_BUCKET}/originals/ content/posts/ \
+              --include "photos/**" --include "videos/**" --include "music/**" \
+              --include "cover.*" \
+              --transfers 4 --verbose
+            echo "Media synced from R2"
+          else
+            echo "R2 not configured, using local media only"
+          fi
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+
+      # ── 3. Compress images ──────────────────
+      - name: Compress images
+        run: node scripts/compress-images.js
+        env:
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+
+      # ── 4. Compress videos ──────────────────
+      - name: Compress videos
+        run: node scripts/compress-videos.js
+        env:
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+
+      # ── 5. Extract music metadata ───────────
+      - name: Extract music metadata
+        run: node scripts/extract-music-meta.js
+        env:
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+
+      # ── 6. Generate site ────────────────────
+      - name: Generate static site
+        run: npm run build
+        env:
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          NODE_ENV: production
+
+      # ── 7. Upload processed media to R2 ─────
+      - name: Upload processed media to R2
+        if: env.R2_ACCESS_KEY != ''
+        run: |
+          # Upload processed images, videos, music, and covers
+          for dir in content/posts/*/; do
+            slug=$(basename "$dir")
+            # Upload processed photos
+            if [ -d "${dir}photos" ]; then
+              rclone copy "${dir}photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" \
+                --include "*-480p.webp" --include "*-720p.webp" --include "*-1080p.webp" \
+                --include "*-meta.json" --transfers 4 --verbose --ignore-existing
+            fi
+            # Upload processed videos
+            if [ -d "${dir}videos" ]; then
+              rclone copy "${dir}videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" \
+                --include "*-480p.*" --include "*-720p.*" --include "*-1080p.*" \
+                --include "*-4K.*" --include "master.m3u8" --include "*-poster.jpg" \
+                --transfers 2 --verbose --ignore-existing
+            fi
+            # Upload processed music
+            if [ -d "${dir}music" ]; then
+              rclone copy "${dir}music" "r2:${R2_BUCKET}/processed/${slug}/music/" \
+                --include "*-320k.mp3" --include "*-128k.mp3" --include "*-cover.webp" \
+                --include "music-meta.json" --include "waveform.json" \
+                --transfers 4 --verbose --ignore-existing
+            fi
+            # Upload covers
+            if [ -d "${dir}media" ]; then
+              rclone copy "${dir}media" "r2:${R2_BUCKET}/processed/${slug}/covers/" \
+                --include "cover-*p.webp" --include "cover-meta.json" \
+                --transfers 4 --verbose --ignore-existing
+            fi
+          done
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+
+      # ── 8. Upload search index to R2 ────────
+      - name: Upload search index to R2
+        if: env.R2_ACCESS_KEY != ''
+        run: |
+          echo "Uploading search index..."
+          rclone copy dist/data/search-index.json "r2:${R2_BUCKET}/site-data/" --verbose
+          rclone copy dist/data/posts.json "r2:${R2_BUCKET}/site-data/" --verbose
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+
+      # ── 9. Upload to Cloudflare Pages ────────
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: mosaic
+          directory: dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 10. Cleanup temp media ──────────────
+      - name: Cleanup temporary media files
+        if: always()
+        run: |
+          find content/posts/ -name "*.jpg" -delete
+          find content/posts/ -name "*.jpeg" -delete
+          find content/posts/ -name "*.png" -delete
+          find content/posts/ -name "*.webp" -delete
+          find content/posts/ -name "*.mp4" -delete
+          find content/posts/ -name "*.mp3" -delete
+          find content/posts/ -name "*.m3u8" -delete
+          find content/posts/ -name "*.ts" -delete
+          echo "Temporary media cleaned"

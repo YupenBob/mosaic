@@ -1,0 +1,10 @@
+# Mosaic Cloud Admin — deployed to Cloudflare Pages
+name = "mosaic-admin"
+compatibility_date = "2025-06-01"
+
+# Build output is just the static files in this directory
+pages_build_output_dir = "."
+
+# Environment variables (set via CF Dashboard or wrangler CLI)
+[vars]
+API_BASE = "https://api.example.com"  # Change to your Worker URL

@@ -1,0 +1,30 @@
+name = "mosaic-api"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+# Route: api.example.com (configure via CF Dashboard)
+# Worker → Route binding done in Cloudflare Dashboard, not here
+
+# R2 Bucket binding
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "mosaic-media"
+
+# KV Namespace for auth sessions
+[[kv_namespaces]]
+binding = "AUTH"
+id = "b04b43f7b1c6421a892a985362fdd620"
+
+# Environment variables
+[vars]
+GITHUB_OWNER = ""          # GitHub username/org
+GITHUB_REPO = ""           # Repository name
+GITHUB_TOKEN = ""          # Set via `wrangler secret put GITHUB_TOKEN`
+JWT_SECRET = ""            # Set via `wrangler secret put JWT_SECRET`
+ADMIN_PASSWORD_HASH = ""   # Set via `wrangler secret put ADMIN_PASSWORD_HASH`
+R2_PUBLIC_URL = ""         # e.g. https://media.example.com
+SITE_URL = ""              # e.g. https://example.com
+
+[observability]
+enabled = true
+head_sampling_rate = 1
