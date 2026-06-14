@@ -178,14 +178,31 @@ export async function generateData(site) {
   const posts = await parsePosts(site);
   log(`Parsed ${posts.length} posts`);
 
-  // Build categories
-  const categoryMap = {};
+  // Build categories (multi-level via /)
+  const catTree = {}, catFlat = {};
   for (const post of posts) {
-    const cat = post.category || 'uncategorized';
-    if (!categoryMap[cat]) categoryMap[cat] = { name: cat, count: 0, slug: cat.toLowerCase().replace(/\s+/g, '-') };
-    categoryMap[cat].count++;
+    const parts = (post.category || 'uncategorized').split('/');
+    let leaf = catTree;
+    let path = '';
+    parts.forEach((p, i) => {
+      const name = p.trim();
+      if (!name) return;
+      path += (i > 0 ? '/' : '') + name;
+      if (!leaf[name]) leaf[name] = { _children: {}, _count: 0 };
+      leaf[name]._count++;
+      if (!catFlat[path]) catFlat[path] = { name, fullPath: path, slug: path.toLowerCase().replace(/\s+/g, '-').replace(/\//g, '/'), count: 0, depth: i };
+      catFlat[path].count++;
+      leaf = leaf[name]._children;
+    });
   }
-  const categories = Object.values(categoryMap);
+  function flattenTree(t, d) {
+    return Object.keys(t).filter(k => !k.startsWith('_')).map(k => ({
+      name: k, slug: k.toLowerCase().replace(/\s+/g, '-'), count: t[k]._count, depth: d || 0,
+      children: flattenTree(t[k]._children, (d || 0) + 1)
+    }));
+  }
+  const categories = flattenTree(catTree, 0);
+  const flatCategories = Object.values(catFlat);
 
   // Build tags
   const tagMap = {};

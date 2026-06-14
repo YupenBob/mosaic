@@ -316,7 +316,8 @@ function resetZoom() {
 function applyTransform() {
   const img = $('#gallery-current-img');
   if (!img) return;
-  const t = `scale(${zoomState.scale}) translate(${zoomState.panX}px, ${zoomState.panY}px)`;
+  // translate BEFORE scale: pan values are in screen pixels, scale doesn't amplify them
+  const t = `translate(${zoomState.panX}px, ${zoomState.panY}px) scale(${zoomState.scale})`;
   img.style.transform = t;
   img.style.cursor = zoomState.scale > 1 ? 'grab' : '';
 }
@@ -375,13 +376,13 @@ function setupGestures(overlay) {
     img.addEventListener('mousedown', (e) => {
       if (zoomState.scale <= 1) return;
       e.preventDefault();
-      dragStart = { x: e.clientX - zoomState.panX * zoomState.scale, y: e.clientY - zoomState.panY * zoomState.scale };
+      dragStart = { x: e.clientX - zoomState.panX, y: e.clientY - zoomState.panY };
       img.style.cursor = 'grabbing';
     });
     document.addEventListener('mousemove', (e) => {
       if (!dragStart) return;
-      zoomState.panX = (e.clientX - dragStart.x) / zoomState.scale;
-      zoomState.panY = (e.clientY - dragStart.y) / zoomState.scale;
+      zoomState.panX = e.clientX - dragStart.x;
+      zoomState.panY = e.clientY - dragStart.y;
       applyTransform();
     });
     document.addEventListener('mouseup', () => {
