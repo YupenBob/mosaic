@@ -108,59 +108,51 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
 
-      # ── 6c. Strip media from dist (served from R2) ──
-      - name: Strip media from dist (served from R2/Worker)
-        if: ${{ secrets.R2_PUBLIC_URL != '' || secrets.WORKER_API_BASE != '' }}
-        run: |
-          echo "Stripping media from dist — will be served from R2"
-          find dist -type d -name "media" -exec rm -rf {} + 2>/dev/null || true
-          find dist -type d -name "photos" -exec rm -rf {} + 2>/dev/null || true
-          find dist -type d -name "videos" -exec rm -rf {} + 2>/dev/null || true
-          find dist -type d -name "music" -exec rm -rf {} + 2>/dev/null || true
-          echo "Media stripped, R2 will serve these files"
-
       # ── 7. Upload processed media to R2 ─────
       - name: Upload processed media to R2
-        if: env.R2_ACCESS_KEY != ''
+        if: ${{ secrets.R2_ACCESS_KEY != '' }}
         run: |
-          # Upload processed images, videos, music, and covers
-          for dir in content/posts/*/; do
+          echo "Uploading processed media from dist/ to R2..."
+          for dir in dist/posts/*/; do
             slug=$(basename "$dir")
-            # Upload processed photos
-            if [ -d "${dir}photos" ]; then
-              rclone copy "${dir}photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" \
-                --include "*-480p.webp" --include "*-720p.webp" --include "*-1080p.webp" \
-                --include "*-meta.json" --transfers 4 --verbose --ignore-existing
+            mediaDir="${dir}media"
+            if [ ! -d "$mediaDir" ]; then continue; fi
+            # Upload photos
+            if [ -d "${mediaDir}/photos" ]; then
+              echo "  ${slug}/photos"
+              rclone copy "${mediaDir}/photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" \
+                --transfers 4 --verbose --ignore-existing
             fi
-            # Upload processed videos
-            if [ -d "${dir}videos" ]; then
-              rclone copy "${dir}videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" \
-                --include "*-480p.*" --include "*-720p.*" --include "*-1080p.*" \
-                --include "*-4K.*" --include "master.m3u8" --include "*-poster.jpg" \
+            # Upload videos
+            if [ -d "${mediaDir}/videos" ]; then
+              echo "  ${slug}/videos"
+              rclone copy "${mediaDir}/videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" \
                 --transfers 2 --verbose --ignore-existing
             fi
-            # Upload processed music
-            if [ -d "${dir}music" ]; then
-              rclone copy "${dir}music" "r2:${R2_BUCKET}/processed/${slug}/music/" \
-                --include "*-320k.mp3" --include "*-128k.mp3" --include "*-cover.webp" \
-                --include "music-meta.json" --include "waveform.json" \
-                --transfers 4 --verbose --ignore-existing
-            fi
             # Upload covers
-            if [ -d "${dir}media" ]; then
-              rclone copy "${dir}media" "r2:${R2_BUCKET}/processed/${slug}/covers/" \
-                --include "cover-*p.webp" --include "cover-meta.json" \
-                --transfers 4 --verbose --ignore-existing
-            fi
+            rclone copy "${mediaDir}" "r2:${R2_BUCKET}/processed/${slug}/covers/" \
+              --include "cover-*" --include "*-meta.json" \
+              --transfers 4 --verbose --ignore-existing 2>/dev/null || true
           done
+          echo "Upload complete"
         env:
           R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
           R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
-      # ── 8. Upload search index to R2 ────────
+      # ── 8. Strip media from dist (now served from R2) ──
+      - name: Strip media from dist
+        if: ${{ secrets.R2_PUBLIC_URL != '' || secrets.WORKER_API_BASE != '' }}
+        run: |
+          echo "Stripping media from dist/"
+          find dist -type d -name "media" -exec rm -rf {} + 2>/dev/null || true
+          echo "Media stripped"
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+
+      # ── 9. Upload search index to R2 ────────
       - name: Upload search index to R2
-        if: env.R2_ACCESS_KEY != ''
+        if: ${{ secrets.R2_ACCESS_KEY != '' }}
         run: |
           echo "Uploading search index..."
           rclone copy dist/data/search-index.json "r2:${R2_BUCKET}/site-data/" --verbose
