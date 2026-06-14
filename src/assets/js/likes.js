@@ -1,27 +1,35 @@
 /**
- * Like button - localStorage backed
+ * Like button — localStorage backed with Worker API sync
  */
 import { $ } from './utils.js';
 
 const STORAGE_KEY = 'mosaic_likes';
+let API_BASE = '';
 
-export function initLikes() {
+export function initLikes(config) {
   const btn = $('.like-button');
   if (!btn) return;
 
+  API_BASE = config?.apiBase || '';
   const slug = btn.dataset.slug;
   const countEl = btn.querySelector('.like-count');
   if (!slug) return;
 
-  // Read current state
   let likedSet = loadLikedSet();
   let count = parseInt(btn.dataset.count) || 0;
   const liked = likedSet.has(slug);
 
-  // Update UI
+  // Fetch real count from API
+  if (API_BASE) {
+    fetch(`${API_BASE}/like/${encodeURIComponent(slug)}/count`)
+      .then(r => r.json())
+      .then(d => { if (d.count !== undefined) { count = d.count; updateLikeButton(btn, count, liked, countEl); } })
+      .catch(() => {});
+  }
+
   updateLikeButton(btn, count, liked, countEl);
 
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     likedSet = loadLikedSet();
     const currentlyLiked = likedSet.has(slug);
 
@@ -35,8 +43,15 @@ export function initLikes() {
 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify([...likedSet]));
-    } catch {
-      // localStorage full or unavailable, silently ignore
+    } catch {}
+
+    // Sync to API
+    if (API_BASE) {
+      try {
+        const r = await fetch(`${API_BASE}/like/${encodeURIComponent(slug)}`, { method: 'POST' });
+        const d = await r.json();
+        count = d.count;
+      } catch {}
     }
 
     updateLikeButton(btn, count, !currentlyLiked, countEl);
@@ -47,9 +62,7 @@ function loadLikedSet() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return new Set(raw ? JSON.parse(raw) : []);
-  } catch {
-    return new Set();
-  }
+  } catch { return new Set(); }
 }
 
 function updateLikeButton(btn, count, liked, countEl) {

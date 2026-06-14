@@ -29,11 +29,22 @@ register({ name: 'video', enabled: true, page: 'post',
   }
 });
 
+register({ name: 'track', enabled: true, page: 'post',
+  async init(el, cfg) {
+    const apiBase = document.querySelector('meta[name="api-base"]')?.content;
+    if (apiBase) {
+      const { initTracking } = await import('./track.js');
+      initTracking({ apiBase });
+    }
+  }
+});
+
 register({ name: 'likes', enabled: true, page: 'post',
   async init(el, cfg) {
     if ($('.like-button')) {
       const { initLikes } = await import('./likes.js');
-      initLikes();
+      const apiBase = document.querySelector('meta[name="api-base"]')?.content;
+      initLikes({ apiBase });
     }
   }
 });

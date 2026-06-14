@@ -97,7 +97,19 @@ jobs:
         env:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           SITE_URL: ${{ secrets.SITE_URL }}
+          WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
           NODE_ENV: production
+
+      # ── 6b. Strip media from dist (served via R2) ──
+      - name: Strip media from dist (served from R2/Worker)
+        if: ${{ secrets.R2_PUBLIC_URL != '' || secrets.WORKER_API_BASE != '' }}
+        run: |
+          echo "Stripping media from dist — will be served from R2"
+          find dist -type d -name "media" -exec rm -rf {} + 2>/dev/null || true
+          find dist -type d -name "photos" -exec rm -rf {} + 2>/dev/null || true
+          find dist -type d -name "videos" -exec rm -rf {} + 2>/dev/null || true
+          find dist -type d -name "music" -exec rm -rf {} + 2>/dev/null || true
+          echo "Media stripped, R2 will serve these files"
 
       # ── 7. Upload processed media to R2 ─────
       - name: Upload processed media to R2

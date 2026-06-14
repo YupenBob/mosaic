@@ -4,6 +4,40 @@ import matter from 'gray-matter';
 import { marked } from 'marked';
 import { CONTENT_DIR, DIST_DIR, ensureDir, computeScore, writeJSON, readJSON, readFile, log, warn } from './utils.js';
 
+// Media URL rewrite:
+//   R2_PUBLIC_URL set  → direct R2 access (public bucket)
+//   WORKER_API_BASE set → Worker proxy (R2 stays private)
+//   neither set         → relative paths (media in CF Pages, backward compat)
+const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
+const USE_PROXY = !process.env.R2_PUBLIC_URL && !!process.env.WORKER_API_BASE;
+
+function rewriteMediaPaths(post, photos, videos, cover) {
+  if (!MEDIA_BASE) return { photos, videos, cover };
+
+  const fix = (relPath) => {
+    if (!relPath || !relPath.startsWith('media/')) return relPath;
+    const filename = relPath.split('/').pop();
+    if (USE_PROXY) {
+      // Worker proxy (R2 stays private)
+      return `${MEDIA_BASE}/api/media/file/${encodeURIComponent(post.slug)}/${encodeURIComponent(filename)}`;
+    }
+    // R2 public URL (direct access)
+    const folder = relPath.includes('/cover') ? 'covers' :
+      (relPath.match(/media\/(photos|videos|music)\//) || [])[1] || '';
+    return `${MEDIA_BASE}/processed/${post.slug}/${folder}/${filename}`;
+  };
+
+  return {
+    photos: photos.map(p => { ['src480','src720','src1080','thumb'].forEach(k => { if (p[k]) p[k] = fix(p[k]); }); return p; }),
+    videos: videos.map(v => {
+      ['hls','poster','src'].forEach(k => { if (v[k]) v[k] = fix(v[k]); });
+      if (v.sources) Object.keys(v.sources).forEach(k => { v.sources[k] = fix(v.sources[k]); });
+      return v;
+    }),
+    cover: fix(cover) || cover,
+  };
+}
+
 /**
  * Parse all posts from content/ directory
  */
@@ -149,6 +183,12 @@ async function parsePosts(site) {
       coverPath = 'media/cover-1080p.webp';
     }
 
+    // Rewrite media paths to R2/Worker if configured
+    const rw = rewriteMediaPaths({ slug }, photos, videos, coverPath);
+    if (MEDIA_BASE && coverSrcset) {
+      for (const k of Object.keys(coverSrcset)) coverSrcset[k] = rw.cover.replace(/cover-1080p/, `cover-${k}p`);
+    }
+
     posts.push({
       slug,
       title,
@@ -158,12 +198,12 @@ async function parsePosts(site) {
       description,
       layout,
       videoMode,
-      cover: coverPath,
+      cover: rw.cover,
       coverAspect,
       coverSrcset,
       bodyHTML,
-      photos,
-      videos,
+      photos: rw.photos,
+      videos: rw.videos,
       stats: { views, likes, dwell_time: dwellTime },
       score,
     });

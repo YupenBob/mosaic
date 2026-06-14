@@ -4,7 +4,8 @@
   "title": "Mosaic",
   "subtitle": "Pieces Together",
   "description": "A pure static multimedia site generator.",
-  "url": "https://yupenbob.github.io/mosaic",
+  "url": "https://mosaic-b3z.pages.dev",
+  "apiBase": "https://mosaic-api.yupenbob.workers.dev/api",
   "language": "zh-CN",
 
   "author": {
