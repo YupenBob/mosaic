@@ -102,7 +102,6 @@ jobs:
 
       # ── 6b. Rewrite media URLs in HTML to R2/Worker ──
       - name: Rewrite media URLs to R2/Worker
-        if: ${{ secrets.R2_PUBLIC_URL != '' || secrets.WORKER_API_BASE != '' }}
         run: node scripts/rewrite-media-urls.js
         env:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
@@ -110,8 +109,8 @@ jobs:
 
       # ── 7. Upload processed media to R2 ─────
       - name: Upload processed media to R2
-        if: ${{ secrets.R2_ACCESS_KEY != '' }}
         run: |
+          if [ -z "$R2_ACCESS_KEY" ]; then echo "No R2_ACCESS_KEY, skipping"; exit 0; fi
           echo "Uploading processed media from dist/ to R2..."
           for dir in dist/posts/*/; do
             slug=$(basename "$dir")
@@ -142,18 +141,16 @@ jobs:
 
       # ── 8. Strip media from dist (now served from R2) ──
       - name: Strip media from dist
-        if: ${{ secrets.R2_PUBLIC_URL != '' || secrets.WORKER_API_BASE != '' }}
         run: |
+          if [ -z "$WORKER_API_BASE" ] && [ -z "$R2_PUBLIC_URL" ]; then echo "No proxy configured, keeping media"; exit 0; fi
           echo "Stripping media from dist/"
           find dist -type d -name "media" -exec rm -rf {} + 2>/dev/null || true
           echo "Media stripped"
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
       # ── 9. Upload search index to R2 ────────
       - name: Upload search index to R2
-        if: ${{ secrets.R2_ACCESS_KEY != '' }}
         run: |
+          if [ -z "$R2_ACCESS_KEY" ]; then echo "No R2_ACCESS_KEY, skipping"; exit 0; fi
           echo "Uploading search index..."
           rclone copy dist/data/search-index.json "r2:${R2_BUCKET}/site-data/" --verbose
           rclone copy dist/data/posts.json "r2:${R2_BUCKET}/site-data/" --verbose

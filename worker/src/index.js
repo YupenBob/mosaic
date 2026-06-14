@@ -406,6 +406,40 @@ app.delete('/api/media/:slug/:file', async (c) => {
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 
+// Admin: push files to GitHub (bypasses local git push issues — uses Worker's GITHUB_TOKEN)
+app.post('/api/admin/push-files', async (c) => {
+  try {
+    const { files } = await c.req.json();
+    if (!files || !Array.isArray(files)) return c.json({ error: 'files array required' }, 400);
+    const ghHeaders = {
+      Authorization: `Bearer ${c.env.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json', 'User-Agent': 'Mosaic/0.8', 'Content-Type': 'application/json',
+    };
+    const encoder = new TextEncoder();
+    function b64(s) {
+      const bytes = encoder.encode(s);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin);
+    }
+    const results = [];
+    for (const { path: filePath, content } of files) {
+      let sha = '';
+      try {
+        const existing = await fetch(`https://api.github.com/repos/${c.env.GITHUB_REPO}/contents/${filePath}`, { headers: ghHeaders });
+        if (existing.ok) { const f = await existing.json(); sha = f.sha; }
+      } catch {}
+      const payload = { message: 'fix: build pipeline', content: b64(content) };
+      if (sha) payload.sha = sha;
+      const resp = await fetch(`https://api.github.com/repos/${c.env.GITHUB_REPO}/contents/${filePath}`, {
+        method: 'PUT', headers: ghHeaders, body: JSON.stringify(payload),
+      });
+      results.push({ path: filePath, status: resp.status, action: sha ? 'updated' : 'created' });
+    }
+    return c.json({ ok: true, results });
+  } catch (e) { return c.json({ error: e.message }, 502); }
+});
+
 // Trash (stub — GitHub doesn't have trash, return empty)
 app.get('/api/trash', (c) => c.json([]));
 app.post('/api/trash/:dir/restore', (c) => c.json({ ok: true }));
