@@ -9,14 +9,15 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "hono": "^4.0.0",
-    "jose": "^5.2.0",
     "@aws-sdk/client-s3": "^3.500.0",
-    "@aws-sdk/s3-request-presigner": "^3.500.0"
+    "@aws-sdk/s3-request-presigner": "^3.500.0",
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.0.0",
+    "jose": "^5.2.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250121.0",
-    "wrangler": "^3.100.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "wrangler": "^3.100.0"
   }
 }
