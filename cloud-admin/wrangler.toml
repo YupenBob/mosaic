@@ -7,4 +7,4 @@ pages_build_output_dir = "."
 
 # Environment variables (set via CF Dashboard or wrangler CLI)
 [vars]
-API_BASE = "https://api.example.com"  # Change to your Worker URL
+API_BASE = "https://mosaic-api.yupenbob.workers.dev/api"

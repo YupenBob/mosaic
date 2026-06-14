@@ -70,13 +70,13 @@ export const posts = {
     apiFetch('/posts', { method: 'POST', body: JSON.stringify(data) }),
 
   update: (slug, data) =>
-    apiFetch(`/posts/${slug}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch('/posts', { method: 'POST', body: JSON.stringify({ slug, ...data }) }),
 
   delete: (slug) =>
     apiFetch(`/posts/${slug}`, { method: 'DELETE' }),
 
   duplicate: (slug, newSlug) =>
-    apiFetch(`/posts/${slug}/duplicate`, { method: 'POST', body: JSON.stringify({ slug: newSlug }) }),
+    apiFetch(`/posts/${slug}/duplicate`, { method: 'POST', body: JSON.stringify({ newSlug }) }),
 };
 
 // ── Media ──────────────────────────────────
@@ -87,15 +87,18 @@ export const media = {
     apiFetch(`/media/${encodeURIComponent(slug)}/${encodeURIComponent(file)}?type=${type}`, { method: 'DELETE' }),
 };
 
-// ── Upload ─────────────────────────────────
+// ── Upload (direct to Worker → R2) ─
 export const upload = {
-  init: (data) =>
-    apiFetch('/upload/init', { method: 'POST', body: JSON.stringify(data) }),
+  /** Direct upload via Worker (primary) */
+  directUrl: (slug, filename) =>
+    `${API_BASE}/upload/direct/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`,
 
-  complete: (uploadId) =>
-    apiFetch('/upload/complete', { method: 'POST', body: JSON.stringify({ uploadId }) }),
-
-  status: (id) => apiFetch(`/upload/status/${id}`),
+  /** Presigned URL for large files (fallback) */
+  presign: (slug, filename, contentType) =>
+    apiFetch('/upload/presign', {
+      method: 'POST',
+      body: JSON.stringify({ slug, filename, contentType: contentType || 'application/octet-stream' }),
+    }),
 };
 
 // ── Build ──────────────────────────────────
@@ -104,12 +107,24 @@ export const build = {
 
   history: () => apiFetch('/build/history'),
 
-  trigger: () => apiFetch('/publish', { method: 'POST' }),
+  trigger: () => apiFetch('/build', { method: 'POST' }),
 };
 
 // ── Stats ──────────────────────────────────
 export const stats = {
-  dashboard: () => apiFetch('/stats/dashboard'),
+  dashboard: () => apiFetch('/stats'),
+  traffic: () => apiFetch('/stats/traffic'),
+};
+
+// ── Track ──────────────────────────────────
+export const track = {
+  view: (slug, category, tags) => apiFetch('/track/view', { method: 'POST', body: JSON.stringify({ slug, category, tags }) }),
+};
+
+// ── Likes ──────────────────────────────────
+export const likes = {
+  toggle: (slug) => apiFetch(`/like/${encodeURIComponent(slug)}`, { method: 'POST' }),
+  count: (slug) => apiFetch(`/like/${encodeURIComponent(slug)}/count`),
 };
 
 // ── Config ─────────────────────────────────
@@ -144,4 +159,6 @@ export const disk = {
 // ── Health ─────────────────────────────────
 export const health = {
   check: () => apiFetch('/health'),
+  github: () => apiFetch('/health/github'),
+  r2: () => apiFetch('/health/r2'),
 };
