@@ -100,36 +100,11 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
 
-      # ── 7. Upload processed media to R2 ─────
-      - name: Upload processed media to R2
+      # ── 7. Upload processed media to R2 via Worker ──
+      - name: Upload processed media via Worker
+        run: node scripts/upload-to-r2.js
         env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET: mosaic-media
-        run: |
-          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skipping (no R2 creds)"; exit 0; fi
-          # Setup rclone config (printf avoids heredoc indent issue)
-          mkdir -p ~/.config/rclone
-          printf '[r2]\ntype = s3\nprovider = Cloudflare\naccess_key_id = %s\nsecret_access_key = %s\nendpoint = %s\nacl = private\n' \
-            "$R2_ACCESS_KEY" "$R2_SECRET_KEY" "$R2_ENDPOINT" > ~/.config/rclone/rclone.conf
-          echo "rclone configured, endpoint: ${R2_ENDPOINT}"
-          echo "Uploading processed media from dist/ to R2..."
-          for dir in dist/posts/*/; do
-            slug=$(basename "$dir")
-            mediaDir="${dir}media"
-            [ -d "$mediaDir" ] || continue
-            if [ -d "${mediaDir}/photos" ]; then
-              echo "  ${slug}/photos"
-              rclone copy "${mediaDir}/photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" --transfers 4 -v --ignore-existing
-            fi
-            if [ -d "${mediaDir}/videos" ]; then
-              echo "  ${slug}/videos"
-              rclone copy "${mediaDir}/videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" --transfers 2 -v --ignore-existing
-            fi
-            rclone copy "${mediaDir}" "r2:${R2_BUCKET}/processed/${slug}/covers/" --include "cover-*" --transfers 4 -v --ignore-existing 2>/dev/null || true
-          done
-          echo "Upload complete"
+          WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
 
       # ── 8. Strip media from dist (now served from R2) ──
       - name: Strip media from dist
