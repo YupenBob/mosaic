@@ -109,35 +109,41 @@ jobs:
 
       # ── 7. Upload processed media to R2 ─────
       - name: Upload processed media to R2
-        run: |
-          if [ -z "$R2_ACCESS_KEY" ]; then echo "No R2_ACCESS_KEY, skipping"; exit 0; fi
-          echo "Uploading processed media from dist/ to R2..."
-          for dir in dist/posts/*/; do
-            slug=$(basename "$dir")
-            mediaDir="${dir}media"
-            if [ ! -d "$mediaDir" ]; then continue; fi
-            # Upload photos
-            if [ -d "${mediaDir}/photos" ]; then
-              echo "  ${slug}/photos"
-              rclone copy "${mediaDir}/photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" \
-                --transfers 4 --verbose --ignore-existing
-            fi
-            # Upload videos
-            if [ -d "${mediaDir}/videos" ]; then
-              echo "  ${slug}/videos"
-              rclone copy "${mediaDir}/videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" \
-                --transfers 2 --verbose --ignore-existing
-            fi
-            # Upload covers
-            rclone copy "${mediaDir}" "r2:${R2_BUCKET}/processed/${slug}/covers/" \
-              --include "cover-*" --include "*-meta.json" \
-              --transfers 4 --verbose --ignore-existing 2>/dev/null || true
-          done
-          echo "Upload complete"
         env:
           R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
           R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: mosaic-media
+        run: |
+          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skipping (no R2 creds)"; exit 0; fi
+          # Setup rclone config
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << RCLONE_EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${R2_ACCESS_KEY}
+          secret_access_key = ${R2_SECRET_KEY}
+          endpoint = ${R2_ENDPOINT}
+          acl = private
+          RCLONE_EOF
+          echo "rclone configured, endpoint: ${R2_ENDPOINT}"
+          echo "Uploading processed media from dist/ to R2..."
+          for dir in dist/posts/*/; do
+            slug=$(basename "$dir")
+            mediaDir="${dir}media"
+            [ -d "$mediaDir" ] || continue
+            if [ -d "${mediaDir}/photos" ]; then
+              echo "  ${slug}/photos"
+              rclone copy "${mediaDir}/photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" --transfers 4 -v --ignore-existing
+            fi
+            if [ -d "${mediaDir}/videos" ]; then
+              echo "  ${slug}/videos"
+              rclone copy "${mediaDir}/videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" --transfers 2 -v --ignore-existing
+            fi
+            rclone copy "${mediaDir}" "r2:${R2_BUCKET}/processed/${slug}/covers/" --include "cover-*" --transfers 4 -v --ignore-existing 2>/dev/null || true
+          done
+          echo "Upload complete"
 
       # ── 8. Strip media from dist (now served from R2) ──
       - name: Strip media from dist
