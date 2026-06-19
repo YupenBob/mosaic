@@ -345,8 +345,17 @@ function setupGestures(overlay) {
       if (img) img.style.transform = zoomState.scale > 1 ? '' : `translateX(${touchState.cx - touchState.sx}px)`;
     } else if (e.touches.length === 2) {
       const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+      // Pinch center point — zoom toward it
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const rect = overlay.getBoundingClientRect();
+      const cx = midX - rect.left, cy = midY - rect.top;
       if (touchState.startDist > 0) {
-        zoomState.scale = Math.max(0.5, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
+        const oldScale = zoomState.scale;
+        const newScale = Math.max(0.5, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
+        zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
+        zoomState.panY = cy - (cy - zoomState.panY) * (newScale / oldScale);
+        zoomState.scale = newScale;
         applyTransform();
       }
     }
@@ -361,11 +370,18 @@ function setupGestures(overlay) {
     touchState.fingers = 0;
   });
 
-  // --- Mouse wheel zoom ---
+  // --- Mouse wheel zoom (centered on cursor) ---
   overlay.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    zoomState.scale = Math.max(0.5, Math.min(5, zoomState.scale + delta));
+    const rect = overlay.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const oldScale = zoomState.scale;
+    const newScale = Math.max(0.5, Math.min(5, oldScale + (e.deltaY > 0 ? -0.15 : 0.15)));
+    // Pan so the point under cursor stays still
+    zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
+    zoomState.panY = cy - (cy - zoomState.panY) * (newScale / oldScale);
+    zoomState.scale = newScale;
     applyTransform();
   }, { passive: false });
 
@@ -390,10 +406,17 @@ function setupGestures(overlay) {
     });
   }
 
-  // --- Double tap zoom ---
+  // --- Double tap zoom (centered on tap point) ---
   overlay.addEventListener('dblclick', (e) => {
     e.preventDefault();
-    if (zoomState.scale > 1.2) { resetZoom(); applyTransform(); }
-    else { zoomState.scale = 2; applyTransform(); }
+    if (zoomState.scale > 1.2) { resetZoom(); applyTransform(); return; }
+    const rect = overlay.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const oldScale = zoomState.scale;
+    const newScale = 2;
+    zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
+    zoomState.panY = cy - (cy - zoomState.panY) * (newScale / oldScale);
+    zoomState.scale = newScale;
+    applyTransform();
   });
 }
