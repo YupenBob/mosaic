@@ -240,7 +240,7 @@ function renderGallery(photos, threshold) {
       <div class="related-grid">
         <% related.forEach(function(r) { %>
         <a href="<%= rp %>posts/<%= r.slug %>/" class="related-card">
-          <% if (r.cover) { %><div class="related-cover"><img src="<%= rp %>posts/<%= r.slug %>/<%= r.cover %>" alt="" loading="lazy" /></div><% } %>
+          <% if (r.cover) { %><div class="related-cover"><img src="<% if (r.cover.startsWith('http')) { %><%= r.cover %><% } else { %><%= rp %>posts/<%= r.slug %>/<%= r.cover %><% } %>" alt="" loading="lazy" /></div><% } %>
           <span class="related-title"><%= r.title %></span>
         </a>
         <% }); %>

@@ -42,6 +42,17 @@ app.get('/api/health/r2', async (c) => {
 // Media file serving — public, no auth (for <img> tags in admin)
 app.get('/api/media/file/:slug/:filename', serveMediaFile);
 
+// Admin: upload file to R2 at any key path — public (for migration, no auth)
+app.post('/api/admin/r2-upload', async (c) => {
+  try {
+    const key = c.req.query('key');
+    if (!key) return c.json({ error: 'key query param required' }, 400);
+    const ct = c.req.header('Content-Type') || 'application/octet-stream';
+    await c.env.MEDIA.put(key, c.req.raw.body, { httpMetadata: { contentType: ct } });
+    return c.json({ ok: true, key });
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
 // Track page view — public, no auth (called by frontend site)
 app.post('/api/track/view', async (c) => {
   try {
