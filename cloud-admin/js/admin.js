@@ -299,7 +299,7 @@ pages.posts = async (signal) => {
         <div class="admin-card-grid">
           ${postsData.map(p => `
             <a href="#editor&slug=${encodeURIComponent(p.slug)}" class="admin-post-card" data-search="${(p.title||'') + ' ' + (p.category||'') + ' ' + (p.tags||[]).join(' ')}" data-cat="${escHtml(p.category||'')}">
-              ${p.cover ? `<div class="admin-card-cover"><img src="/api/media/file/${encodeURIComponent(p.slug)}/${encodeURIComponent(p.cover)}" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
+              ${(p.cover && !p.cover.startsWith('video:') && !p.cover.startsWith('photo:')) ? `<div class="admin-card-cover"><img src="https://mosaic-api.yupenbob.workers.dev/api/media/file/${encodeURIComponent(p.slug)}/${encodeURIComponent(p.cover)}" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
               <div class="admin-card-body">
                 <span class="admin-card-cat">${escHtml((p.category || 'Uncategorized').split('/').pop())}</span>
                 <h3 class="admin-card-title">${escHtml(p.title || p.slug)}</h3>
@@ -509,15 +509,18 @@ function buildCatOptions(postsData) {
       const name = part.trim();
       if (!name) continue;
       path += (path ? '/' : '') + name;
-      if (!node[name]) node[name] = { fullPath: path };
+      if (!node[name]) node[name] = { _path: path };
       node = node[name];
     }
   }
   function render(node, depth) {
-    return Object.entries(node).map(([name, info]) =>
-      `<option value="${escHtml(info.fullPath)}">${'&nbsp;&nbsp;'.repeat(depth)}${depth > 0 ? '└ ' : ''}${escHtml(name)}</option>` +
-      render(info, depth + 1)
-    ).join('');
+    return Object.entries(node)
+      .filter(([k]) => !k.startsWith('_'))
+      .map(([name, info]) => {
+        const hasChildren = Object.keys(info).some(k => !k.startsWith('_'));
+        return `<option value="${escHtml(info._path)}">${'&nbsp;&nbsp;'.repeat(depth)}${depth > 0 ? '└ ' : ''}${escHtml(name)}</option>` +
+          (hasChildren ? render(info, depth + 1) : '');
+      }).join('');
   }
   return render(tree, 0);
 }
@@ -710,31 +713,56 @@ async function handleUploadFiles(files) {
 
   for (const file of files) {
     const itemEl = document.createElement('div');
-    itemEl.style.cssText = 'padding:4px 0;font-size:13px';
-    itemEl.textContent = `${file.name} — uploading...`;
+    itemEl.className = 'upload-item';
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const icon = ['jpg','jpeg','png','webp','gif','svg'].includes(ext) ? 'ri-image-line' :
+                 ['mp4','mov','mkv','webm'].includes(ext) ? 'ri-video-line' :
+                 ['mp3','flac','wav','ogg'].includes(ext) ? 'ri-music-line' : 'ri-file-line';
+    const sizeStr = file.size > 1024*1024 ? (file.size/1024/1024).toFixed(1)+'MB' : (file.size/1024).toFixed(0)+'KB';
+    itemEl.innerHTML = `<div class="upload-item-icon"><i class="${icon}"></i></div>
+      <div class="upload-item-info">
+        <div class="upload-item-name">${escHtml(file.name)}</div>
+        <div class="upload-item-meta"><span>${sizeStr}</span></div>
+        <div class="upload-item-bar"><div class="upload-item-fill" style="width:0%"></div></div>
+      </div>
+      <div class="upload-item-status">0%</div>`;
     progressEl.appendChild(itemEl);
 
     try {
       const url = upload.directUrl(slug, file.name);
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        const fillEl = itemEl.querySelector('.upload-item-fill');
+        const statusEl = itemEl.querySelector('.upload-item-status');
+        const metaEl = itemEl.querySelector('.upload-item-meta');
         xhr.upload.addEventListener('progress', e => {
-          if (e.lengthComputable) itemEl.textContent = `${file.name} — ${Math.round(e.loaded / e.total * 100)}%`;
+          if (e.lengthComputable) {
+            const pct = Math.round(e.loaded / e.total * 100);
+            if (fillEl) fillEl.style.width = pct + '%';
+            if (statusEl) statusEl.textContent = pct + '%';
+            if (metaEl && pct >= 100) metaEl.innerHTML = '<span>Processing on server...</span>';
+          }
         });
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`HTTP ${xhr.status}`));
+          else reject(new Error('HTTP ' + xhr.status));
         });
         xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.timeout = 300000; // 5 min timeout for large files
+        xhr.upload.onprogress = xhr.upload.onprogress;
         xhr.open('POST', url);
         xhr.setRequestHeader('Authorization', 'Bearer ' + token);
         xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
         xhr.send(file);
       });
       done++;
-      itemEl.innerHTML = `<i class="ri-check-line" style="color:#2ecc71"></i> ${file.name} — done (${done}/${total})`;
+      itemEl.classList.add('upload-done');
+      itemEl.querySelector('.upload-item-status').textContent = '✅';
+      itemEl.querySelector('.upload-item-meta').innerHTML = '<span style="color:#2ecc71">Done</span>';
     } catch (err) {
-      itemEl.innerHTML = `<i class="ri-close-line" style="color:#e74c3c"></i> ${file.name} — ${escHtml(err.message)}`;
+      itemEl.classList.add('upload-error');
+      itemEl.querySelector('.upload-item-status').textContent = '❌';
+      itemEl.querySelector('.upload-item-meta').innerHTML = '<span style="color:#e74c3c">' + escHtml(err.message) + '</span>';
     }
   }
 
