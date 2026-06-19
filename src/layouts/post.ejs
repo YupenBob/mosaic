@@ -34,9 +34,10 @@ function videoElementHTML(vid) {
     h += '</video>';
   } else if (multiSrc) {
     h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element">';
-    h += '<source data-res="480p" src="' + vid.sources['480p'] + '" type="video/mp4" />';
-    h += '<source data-res="720p" src="' + vid.sources['720p'] + '" type="video/mp4" />';
-    h += '<source data-res="1080p" src="' + vid.sources['1080p'] + '" type="video/mp4" />';
+    var resKeys = Object.keys(vid.sources).sort().reverse();
+    for (var r = 0; r < resKeys.length; r++) {
+      h += '<source data-res="' + resKeys[r] + '" src="' + vid.sources[resKeys[r]] + '" type="video/mp4" />';
+    }
     h += '</video>';
   } else if (vid.src) {
     h += '<video preload="metadata" poster="' + (vid.poster || '') + '" src="' + vid.src + '" class="video-element"></video>';
