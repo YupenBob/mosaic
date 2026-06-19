@@ -5,7 +5,7 @@
 import { $, $$ } from './utils.js';
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const RES_ORDER = ['1080p', '720p', '480p'];
+const RES_ORDER = ['1080p', '720p', '480p', '360p'];
 
 let allPlayers = [];
 let _logLevel = 'info'; // debug | info | warn | error
@@ -109,7 +109,7 @@ class VideoPlayer {
 
     if (this.isHLS && hlsSource && typeof window.Hls !== 'undefined') {
       // Pre-set sources so quality menu shows immediately
-      this.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
+      this.sources = { '360p': hlsSource.src, '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
       this.currentRes = 'auto'; // Default to ABR
       try {
         this.hls = new window.Hls({
@@ -227,16 +227,17 @@ class VideoPlayer {
     // Check stored preference first
     try {
       const stored = localStorage.getItem('mosaic_video_quality');
-      if (stored && ['480p','720p','1080p'].includes(stored)) return stored;
+      if (stored && ['360p','480p','720p','1080p'].includes(stored)) return stored;
     } catch {}
     const w = window.innerWidth;
     const dpr = window.devicePixelRatio || 1;
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const isSlow = conn && (conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g');
-    if (isSlow) return '480p';
+    if (isSlow) return '360p';
     if (w * dpr >= 1920) return '1080p';
     if (w * dpr >= 1280) return '720p';
-    return '480p';
+    if (w * dpr >= 640) return '480p';
+    return '360p';
   }
 
   buildSpeedMenu() {

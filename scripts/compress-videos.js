@@ -4,6 +4,7 @@ import { execSync, spawn } from 'child_process';
 import { CONTENT_DIR, DIST_DIR, ensureDir, getMtime, log, warn } from './utils.js';
 
 const ALL_RESOLUTIONS = [
+  { name: '360p', height: 360 },
   { name: '480p', height: 480 },
   { name: '720p', height: 720 },
   { name: '1080p', height: 1080 },
@@ -137,8 +138,8 @@ function hlsSegment(mp4Path, outputDir, baseName, resName) {
 function generateMasterPlaylist(outputDir, baseName, resolutions, playlistPath) {
   if (!playlistPath) playlistPath = path.join(outputDir, `${baseName}-master.m3u8`);
   let content = '#EXTM3U\n#EXT-X-VERSION:3\n';
-  const bwMap = { '480p': 800000, '720p': 2000000, '1080p': 5000000, '4K': 15000000 };
-  const resMap = { '480p': '854x480', '720p': '1280x720', '1080p': '1920x1080', '4K': '3840x2160' };
+  const bwMap = { '360p': 400000, '480p': 800000, '720p': 2000000, '1080p': 5000000, '4K': 15000000 };
+  const resMap = { '360p': '640x360', '480p': '854x480', '720p': '1280x720', '1080p': '1920x1080', '4K': '3840x2160' };
   resolutions.forEach((res) => {
     content += `#EXT-X-STREAM-INF:BANDWIDTH=${bwMap[res]},RESOLUTION=${resMap[res]}\n`;
     content += `${baseName}-${res}.m3u8\n`;

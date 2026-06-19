@@ -110,7 +110,7 @@ async function parsePosts(site) {
         // Must match sanitization in compress-videos.js
         const base = rawBase.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
         if (compressVideos) {
-          const resNames = ['1080p', '720p', '480p'];
+          const resNames = ['1080p', '720p', '480p', '360p'];
           const sources = {};
           const masterPath = path.join(DIST_DIR, 'posts', slug, 'media', 'videos', `${base}-master.m3u8`);
           const hasHLS = await fs.pathExists(masterPath);
