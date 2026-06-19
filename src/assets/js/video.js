@@ -456,12 +456,11 @@ class VideoPlayer {
       this.progressTrack.addEventListener('mousedown', function(e) {
         _drag = true; self._dragSeek = true;
         var rect = self.progressTrack.getBoundingClientRect();
-        if (!isFinite(self.video.duration)) return;
-        self.video.currentTime = ((e.clientX - rect.left) / rect.width) * self.video.duration;
+        if (isFinite(self.video.duration)) { self.video.currentTime = ((e.clientX - rect.left) / rect.width) * self.video.duration; }
         document.addEventListener('mousemove', onDrag); document.addEventListener('mouseup', onEnd);
       });
       function onDrag(e) {
-        if (!isFinite(self.video.duration)) return;
+        if (isFinite(self.video.duration)) { self.video.currentTime = pct * self.video.duration; }
         var rect = self.progressTrack.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         self.video.currentTime = pct * self.video.duration;
