@@ -6,11 +6,14 @@
 import fs from 'fs';
 import path from 'path';
 
-const WORKER_BASE = (process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
+let WORKER_BASE = (process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
+// Handle both 'https://worker.dev' and 'https://worker.dev/api' formats
+if (WORKER_BASE && !WORKER_BASE.endsWith('/api')) WORKER_BASE += '/api';
 if (!WORKER_BASE) {
   console.log('[upload-to-r2] No WORKER_API_BASE set — skipping');
   process.exit(0);
 }
+console.log('[upload-to-r2] Uploading to', WORKER_BASE + '/admin/r2-upload');
 
 const DIST = path.resolve('dist');
 
