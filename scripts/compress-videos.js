@@ -136,7 +136,9 @@ function generateMasterPlaylist(outputDir, baseName, resolutions, playlistPath) 
 }
 
 async function processVideo({ dir, videosDir, file }) {
-  const baseName = path.parse(file).name;
+  const rawBase = path.parse(file).name;
+  // Sanitize: ASCII-safe baseName for FFmpeg output (strip non-ASCII, keep alnum + _-)
+  const baseName = rawBase.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
   const outputDir = path.join(DIST_DIR, 'posts', dir, 'media', 'videos');
   await ensureDir(outputDir);
   const srcPath = path.join(videosDir, file);

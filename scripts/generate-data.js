@@ -106,7 +106,9 @@ async function parsePosts(site) {
       for (const f of files) {
         const ext = path.extname(f).toLowerCase().slice(1);
         if (!vidExts.includes(ext)) continue;
-        const base = path.parse(f).name;
+        const rawBase = path.parse(f).name;
+        // Must match sanitization in compress-videos.js
+        const base = rawBase.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
         if (compressVideos) {
           const resNames = ['1080p', '720p', '480p'];
           const sources = {};
