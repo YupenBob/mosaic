@@ -436,6 +436,7 @@ class VideoPlayer {
       this.progressTrack.addEventListener('click', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
+        if (!isFinite(v.duration)) return;
         v.currentTime = pct * v.duration;
         if (this.progressFill) this.progressFill.style.width = (pct * 100) + '%';
         if (this.progressThumb) this.progressThumb.style.left = (pct * 100) + '%';
@@ -445,7 +446,7 @@ class VideoPlayer {
       this.progressTrack.addEventListener('mousemove', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
-        if (this.progressTooltip) { this.progressTooltip.textContent = this.fmt(v.duration * pct); this.progressTooltip.style.left = (pct * 100) + '%'; this.progressTooltip.style.opacity = '1'; }
+        if (this.progressTooltip && isFinite(v.duration)) { this.progressTooltip.textContent = this.fmt(v.duration * pct); this.progressTooltip.style.left = (pct * 100) + '%'; this.progressTooltip.style.opacity = '1'; }
       });
       this.progressTrack.addEventListener('mouseleave', () => {
         if (this.progressTooltip) this.progressTooltip.style.opacity = '0';
@@ -455,10 +456,12 @@ class VideoPlayer {
       this.progressTrack.addEventListener('mousedown', function(e) {
         _drag = true; self._dragSeek = true;
         var rect = self.progressTrack.getBoundingClientRect();
+        if (!isFinite(self.video.duration)) return;
         self.video.currentTime = ((e.clientX - rect.left) / rect.width) * self.video.duration;
         document.addEventListener('mousemove', onDrag); document.addEventListener('mouseup', onEnd);
       });
       function onDrag(e) {
+        if (!isFinite(self.video.duration)) return;
         var rect = self.progressTrack.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         self.video.currentTime = pct * self.video.duration;
