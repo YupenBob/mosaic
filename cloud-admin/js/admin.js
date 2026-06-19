@@ -50,6 +50,20 @@ function showLogin() {
   setToken(null);
 }
 
+// ── Toast notifications ────────────────────
+function toast(msg, type='info', duration=5000) {
+  let container = document.querySelector('.toast-container');
+  if (!container) { container = document.createElement('div'); container.className = 'toast-container'; document.body.appendChild(container); }
+  const icons = { success: 'ri-check-line', error: 'ri-close-line', info: 'ri-information-line' };
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.innerHTML = '<span class="toast-icon"><i class="' + icons[type] + '"></i></span><span class="toast-msg">' + msg + '</span><span class="toast-close"><i class="ri-close-line"></i></span>';
+  el.querySelector('.toast-close').addEventListener('click', () => dismiss());
+  container.appendChild(el);
+  const dismiss = () => { el.classList.add('toast-out'); setTimeout(() => el.remove(), 200); };
+  if (duration > 0) setTimeout(dismiss, duration);
+}
+
 window.mosaicLogin = async function() {
   const password = document.getElementById('login-password').value;
   const errorEl = document.getElementById('login-error');
@@ -846,24 +860,26 @@ window.doDeleteMedia = async (slug, file, type) => {
 };
 
 window.doTriggerBuild = async () => {
+  const btn = document.querySelector('#build .btn-primary, .page-header .btn-primary');
+  const origHTML = btn?.innerHTML || '';
+  if (btn) btn.innerHTML = '<span class="btn-spinner"></span> Triggering...';
+
   try {
     const result = await build.trigger();
-    let msg = `Build triggered via ${result.method || 'unknown'}!`;
-    if (result.wfError) msg += `\n(workflow_dispatch failed: ${result.wfError})`;
-    alert(msg);
-    location.hash = 'build';
+    const msg = `Build triggered via ${result.method || 'push'}! Check status below.`;
+    if (result.wfError) toast('Fallback used: ' + result.wfError, 'info', 6000);
+    toast(msg, 'success', 5000);
+    if (location.hash !== '#build') location.hash = 'build';
   } catch (err) {
     const msg = err.message || '';
     if (msg.includes('already in progress') || msg.includes('BUILD_RUNNING')) {
-      // Extract run info from error
-      try {
-        const statusData = await build.status();
-        const go = confirm(`A build is already running!\n\n#${statusData.runNumber || '?'} — ${statusData.status || 'in_progress'}\n\nClick OK to view status, Cancel to stay here.`);
-        if (go) location.hash = 'build';
-      } catch { alert('A build is already in progress. Please wait for it to finish.'); }
+      toast('Build already in progress — check status below', 'info', 5000);
+      if (location.hash !== '#build') location.hash = 'build';
     } else {
-      alert('Build trigger failed: ' + msg);
+      toast('Build trigger failed: ' + msg, 'error', 8000);
     }
+  } finally {
+    if (btn) btn.innerHTML = origHTML;
   }
 };
 

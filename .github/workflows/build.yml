@@ -151,15 +151,9 @@ jobs:
           R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
-      # ── 9. Upload to Cloudflare Pages ────────
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: mosaic
-          directory: dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+      # Deploy handled by deploy-cf workflow (avoids concurrent deploy conflicts)
+      - name: Deploy note
+        run: echo "Deploy handled by Deploy to Cloudflare Pages workflow"
 
       # ── 10. Cleanup temp media ──────────────
       - name: Cleanup temporary media files

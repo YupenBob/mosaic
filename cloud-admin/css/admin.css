@@ -250,6 +250,26 @@ body {
 .upload-zone:hover { border-color: var(--color-accent); background: var(--color-surface-hover); }
 .upload-zone p { color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-top: var(--space-2); }
 
+/* ── Upload Progress ── */
+.upload-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  background: var(--color-surface); border: 1px solid var(--color-border-light);
+  border-radius: 8px; margin-bottom: 6px;
+}
+.upload-item-icon {
+  width: 36px; height: 36px; border-radius: 8px; background: var(--color-bg);
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  color: var(--color-accent); flex-shrink: 0;
+}
+.upload-item-info { flex: 1; min-width: 0; }
+.upload-item-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upload-item-meta { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+.upload-item-bar { height: 4px; background: var(--color-border-light); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.upload-item-fill { height: 100%; background: var(--color-accent); border-radius: 2px; transition: width 0.2s ease; }
+.upload-item-status { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); min-width: 36px; text-align: right; }
+.upload-done .upload-item-fill { background: #2ecc71; }
+.upload-error .upload-item-fill { background: #e74c3c; }
+
 /* ── Media Grid ── */
 .media-grid { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
@@ -285,6 +305,31 @@ body {
 .admin-card-tags { font-size: 11px; color: var(--color-text-tertiary); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .admin-card-footer { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; border-top: 1px solid var(--color-border-light); font-size: 11px; color: var(--color-text-tertiary); }
+
+/* ── Toast Notifications ── */
+.toast-container { position: fixed; top: 16px; right: 16px; z-index: 99999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast {
+  display: flex; align-items: center; gap: 10px; padding: 12px 18px;
+  background: var(--color-surface); border: 1px solid var(--color-border-light);
+  border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 500; min-width: 280px; max-width: 420px;
+  pointer-events: auto; animation: toastIn 0.3s ease;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.toast.toast-out { opacity: 0; transform: translateX(40px); }
+.toast-icon { font-size: 18px; flex-shrink: 0; }
+.toast-msg { flex: 1; }
+.toast-close { cursor: pointer; color: var(--color-text-tertiary); font-size: 14px; padding: 2px; }
+.toast-success { border-left: 3px solid #2ecc71; }
+.toast-success .toast-icon { color: #2ecc71; }
+.toast-error { border-left: 3px solid #e74c3c; }
+.toast-error .toast-icon { color: #e74c3c; }
+.toast-info { border-left: 3px solid var(--color-accent); }
+.toast-info .toast-icon { color: var(--color-accent); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ── Spinner ── */
+.btn-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 4px; }
 
 /* ── Error ── */
 .error { color: var(--color-danger); font-size: var(--font-size-sm); }
