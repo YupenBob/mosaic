@@ -118,14 +118,6 @@ async function parsePosts(site) {
             const mp4Path = path.join(DIST_DIR, 'posts', slug, 'media', 'videos', `${base}-${res}.mp4`);
             if (fs.existsSync(mp4Path)) sources[res] = `media/videos/${base}-${res}.mp4`;
           });
-          // Fallback: if no compressed output, use the raw copied file
-          if (!hasHLS && Object.keys(sources).length === 0) {
-            const rawCopy = path.join(DIST_DIR, 'posts', slug, 'media', 'videos', f);
-            if (await fs.pathExists(rawCopy)) {
-              videos.push({ base, src: `media/videos/${f}` });
-              continue;
-            }
-          }
           videos.push({
             base,
             poster: `media/videos/${base}-poster.jpg`,
