@@ -112,7 +112,12 @@ async function parsePosts(site) {
         if (compressVideos) {
           const resNames = ['1080p', '720p', '480p', '360p'];
           const sources = {};
-          const masterPath = path.join(DIST_DIR, 'posts', slug, 'media', 'videos', `${base}-master.m3u8`);
+          let masterPath = path.join(DIST_DIR, 'posts', slug, 'media', 'videos', `${base}-master.m3u8`);
+          // Fallback: pre-built HLS files in content/posts/{slug}/dist-media/
+          if (!(await fs.pathExists(masterPath))) {
+            const fallback = path.join(postPath, 'dist-media', `${base}-master.m3u8`);
+            if (await fs.pathExists(fallback)) { masterPath = fallback; }
+          }
           const hasHLS = await fs.pathExists(masterPath);
           resNames.forEach((res) => {
             const mp4Path = path.join(DIST_DIR, 'posts', slug, 'media', 'videos', `${base}-${res}.mp4`);
