@@ -123,16 +123,27 @@ jobs:
             mediaDir="${dir}media"
             [ -d "$mediaDir" ] || continue
             if [ -d "${mediaDir}/photos" ]; then
-              echo "  ${slug}/photos"
-              rclone copy "${mediaDir}/photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" --transfers 4 -v --ignore-existing 2>&1 || echo "WARN: photos upload had errors"
+              echo "  ${slug}/photos ($(ls ${mediaDir}/photos | wc -l) files)"
+              rclone copy "${mediaDir}/photos" "r2:${R2_BUCKET}/processed/${slug}/photos/" \
+                --transfers 4 --retries 3 --timeout 60s --low-level-retries 3 -v --ignore-existing 2>&1 || echo "WARN: photos upload had errors"
             fi
             if [ -d "${mediaDir}/videos" ]; then
-              echo "  ${slug}/videos"
-              rclone copy "${mediaDir}/videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" --transfers 2 -v --ignore-existing 2>&1 || echo "WARN: videos upload had errors"
+              echo "  ${slug}/videos ($(ls ${mediaDir}/videos | wc -l) files)"
+              rclone copy "${mediaDir}/videos" "r2:${R2_BUCKET}/processed/${slug}/videos/" \
+                --transfers 2 --retries 5 --timeout 120s --low-level-retries 5 -v --ignore-existing 2>&1 || echo "WARN: videos upload had errors"
             fi
-            rclone copy "${mediaDir}" "r2:${R2_BUCKET}/processed/${slug}/covers/" --include "cover-*" --transfers 4 -v --ignore-existing 2>&1 || true
+            rclone copy "${mediaDir}" "r2:${R2_BUCKET}/processed/${slug}/covers/" \
+              --include "cover-*" --transfers 4 --retries 3 --timeout 60s -v --ignore-existing 2>&1 || true
           done
           echo "Upload complete"
+          echo "Files uploaded:"
+          for dir in dist/posts/*/media/*/; do
+            if [ -d "$dir" ]; then
+              slug=$(echo $dir | cut -d/ -f2,4)
+              count=$(ls "$dir" | wc -l)
+              echo "  dist/posts/$slug: $count files"
+            fi
+          done
 
       # ── 8. Strip media from dist (now served from R2) ──
       - name: Strip media from dist
