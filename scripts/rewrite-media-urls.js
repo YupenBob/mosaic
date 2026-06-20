@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
+const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || 'https://mosaic-api.yupenbob.workers.dev').replace(/\/+$/, '');
 if (!MEDIA_BASE) {
   console.log('[rewrite] No WORKER_API_BASE or R2_PUBLIC_URL set — skipping');
   process.exit(0);
