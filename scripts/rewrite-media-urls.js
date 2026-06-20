@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 
 const USE_PAGES_FN = !!process.env.USE_PAGES_PROXY;
-const MEDIA_BASE = (!USE_PAGES_FN && (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '')).replace(/\/+$/, '');
+const MEDIA_BASE = ((!USE_PAGES_FN && (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE)) || '').replace(/\/+$/, '');
 const USE_PROXY = !USE_PAGES_FN && !process.env.R2_PUBLIC_URL && !!MEDIA_BASE;
 
 if (!MEDIA_BASE && !USE_PAGES_FN) {
