@@ -189,6 +189,15 @@ class VideoPlayer {
     this.controls = container.querySelector('.video-controls');
     this.playBtn = container.querySelector('.vc-play');
     this.timeCur = container.querySelector('.vc-time-current');
+    if (this.timeCur) {
+      this.timeCur.style.cursor = 'pointer';
+      this.timeCur.title = 'Click to copy timestamp';
+      this.timeCur.addEventListener('click', () => {
+        if (!isFinite(this.video.currentTime)) return;
+        const ts = this.fmt(this.video.currentTime);
+        navigator.clipboard?.writeText(ts).then(() => this.showOverlay('📋 ' + ts, 'copy')).catch(() => {});
+      });
+    }
     this.timeDur = container.querySelector('.vc-time-duration');
     this.progressFill = container.querySelector('.vc-progress-fill');
     this.progressBuffer = container.querySelector('.vc-progress-buffer');
@@ -577,6 +586,20 @@ class VideoPlayer {
     }
   }
 
+  showOverlay(text, type) {
+    // Remove existing overlay if any
+    const existing = this.container.querySelector('.video-key-overlay');
+    if (existing) existing.remove();
+    const el = document.createElement('div');
+    el.className = 'video-key-overlay';
+    el.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;'
+      + 'background:rgba(0,0,0,0.7);color:#fff;padding:12px 20px;border-radius:10px;font-size:16px;font-weight:600;'
+      + 'text-align:center;white-space:pre-line;transition:opacity 0.3s';
+    el.textContent = text;
+    this.container.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 1200);
+  }
+
   handleKeyboard(e) {
     // Only handle if this container is focused or contains focus
     if (!this.container.contains(document.activeElement) && document.activeElement !== document.body) return;
@@ -588,19 +611,25 @@ class VideoPlayer {
         break;
       case 'ArrowLeft':
         e.preventDefault();
+        if (!isFinite(this.video.duration)) break;
         this.video.currentTime = Math.max(0, this.video.currentTime - 5);
+        this.showOverlay('⏪\n-5s', 'seek');
         break;
       case 'ArrowRight':
         e.preventDefault();
+        if (!isFinite(this.video.duration)) break;
         this.video.currentTime = Math.min(this.video.duration, this.video.currentTime + 5);
+        this.showOverlay('⏩\n+5s', 'seek');
         break;
       case 'ArrowUp':
         e.preventDefault();
-        this.video.volume = Math.min(1, this.video.volume + 0.1);
+        this.video.volume = Math.min(1, Math.round((this.video.volume + 0.1) * 10) / 10);
+        this.showOverlay('🔊 ' + Math.round(this.video.volume * 100) + '%', 'volume');
         break;
       case 'ArrowDown':
         e.preventDefault();
-        this.video.volume = Math.max(0, this.video.volume - 0.1);
+        this.video.volume = Math.max(0, Math.round((this.video.volume - 0.1) * 10) / 10);
+        this.showOverlay('🔉 ' + Math.round(this.video.volume * 100) + '%', 'volume');
         break;
       case 'f':
         if (document.fullscreenElement) document.exitFullscreen();
