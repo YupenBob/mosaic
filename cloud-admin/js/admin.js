@@ -463,6 +463,13 @@ function renderStatusCard(run) {
         <div><span style="color:var(--color-text-tertiary)">Time</span><br>${time}</div>
       </div>
       ${run.commitMessage ? `<div style="margin-top:10px;font-size:13px;color:var(--color-text-secondary)">${escHtml(run.commitMessage)}</div>` : ''}
+      ${run.steps?.length ? `
+        <div style="margin-top:12px;border-top:1px solid var(--color-border-light);padding-top:10px">
+          <div style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:6px">Progress (${run.steps.length} steps active)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${run.steps.map(s => `<span style="padding:3px 8px;border-radius:4px;font-size:11px;background:${s.status==='in_progress'?'rgba(240,165,0,0.15)':'var(--color-surface-hover)'};color:${s.status==='in_progress'?'#f0a500':'var(--color-text-tertiary)'};border:1px solid var(--color-border-light)">${escHtml(s.name)}</span>`).join('')}
+          </div>
+        </div>` : ''}
       ${run.htmlUrl ? `
         <a href="${run.htmlUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:12px;font-size:13px;color:var(--color-accent);text-decoration:none">
           View on GitHub <i class="ri-external-link-line"></i>

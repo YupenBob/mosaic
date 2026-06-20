@@ -24,8 +24,8 @@ export async function listPosts(c) {
       const md = await mdResp.json();
       const content = decodeBase64(md.content);
       const fm = parseFrontMatter(content);
-      return { slug: d.name, title: fm.title || d.name, category: fm.category, tags: fm.tags || [], date: fm.date, description: fm.description };
-    } catch { return { slug: d.name, title: d.name }; }
+      return { slug: d.name, title: fm.title || d.name, category: fm.category, tags: fm.tags || [], date: fm.date, description: fm.description, cover: fm.cover || '' };
+    } catch { return { slug: d.name, title: d.name, cover: '' }; }
   }));
 }
 
@@ -113,12 +113,12 @@ export async function dispatchBuild(c) {
 }
 
 export async function getLatestRun(c) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs?per_page=1`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/build.yml/runs?per_page=1`, { headers: headers(c) });
   if (!resp.ok) return null;
   const data = await resp.json();
   const run = data.workflow_runs?.[0];
   if (!run) return null;
-  return {
+  const result = {
     id: run.id,
     runNumber: run.run_number,
     status: run.status,
@@ -132,10 +132,31 @@ export async function getLatestRun(c) {
     updatedAt: run.updated_at,
     event: run.event,
   };
+
+  // Fetch job steps for in-progress builds
+  if (run.status === 'in_progress') {
+    try {
+      const jobsResp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs/${run.id}/jobs`, { headers: headers(c) });
+      if (jobsResp.ok) {
+        const jobsData = await jobsResp.json();
+        const steps = [];
+        for (const job of (jobsData.jobs || [])) {
+          for (const step of (job.steps || [])) {
+            if (step.status === 'completed') continue; // skip finished steps
+            steps.push({ name: step.name, status: step.status, number: step.number });
+          }
+        }
+        result.steps = steps;
+        result.totalSteps = Math.max(...(jobsData.jobs || []).flatMap(j => (j.steps || []).map(s => s.number)), 0);
+      }
+    } catch {}
+  }
+
+  return result;
 }
 
 export async function getRunHistory(c) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs?per_page=10`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/build.yml/runs?per_page=10`, { headers: headers(c) });
   if (!resp.ok) return [];
   const data = await resp.json();
   return (data.workflow_runs || []).map(run => ({
