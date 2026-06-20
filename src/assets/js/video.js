@@ -195,7 +195,7 @@ class VideoPlayer {
       this.timeCur.addEventListener('click', () => {
         if (!isFinite(this.video.currentTime)) return;
         const ts = this.fmt(this.video.currentTime);
-        navigator.clipboard?.writeText(ts).then(() => this.showOverlay('📋 ' + ts, 'copy')).catch(() => {});
+        navigator.clipboard?.writeText(ts).then(() => this.showOverlay('复制成功 ' + ts)).catch(() => {});
       });
     }
     this.timeDur = container.querySelector('.vc-time-duration');
@@ -595,7 +595,7 @@ class VideoPlayer {
     el.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;'
       + 'background:rgba(0,0,0,0.7);color:#fff;padding:12px 20px;border-radius:10px;font-size:16px;font-weight:600;'
       + 'text-align:center;white-space:pre-line;transition:opacity 0.3s';
-    el.textContent = text;
+    el.innerHTML = text;
     this.container.appendChild(el);
     setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 1200);
   }
@@ -613,23 +613,23 @@ class VideoPlayer {
         e.preventDefault();
         if (!isFinite(this.video.duration)) break;
         this.video.currentTime = Math.max(0, this.video.currentTime - 5);
-        this.showOverlay('⏪\n-5s', 'seek');
+        this.showOverlay('<i class=\"ri-rewind-fill\" style=\"font-size:24px\"></i><br>后退 5s');
         break;
       case 'ArrowRight':
         e.preventDefault();
         if (!isFinite(this.video.duration)) break;
         this.video.currentTime = Math.min(this.video.duration, this.video.currentTime + 5);
-        this.showOverlay('⏩\n+5s', 'seek');
+        this.showOverlay('<i class=\"ri-speed-fill\" style=\"font-size:24px\"></i><br>快进 5s');
         break;
       case 'ArrowUp':
         e.preventDefault();
         this.video.volume = Math.min(1, Math.round((this.video.volume + 0.1) * 10) / 10);
-        this.showOverlay('🔊 ' + Math.round(this.video.volume * 100) + '%', 'volume');
+        this.showOverlay('<i class=\"ri-volume-up-fill\" style=\"font-size:24px\"></i><br>' + Math.round(this.video.volume * 100) + '%');
         break;
       case 'ArrowDown':
         e.preventDefault();
         this.video.volume = Math.max(0, Math.round((this.video.volume - 0.1) * 10) / 10);
-        this.showOverlay('🔉 ' + Math.round(this.video.volume * 100) + '%', 'volume');
+        this.showOverlay('<i class=\"ri-volume-down-fill\" style=\"font-size:24px\"></i><br>' + Math.round(this.video.volume * 100) + '%');
         break;
       case 'f':
         if (document.fullscreenElement) document.exitFullscreen();
