@@ -9,9 +9,10 @@ import { CONTENT_DIR, DIST_DIR, ensureDir, computeScore, writeJSON, readJSON, re
 //   WORKER_API_BASE set   → Worker proxy (R2 stays private)
 //   USE_PAGES_PROXY set   → relative /api/... (Pages Functions proxy, GFW-safe)
 //   none set              → relative paths (media in CF Pages, backward compat)
-const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
-const USE_PROXY = !process.env.R2_PUBLIC_URL && !!process.env.WORKER_API_BASE;
-const USE_PAGES_FN = !process.env.R2_PUBLIC_URL && !process.env.WORKER_API_BASE && !!process.env.USE_PAGES_PROXY;
+// USE_PAGES_PROXY takes priority — ignores WORKER_API_BASE/R2_PUBLIC_URL
+const USE_PAGES_FN = !!process.env.USE_PAGES_PROXY;
+const MEDIA_BASE = (!USE_PAGES_FN && (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '')).replace(/\/+$/, '');
+const USE_PROXY = !USE_PAGES_FN && !process.env.R2_PUBLIC_URL && !!MEDIA_BASE;
 if (USE_PAGES_FN) console.log('[generate-data] Pages Functions proxy — relative /api/ paths');
 else if (MEDIA_BASE) console.log(`[generate-data] Media base: ${MEDIA_BASE} (proxy: ${USE_PROXY})`);
 else console.log('[generate-data] No media base — using relative paths');
