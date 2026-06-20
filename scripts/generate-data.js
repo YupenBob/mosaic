@@ -11,7 +11,7 @@ import { CONTENT_DIR, DIST_DIR, ensureDir, computeScore, writeJSON, readJSON, re
 //   none set              → relative paths (media in CF Pages, backward compat)
 // USE_PAGES_PROXY takes priority — ignores WORKER_API_BASE/R2_PUBLIC_URL
 const USE_PAGES_FN = !!process.env.USE_PAGES_PROXY;
-const MEDIA_BASE = (!USE_PAGES_FN && (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '')).replace(/\/+$/, '');
+const MEDIA_BASE = ((!USE_PAGES_FN && (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE)) || '').replace(/\/+$/, '');
 const USE_PROXY = !USE_PAGES_FN && !process.env.R2_PUBLIC_URL && !!MEDIA_BASE;
 if (USE_PAGES_FN) console.log('[generate-data] Pages Functions proxy — relative /api/ paths');
 else if (MEDIA_BASE) console.log(`[generate-data] Media base: ${MEDIA_BASE} (proxy: ${USE_PROXY})`);
