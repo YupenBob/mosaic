@@ -91,6 +91,7 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           SITE_URL: ${{ secrets.SITE_URL }}
           WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
+          USE_PAGES_PROXY: ${{ vars.USE_PAGES_PROXY || 'true' }}
           NODE_ENV: production
 
       # ── 6b. Rewrite media URLs in HTML to R2/Worker ──

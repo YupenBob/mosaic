@@ -107,7 +107,7 @@ function renderGallery(photos, threshold) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="<%= post.description %>" />
   <meta name="data-base" content="<%= rp %>data" />
-  <% if (typeof site !== 'undefined' && site.apiBase) { %><meta name="api-base" content="<%= site.apiBase %>" /><% } %>
+  <meta name="api-base" content="/api" />
   <title><%= pageDataTitle %></title>
   <link rel="icon" type="image/svg+xml" href="<%= rp %>assets/logo.svg" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />

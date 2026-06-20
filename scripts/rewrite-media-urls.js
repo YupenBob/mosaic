@@ -5,14 +5,16 @@
 import fs from 'fs';
 import path from 'path';
 
-const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || 'https://mosaic-api.yupenbob.workers.dev').replace(/\/+$/, '');
-if (!MEDIA_BASE) {
-  console.log('[rewrite] No WORKER_API_BASE or R2_PUBLIC_URL set — skipping');
+const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
+const USE_PAGES_FN = !process.env.R2_PUBLIC_URL && !process.env.WORKER_API_BASE && !!process.env.USE_PAGES_PROXY;
+const USE_PROXY = !process.env.R2_PUBLIC_URL && !!process.env.WORKER_API_BASE;
+
+if (!MEDIA_BASE && !USE_PAGES_FN) {
+  console.log('[rewrite] No WORKER_API_BASE, R2_PUBLIC_URL, or USE_PAGES_PROXY — keeping relative paths');
   process.exit(0);
 }
 
-const USE_PROXY = !process.env.R2_PUBLIC_URL && !!process.env.WORKER_API_BASE;
-console.log(`[rewrite] Rewriting media paths to ${MEDIA_BASE} (proxy=${USE_PROXY})`);
+console.log(`[rewrite] Mode: ${USE_PAGES_FN ? 'Pages Functions (relative /api/)' : USE_PROXY ? 'Worker proxy' : 'R2 direct'} — base: ${MEDIA_BASE || '(relative)'}`);
 
 const DIST_DIR = path.resolve('dist');
 let totalRewrites = 0;
@@ -35,7 +37,9 @@ function walk(dir) {
       (m, attr, relPath) => {
         const filename = relPath.split('/').pop();
         let url;
-        if (USE_PROXY) {
+        if (USE_PAGES_FN) {
+          url = `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
+        } else if (USE_PROXY) {
           url = `${MEDIA_BASE}/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
         } else {
           url = `${MEDIA_BASE}/processed/${relPath.replace(/^media\//, '')}`;
