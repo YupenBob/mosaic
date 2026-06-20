@@ -107,6 +107,7 @@ async function parsePosts(site) {
     const videosDir = path.join(postPath, 'videos');
     if (await fs.pathExists(videosDir)) {
       const files = (await fs.readdir(videosDir)).sort();
+      console.log(`[generate-data] ${slug}: ${files.length} files in videos/, compressVideos=${compressVideos}`);
       const vidExts = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
       for (const f of files) {
         const ext = path.extname(f).toLowerCase().slice(1);
@@ -141,6 +142,7 @@ async function parsePosts(site) {
           });
         }
       }
+      console.log(`[generate-data] ${slug}: ${videos.length} videos detected (${videos.filter(v=>!!v.hls).length} HLS, ${videos.filter(v=>!!v.src).length} src)`);
     }
 
     // Process cover: auto-detect or explicit
