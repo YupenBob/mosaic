@@ -47,7 +47,6 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          WORKER_API_BASE: ${{ secrets.WORKER_API_BASE }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           USE_PAGES_PROXY: ${{ vars.USE_PAGES_PROXY || 'true' }}
 
