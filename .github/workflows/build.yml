@@ -52,11 +52,8 @@ jobs:
             mkdir -p ~/.config/rclone
             printf '[r2]\ntype = s3\nprovider = Cloudflare\naccess_key_id = %s\nsecret_access_key = %s\nendpoint = %s\nacl = private\n' \
               "$R2_ACCESS_KEY" "$R2_SECRET_KEY" "$R2_ENDPOINT" > ~/.config/rclone/rclone.conf
-            # Pull originals for processing
-            rclone copy r2:${R2_BUCKET}/originals/ content/posts/ \
-              --include "photos/**" --include "videos/**" --include "music/**" \
-              --include "cover.*" \
-              --transfers 4 --verbose
+            # Pull originals for processing (no filter — get everything)
+            rclone copy r2:${R2_BUCKET}/originals/ content/posts/ --transfers 4 --verbose
             echo "Media synced from R2"
           else
             echo "R2 not configured, using local media only"
