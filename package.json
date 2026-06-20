@@ -17,6 +17,7 @@
     "gray-matter": "^4.0.3",
     "html-minifier-terser": "^7.2.0",
     "marked": "^15.0.7",
+    "playwright": "^1.60.0",
     "sharp": "^0.33.5"
   }
 }

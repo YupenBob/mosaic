@@ -55,21 +55,6 @@ jobs:
           find dist -name "*.mp4" -size +25M -delete
           echo "Removed large MP4s, kept HLS segments"
 
-      - name: Ensure CF Pages project exists
-        run: |
-          PROJECT=$(curl -s -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pages/projects?name=mosaic" \
-            | node -e "process.stdin.on('data',d=>{const r=JSON.parse(d);console.log(r.result&&r.result[0]?r.result[0].name:'')})")
-          if [ -z "$PROJECT" ]; then
-            echo "Creating CF Pages project..."
-            curl -s -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d '{"name":"mosaic","production_branch":"main"}' \
-              "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pages/projects"
-          else
-            echo "Project already exists"
-          fi
-
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:

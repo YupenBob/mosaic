@@ -39,6 +39,9 @@ app.get('/api/health/r2', async (c) => {
   } catch (e) { return c.json({ status: 'error', error: e.message, latency: Date.now() - start }); }
 });
 
+// Upload — direct to R2 (public, admin sends JWT in XHR)
+app.post('/api/upload/direct/:slug/:filename', uploadDirect);
+
 // Media file serving — public, no auth (for <img> tags in admin)
 app.get('/api/media/file/:slug/:filename', serveMediaFile);
 
@@ -129,7 +132,6 @@ app.get('/api/like/:slug/count', async (c) => {
 // ====== Protected routes ======
 app.use('/api/*', authMiddleware);
 
-// Posts CRUD
 app.get('/api/posts', async (c) => {
   try {
     const posts = await listPosts(c);
@@ -161,9 +163,6 @@ app.delete('/api/posts/:slug', async (c) => {
     return c.json(result);
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
-
-// Upload — direct to R2 via Worker (primary)
-app.post('/api/upload/direct/:slug/:filename', uploadDirect);
 
 // Upload — presigned URL (fallback for large files)
 app.post('/api/upload/presign', generatePresignedUrl);
@@ -393,13 +392,14 @@ app.delete('/api/media/:slug/:file', async (c) => {
   try {
     const slug = c.req.param('slug');
     const filename = c.req.param('file');
-    // Try to find and delete from R2 first
-    for (const folder of ['photos', 'videos', 'music', 'others']) {
-      const key = `originals/${slug}/${folder}/${filename}`;
-      const obj = await c.env.MEDIA.get(key);
-      if (obj) {
-        await c.env.MEDIA.delete(key);
-        return c.json({ deleted: true, filename, source: 'r2' });
+    // Search R2 (both prefixes + all folders)
+    for (const prefix of ['originals', 'processed']) {
+      for (const folder of ['photos', 'videos', 'music', 'covers', 'others']) {
+        const key = `${prefix}/${slug}/${folder}/${filename}`;
+        try {
+          const obj = await c.env.MEDIA.get(key);
+          if (obj) { await c.env.MEDIA.delete(key); return c.json({ deleted: true, filename, source: 'r2' }); }
+        } catch {}
       }
     }
     // Fallback: try GitHub

@@ -2,12 +2,28 @@
  * R2 Presigned URL generation + direct upload via Worker binding.
  */
 import { AwsClient } from 'aws4fetch';
+import { jwtVerify } from 'jose';
 
 // Direct upload via Worker R2 binding — no CORS issues
 export async function uploadDirect(c) {
   const slug = c.req.param('slug');
   const filename = decodeURIComponent(c.req.param('filename'));
   if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
+
+  // Verify JWT (inline check, not middleware — gives better CORS behavior)
+  const authHeader = c.req.header('Authorization') || '';
+  const token = authHeader.replace('Bearer ', '');
+  if (!token || !c.env.ADMIN_PASSWORD) {
+    if (c.env.ADMIN_PASSWORD) return c.json({ error: 'Unauthorized', code: 'AUTH_REQUIRED' }, 401);
+    // No admin password set = dev mode, allow
+  } else {
+    try {
+      const secret = new TextEncoder().encode(c.env.JWT_SECRET || 'mosaic-dev-secret');
+      await jwtVerify(token, secret);
+    } catch {
+      return c.json({ error: 'Token expired or invalid', code: 'AUTH_EXPIRED' }, 401);
+    }
+  }
 
   const ext = filename.split('.').pop()?.toLowerCase();
   const folder = ['jpg','jpeg','png','webp','gif','svg'].includes(ext) ? 'photos'
