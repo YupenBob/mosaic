@@ -5,25 +5,29 @@ import { marked } from 'marked';
 import { CONTENT_DIR, DIST_DIR, ensureDir, computeScore, writeJSON, readJSON, readFile, log, warn } from './utils.js';
 
 // Media URL rewrite:
-//   R2_PUBLIC_URL set  → direct R2 access (public bucket)
-//   WORKER_API_BASE set → Worker proxy (R2 stays private)
-//   neither set         → relative paths (media in CF Pages, backward compat)
+//   R2_PUBLIC_URL set     → direct R2 access (public bucket)
+//   WORKER_API_BASE set   → Worker proxy (R2 stays private)
+//   USE_PAGES_PROXY set   → relative /api/... (Pages Functions proxy, GFW-safe)
+//   none set              → relative paths (media in CF Pages, backward compat)
 const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
 const USE_PROXY = !process.env.R2_PUBLIC_URL && !!process.env.WORKER_API_BASE;
-if (MEDIA_BASE) console.log(`[generate-data] Media base: ${MEDIA_BASE} (proxy: ${USE_PROXY})`);
-else console.log('[generate-data] No media base configured — using relative paths');
+const USE_PAGES_FN = !process.env.R2_PUBLIC_URL && !process.env.WORKER_API_BASE && !!process.env.USE_PAGES_PROXY;
+if (USE_PAGES_FN) console.log('[generate-data] Pages Functions proxy — relative /api/ paths');
+else if (MEDIA_BASE) console.log(`[generate-data] Media base: ${MEDIA_BASE} (proxy: ${USE_PROXY})`);
+else console.log('[generate-data] No media base — using relative paths');
 
 function rewriteMediaPaths(post, photos, videos, cover) {
-  if (!MEDIA_BASE) return { photos, videos, cover };
+  if (!MEDIA_BASE && !USE_PAGES_FN) return { photos, videos, cover };
 
   const fix = (relPath) => {
     if (!relPath || !relPath.startsWith('media/')) return relPath;
     const filename = relPath.split('/').pop();
+    if (USE_PAGES_FN) {
+      return `/api/media/file/${encodeURIComponent(post.slug)}/${encodeURIComponent(filename)}`;
+    }
     if (USE_PROXY) {
-      // Worker proxy (R2 stays private)
       return `${MEDIA_BASE}/api/media/file/${encodeURIComponent(post.slug)}/${encodeURIComponent(filename)}`;
     }
-    // R2 public URL (direct access)
     const folder = relPath.includes('/cover') ? 'covers' :
       (relPath.match(/media\/(photos|videos|music)\//) || [])[1] || '';
     return `${MEDIA_BASE}/processed/${post.slug}/${folder}/${filename}`;
