@@ -48,7 +48,7 @@ jobs:
         env:
           NODE_ENV: production
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
-          USE_PAGES_PROXY: ${{ vars.USE_PAGES_PROXY || 'true' }}
+          USE_PAGES_PROXY: true
 
       - name: Strip large MP4 files (keep HLS ts/m3u8)
         run: |

@@ -90,7 +90,7 @@ jobs:
         env:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           SITE_URL: ${{ secrets.SITE_URL }}
-          USE_PAGES_PROXY: ${{ vars.USE_PAGES_PROXY || 'true' }}
+          USE_PAGES_PROXY: true
           NODE_ENV: production
 
       # ── 6b. Rewrite media URLs in HTML to R2/Worker ──
@@ -98,7 +98,7 @@ jobs:
         run: node scripts/rewrite-media-urls.js
         env:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
-          USE_PAGES_PROXY: ${{ vars.USE_PAGES_PROXY || 'true' }}
+          USE_PAGES_PROXY: true
 
       # ── 7. Upload processed media to R2 ──
       - name: Upload processed media to R2
