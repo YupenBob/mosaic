@@ -461,9 +461,9 @@ class VideoPlayer {
         document.addEventListener('mousemove', onDrag); document.addEventListener('mouseup', onEnd);
       });
       function onDrag(e) {
-        if (isFinite(self.video.duration)) { self.video.currentTime = pct * self.video.duration; }
         var rect = self.progressTrack.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        if (isFinite(self.video.duration)) { self.video.currentTime = pct * self.video.duration; }
         self.video.currentTime = pct * self.video.duration;
       }
       function onEnd() { _drag = false; self._dragSeek = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd);
