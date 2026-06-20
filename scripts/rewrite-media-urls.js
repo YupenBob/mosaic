@@ -5,9 +5,9 @@
 import fs from 'fs';
 import path from 'path';
 
-const MEDIA_BASE = (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '').replace(/\/+$/, '');
-const USE_PAGES_FN = !process.env.R2_PUBLIC_URL && !process.env.WORKER_API_BASE && !!process.env.USE_PAGES_PROXY;
-const USE_PROXY = !process.env.R2_PUBLIC_URL && !!process.env.WORKER_API_BASE;
+const USE_PAGES_FN = !!process.env.USE_PAGES_PROXY;
+const MEDIA_BASE = (!USE_PAGES_FN && (process.env.R2_PUBLIC_URL || process.env.WORKER_API_BASE || '')).replace(/\/+$/, '');
+const USE_PROXY = !USE_PAGES_FN && !process.env.R2_PUBLIC_URL && !!MEDIA_BASE;
 
 if (!MEDIA_BASE && !USE_PAGES_FN) {
   console.log('[rewrite] No WORKER_API_BASE, R2_PUBLIC_URL, or USE_PAGES_PROXY — keeping relative paths');
