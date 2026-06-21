@@ -96,8 +96,8 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
         <a href="<%= rp %>posts/<%= post.slug %>/" class="post-card<% if (!post.cover) { %> post-card-text<% } %>">
           <% if (post.cover) { %>
           <div class="post-card-cover" style="padding-top:<%= (100 / (post.coverAspect || 1.778)).toFixed(2) %>%">
-            <img src="<% if (post.cover && post.cover.startsWith('http')) { %><%= post.cover %><% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.cover %><% } %>"
-                 <% if (post.coverSrcset) { %>srcset="<% if (post.cover && post.cover.startsWith('http')) { %><%= post.coverSrcset['480'] %> 480w, <%= post.coverSrcset['720'] %> 720w, <%= post.coverSrcset['1080'] %> 1080w<% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['480'] %> 480w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['720'] %> 720w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['1080'] %> 1080w<% } %>"
+            <img src="<% if (post.cover && (post.cover.startsWith('http') || post.cover.startsWith('/api/'))) { %><%= post.cover %><% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.cover %><% } %>"
+                 <% if (post.coverSrcset) { %>srcset="<% if (post.cover && (post.cover.startsWith('http') || post.cover.startsWith('/api/'))) { %><%= post.coverSrcset['480'] %> 480w, <%= post.coverSrcset['720'] %> 720w, <%= post.coverSrcset['1080'] %> 1080w<% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['480'] %> 480w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['720'] %> 720w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['1080'] %> 1080w<% } %>"
                  sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"<% } %>
                  alt="<%= post.title %>" loading="lazy" />
           </div>
