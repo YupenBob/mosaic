@@ -348,8 +348,10 @@ function setupGestures(overlay) {
       // Pinch center point — zoom toward it
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const rect = overlay.getBoundingClientRect();
-      const cx = midX - rect.left - rect.width / 2, cy = midY - rect.top - rect.height / 2;
+      const img = $('#gallery-current-img');
+      if (!img) return;
+      const imgRect = img.getBoundingClientRect();
+      const cx = midX - (imgRect.left + imgRect.width / 2), cy = midY - (imgRect.top + imgRect.height / 2);
       if (touchState.startDist > 0) {
         const oldScale = zoomState.scale;
         const newScale = Math.max(0.5, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
@@ -373,9 +375,11 @@ function setupGestures(overlay) {
   // --- Mouse wheel zoom (centered on cursor) ---
   overlay.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const rect = overlay.getBoundingClientRect();
-    const cx = e.clientX - rect.left - rect.width / 2;
-    const cy = e.clientY - rect.top - rect.height / 2;
+    const img = $('#gallery-current-img');
+    if (!img) return;
+    const imgRect = img.getBoundingClientRect();
+    const cx = e.clientX - (imgRect.left + imgRect.width / 2);
+    const cy = e.clientY - (imgRect.top + imgRect.height / 2);
     const oldScale = zoomState.scale;
     const newScale = Math.max(0.5, Math.min(5, oldScale + (e.deltaY > 0 ? -0.15 : 0.15)));
     const ratio = newScale / oldScale;
@@ -410,8 +414,10 @@ function setupGestures(overlay) {
   overlay.addEventListener('dblclick', (e) => {
     e.preventDefault();
     if (zoomState.scale > 1.2) { resetZoom(); applyTransform(); return; }
-    const rect = overlay.getBoundingClientRect();
-    const cx = e.clientX - rect.left - rect.width / 2, cy = e.clientY - rect.top - rect.height / 2;
+    const img = $('#gallery-current-img');
+    if (!img) return;
+    const imgRect = img.getBoundingClientRect();
+    const cx = e.clientX - (imgRect.left + imgRect.width / 2), cy = e.clientY - (imgRect.top + imgRect.height / 2);
     const oldScale = zoomState.scale;
     const newScale = 2;
     zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
