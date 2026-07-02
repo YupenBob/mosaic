@@ -3,10 +3,11 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { execSync, spawn } from 'child_process';
 import sharp from 'sharp';
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const DIST = path.join(ROOT, 'dist');

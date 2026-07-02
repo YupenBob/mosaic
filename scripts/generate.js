@@ -4,11 +4,12 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
 import { marked } from 'marked';
 import ejs from 'ejs';
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const SRC = path.join(ROOT, 'src');
@@ -180,7 +181,16 @@ const relativePath = (from, to) => {
 
 function renderFile(template, outPath, data) {
   const rp = relativePath(outPath, path.join(DIST, 'index.html'));
-  const html = ejs.render(fs.readFileSync(path.join(viewsDir, template), 'utf-8'), { ...data, rp, site: SITE, t });
+  const html = ejs.render(fs.readFileSync(path.join(viewsDir, template), 'utf-8'), {
+    ...data, rp, site: SITE, t,
+    activeCategory: data.activeCategory || '',
+    activeTag: data.activeTag || '',
+    pageTitle: data.titleExtra ? SITE.title + (data.titleExtra || '') : SITE.title,
+    pageDescription: SITE.description,
+    currentPage: data.page || 1,
+    prevPage: data.page > 1 ? (data.page === 2 ? 'index.html' : `page/${data.page - 1}/index.html`) : '',
+    nextPage: data.page < data.totalPages ? `page/${data.page + 1}/index.html` : '',
+  });
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, html);
 }
