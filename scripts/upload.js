@@ -6,7 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-const DIST = path.resolve(import.meta.dirname, '..', 'dist');
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const DIST = path.resolve(__dirname, '..', 'dist');
 
 // Walk dist/posts/*/media/ and upload each directory
 const postsDir = path.join(DIST, 'posts');

@@ -8,7 +8,8 @@ import matter from 'gray-matter';
 import { marked } from 'marked';
 import ejs from 'ejs';
 
-const ROOT = path.resolve(import.meta.dirname, '..');
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');

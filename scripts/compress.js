@@ -6,7 +6,8 @@ import path from 'path';
 import { execSync, spawn } from 'child_process';
 import sharp from 'sharp';
 
-const ROOT = path.resolve(import.meta.dirname, '..');
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const DIST = path.join(ROOT, 'dist');
 
