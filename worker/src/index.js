@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { loginHandler, authMiddleware } from './auth.js';
 import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig } from './github.js';
-import { generatePresignedUrl } from './r2.js';
+import { generatePresignedUrl, listMedia, serveMediaFile } from './r2.js';
 
 const app = new Hono();
 
@@ -15,6 +15,12 @@ app.use('*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type']
 
 // ====== Auth (no middleware) ======
 app.post('/api/auth/login', loginHandler);
+
+// Health check — public, no auth required
+app.get('/api/health', (c) => c.json({ status: 'ok', version: '0.8.0' }));
+
+// Media file serving — public
+app.get('/api/media/file/:slug/:filename', serveMediaFile);
 
 // ====== Protected routes ======
 app.use('/api/*', authMiddleware);
@@ -173,9 +179,6 @@ app.get('/api/recent-files', (c) => c.json([]));
 
 // Build logs (stub)
 app.get('/api/logs', (c) => c.json([]));
-
-// Health check
-app.get('/api/health', (c) => c.json({ status: 'ok', version: '0.8.0' }));
 
 // 404
 app.all('*', (c) => c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404));
