@@ -120,6 +120,8 @@ for (const dir of postDirs) {
         '720': `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-720p.webp`,
         '1080': `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-1080p.webp`,
       };
+    } else {
+      cover = ''; // No cover file on disk
     }
   }
 
