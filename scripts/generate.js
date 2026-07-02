@@ -103,8 +103,10 @@ for (const dir of postDirs) {
     if (videos.length && videos[0].poster) cover = videos[0].poster;
     else if (photos.length) {
       cover = photos[0].src480;
-      const meta = JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'photos', `${photos[0].base}-meta.json`), 'utf-8').catch(() => '{}'));
-      coverAspect = meta.aspect || 1.5;
+      try {
+        const meta = JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'photos', `${photos[0].base}-meta.json`), 'utf-8'));
+        coverAspect = meta.aspect || 1.5;
+      } catch {}
     }
   }
   // Check if compressed cover exists
