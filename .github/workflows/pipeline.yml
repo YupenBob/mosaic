@@ -78,7 +78,14 @@ jobs:
           echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
           node scripts/upload.js
 
-      # ── 5. Deploy to CF Pages ──
+      # ── 5. Copy Functions + Deploy to CF Pages ──
+      - name: Copy Functions to dist
+        run: |
+          if [ -d "functions" ]; then
+            cp -r functions dist/
+            echo "Functions copied to dist/"
+          fi
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
