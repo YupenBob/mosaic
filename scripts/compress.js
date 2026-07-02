@@ -3,6 +3,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { execSync, spawn } from 'child_process';
 import sharp from 'sharp';
@@ -11,6 +12,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const DIST = path.join(ROOT, 'dist');
+const CHECKSUMS_FILE = path.join(ROOT, 'content', '.media-checksums.json');
+
+// Load existing checksums
+let checksums = {};
+try { checksums = JSON.parse(fs.readFileSync(CHECKSUMS_FILE, 'utf-8')); } catch {}
+
+function md5(filePath) {
+  return crypto.createHash('md5').update(fs.readFileSync(filePath)).digest('hex');
+}
+
+function changed(filePath) {
+  const key = path.relative(CONTENT, filePath).replace(/\\/g, '/');
+  const hash = md5(filePath);
+  if (checksums[key] === hash) return false; // unchanged
+  checksums[key] = hash;
+  return true;
+}
 
 const POSTS = fs.readdirSync(CONTENT).filter(d => fs.statSync(path.join(CONTENT, d)).isDirectory());
 
@@ -29,6 +47,7 @@ async function compressPhotos(postDir, slug) {
     if (!/\.(jpg|jpeg|png|webp|tiff)$/i.test(f)) continue;
     const base = path.parse(f).name;
     const src = path.join(photosDir, f);
+    if (!changed(src)) { console.log(`  SKIP ${f} (unchanged)`); continue; }
     const img = sharp(src);
     const meta = await img.metadata();
     const aspect = meta.width / (meta.height || 1);
@@ -62,6 +81,7 @@ async function compressCover(postDir, slug) {
     }
   }
   if (!coverFile) return;
+  if (!changed(coverFile)) { console.log(`  SKIP cover (unchanged)`); return; }
 
   const outDir = path.join(DIST, 'posts', slug, 'media');
   fs.mkdirSync(outDir, { recursive: true });
@@ -182,8 +202,14 @@ for (const slug of POSTS) {
   const videosDir = path.join(postDir, 'videos');
   if (fs.existsSync(videosDir)) {
     for (const f of fs.readdirSync(videosDir)) {
-      if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) await compressVideo(f, postDir, slug);
+      if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) {
+        const src = path.join(videosDir, f);
+        if (!changed(src)) { console.log(`  SKIP ${f} (unchanged)`); continue; }
+        await compressVideo(f, postDir, slug);
+      }
     }
   }
 }
-console.log('Compression complete');
+// Save checksums for next build
+fs.writeFileSync(CHECKSUMS_FILE, JSON.stringify(checksums, null, 2));
+console.log(`Compression complete. Checksums saved (${Object.keys(checksums).length} entries)`);
