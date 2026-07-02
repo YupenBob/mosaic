@@ -183,14 +183,14 @@ const relativePath = (from, to) => {
 function renderFile(template, outPath, data) {
   const rp = relativePath(outPath, path.join(DIST, 'index.html'));
   const html = ejs.render(fs.readFileSync(path.join(viewsDir, template), 'utf-8'), {
-    ...data, rp, site: SITE, t,
+    ...data, rp, site: SITE, t, i18n, categories, tags, lang: SITE.language || 'zh-CN',
     activeCategory: data.activeCategory || '',
     activeTag: data.activeTag || '',
     pageTitle: data.titleExtra ? SITE.title + (data.titleExtra || '') : SITE.title,
     pageDescription: SITE.description,
-    currentPage: data.page || 1,
-    prevPage: data.page > 1 ? (data.page === 2 ? 'index.html' : `page/${data.page - 1}/index.html`) : '',
-    nextPage: data.page < data.totalPages ? `page/${data.page + 1}/index.html` : '',
+    currentPage: data.page || 1, totalPages: data.totalPages || 1,
+    prev: data.page > 1 ? (data.page === 2 ? 'index.html' : `page/${data.page - 1}/index.html`) : '',
+    next: data.page < data.totalPages ? `page/${data.page + 1}/index.html` : '',
   });
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, html);
@@ -208,7 +208,8 @@ for (let page = 1; page <= totalPages; page++) {
 
 // Post pages
 for (const post of posts) {
-  renderFile('post.ejs', path.join(DIST, 'posts', post.slug, 'index.html'), { post, posts });
+  const related = posts.filter(p => p.slug !== post.slug && ((p.category || '') === (post.category || '') || (p.tags || []).some(t => (post.tags || []).includes(t)))).slice(0, 4);
+  renderFile('post.ejs', path.join(DIST, 'posts', post.slug, 'index.html'), { post, posts, related });
 }
 
 // Category pages
