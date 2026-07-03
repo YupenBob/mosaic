@@ -35,6 +35,7 @@ const POSTS = fs.readdirSync(CONTENT).filter(d => fs.statSync(path.join(CONTENT,
 // ── Image compression ──
 const QUALITY = { 1080: 85, 720: 80, 480: 75 };
 const SIZES = [1080, 720, 480];
+const THUMB_W = 10; // LQIP placeholder — 10px wide, ~200 bytes
 
 async function compressPhotos(postDir, slug) {
   const photosDir = path.join(postDir, 'photos');
@@ -51,6 +52,10 @@ async function compressPhotos(postDir, slug) {
     const img = sharp(src);
     const meta = await img.metadata();
     const aspect = meta.width / (meta.height || 1);
+
+    // LQIP: 10px thumbnail for instant placeholder
+    const thumbOut = path.join(outDir, `${base}-10p.webp`);
+    if (!fs.existsSync(thumbOut)) await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(thumbOut);
 
     for (const w of SIZES) {
       const out = path.join(outDir, `${base}-${w}p.webp`);
@@ -89,6 +94,9 @@ async function compressCover(postDir, slug) {
   const meta = await img.metadata();
   const aspect = meta.width / (meta.height || 1);
 
+  // LQIP
+  const thumbOut = path.join(outDir, 'cover-10p.webp');
+  if (!fs.existsSync(thumbOut)) await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(thumbOut);
   for (const w of SIZES) {
     const out = path.join(outDir, `cover-${w}p.webp`);
     if (fs.existsSync(out)) continue;

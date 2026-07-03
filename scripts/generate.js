@@ -116,7 +116,7 @@ for (const dir of postDirs) {
     const coverMeta = (() => { try { return JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'cover-meta.json'), 'utf-8')); } catch { return null; } })();
     if (coverMeta) {
       coverAspect = coverMeta.aspect || 1.778;
-      cover = `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-480p.webp`;
+      cover = `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-10p.webp`;
       coverSrcset = {
         '480': `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-480p.webp`,
         '720': `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-720p.webp`,

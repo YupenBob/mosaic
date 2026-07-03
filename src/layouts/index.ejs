@@ -99,7 +99,7 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
             <img src="<% if (post.cover && (post.cover.startsWith('http') || post.cover.startsWith('/api/'))) { %><%= post.cover %><% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.cover %><% } %>"
                  <% if (post.coverSrcset) { %>srcset="<% if (post.cover && (post.cover.startsWith('http') || post.cover.startsWith('/api/'))) { %><%= post.coverSrcset['480'] %> 480w, <%= post.coverSrcset['720'] %> 720w, <%= post.coverSrcset['1080'] %> 1080w<% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['480'] %> 480w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['720'] %> 720w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['1080'] %> 1080w<% } %>"
                  sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"<% } %>
-                 alt="<%= post.title %>" loading="lazy" />
+                 alt="<%= post.title %>" loading="lazy" onload="this.classList.add('loaded')" />
           </div>
           <% } %>
           <div class="post-card-body">
