@@ -229,9 +229,10 @@ pages.dashboard = async (signal) => {
       const tagLabels = (trafficData.byTag || []).map(t => t.name);
       const tagData = (trafficData.byTag || []).map(t => t.count);
 
-      makeChart('chart-traffic', 'line', dayLabels, dayData, '#4361ee');
-      makeChart('chart-categories', 'doughnut', catLabels, catData, ['#4361ee','#2ecc71','#f0a500','#9b59b6','#e74c3c','#1abc9c','#3498db','#e67e22','#95a5a6','#34495e']);
-      if (tagLabels.length) makeChart('chart-tags', 'bar', tagLabels, tagData, '#9b59b6');
+      const noData = (id) => { const el = document.getElementById(id); if (el) el.parentElement.innerHTML = '<div style=\"text-align:center;padding:40px;color:var(--color-text-tertiary)\"><i class=\"ri-bar-chart-line\" style=\"font-size:32px\"></i><p style=\"margin-top:8px\">No data yet</p></div>'; };
+      if (dayData.some(v => v > 0)) makeChart('chart-traffic', 'line', dayLabels, dayData, '#4361ee'); else noData('chart-traffic');
+      if (catData.some(v => v > 0)) makeChart('chart-categories', 'doughnut', catLabels, catData, ['#4361ee','#2ecc71','#f0a500','#9b59b6','#e74c3c','#1abc9c','#3498db','#e67e22','#95a5a6','#34495e']); else noData('chart-categories');
+      if (tagLabels.length && tagData.some(v => v > 0)) makeChart('chart-tags', 'bar', tagLabels, tagData, '#9b59b6'); else noData('chart-tags');
     }
   };
 };

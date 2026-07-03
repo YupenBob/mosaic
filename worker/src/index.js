@@ -21,8 +21,25 @@ app.get('/api/health', (c) => c.json({ status: 'ok', ok: true, version: '0.8.0' 
 app.get('/api/health/github', (c) => c.json({ status: 'ok', latency: 0 }));
 app.get('/api/health/r2', (c) => c.json({ status: 'ok', latency: 0 }));
 
-// Traffic stats stub
-app.get('/api/stats/traffic', (c) => c.json({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }));
+// Traffic stats — based on post data (views would need tracking system)
+app.get('/api/stats/traffic', async (c) => {
+  try {
+    const posts = await listPosts(c);
+    const byCategory = {}, byTag = {};
+    posts.forEach(p => {
+      const cat = (p.category || 'uncategorized').split('/')[0].trim();
+      byCategory[cat] = (byCategory[cat] || 0) + 1;
+      (p.tags || []).forEach(t => { byTag[t] = (byTag[t] || 0) + 1; });
+    });
+    return c.json({
+      total: 0, posts: posts.length,
+      byDay: Array.from({length: 30}, (_, i) => ({ date: new Date(Date.now() - (29-i)*864e5).toISOString().slice(0,10), count: 0 })),
+      byCategory: Object.entries(byCategory).map(([name, count]) => ({ name, count })),
+      byTag: Object.entries(byTag).sort((a,b) => b[1]-a[1]).slice(0, 10).map(([name, count]) => ({ name, count })),
+      top5: posts.slice(0, 5).map(p => ({ slug: p.slug, count: 0 })),
+    });
+  } catch { return c.json({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
+});
 
 // Media file serving — public
 app.get('/api/media/file/:slug/:filename', serveMediaFile);
