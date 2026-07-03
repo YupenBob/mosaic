@@ -54,6 +54,7 @@ for (const dir of postDirs) {
       const base = path.parse(f).name;
       photos.push({
         base,
+        src10p: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-10p.webp')}`,
         src480: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-480p.webp')}`,
         src720: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-720p.webp')}`,
         src1080: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-1080p.webp')}`,

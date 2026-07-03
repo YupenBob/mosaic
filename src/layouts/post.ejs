@@ -85,14 +85,14 @@ function renderGallery(photos, threshold) {
       h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" ';
       h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
       h += 'sizes="100vw" ';
-      h += 'src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'1920\' height=\'1080\'%3E%3C/svg%3E" alt="Photo" loading="lazy" />';
+      h += 'src="' + p.src10p + '" alt="Photo" loading="lazy" onload="this.classList.add(\'loaded\')" />';
       h += '</div>';
     } else {
       h += '<div class="gallery-item">';
       h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" ';
       h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
       h += 'sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" ';
-      h += 'src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\'%3E%3C/svg%3E" alt="Photo" loading="lazy" />';
+      h += 'src="' + p.src10p + '" alt="Photo" loading="lazy" onload="this.classList.add(\'loaded\')" />';
       h += '</div>';
     }
   });
