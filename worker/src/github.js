@@ -122,7 +122,7 @@ export async function dispatchBuild(c) {
 }
 
 export async function getLatestRun(c) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/build.yml/runs?per_page=1`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=1`, { headers: headers(c) });
   if (!resp.ok) return null;
   const data = await resp.json();
   const run = data.workflow_runs?.[0];
@@ -165,7 +165,7 @@ export async function getLatestRun(c) {
 }
 
 export async function getRunHistory(c) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/build.yml/runs?per_page=10`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=10`, { headers: headers(c) });
   if (!resp.ok) return [];
   const data = await resp.json();
   return (data.workflow_runs || []).map(run => ({

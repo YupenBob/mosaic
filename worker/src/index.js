@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { loginHandler, authMiddleware } from './auth.js';
 import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig } from './github.js';
-import { generatePresignedUrl, listMedia, serveMediaFile } from './r2.js';
+import { generatePresignedUrl, listMedia, serveMediaFile, uploadDirect } from './r2.js';
 
 const app = new Hono();
 
@@ -49,6 +49,10 @@ app.get('/api/stats/traffic', async (c) => {
 
     entries.sort((a, b) => b.count - a.count);
 
+    // Enrich top entries with titles from post list
+    const posts = await listPosts(c).catch(() => []);
+    const titleMap = Object.fromEntries(posts.map(p => [p.slug, p.title || p.slug]));
+
     const days = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
@@ -59,13 +63,18 @@ app.get('/api/stats/traffic', async (c) => {
       total, posts: entries.length, byDay: days,
       byCategory: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,c])=>({name:n,count:c})),
       byTag: Object.entries(byTag).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>({name:n,count:c})),
-      top5: entries.slice(0, 5),
+      top5: entries.slice(0, 5).map(e => ({ slug: e.slug, count: e.count, title: titleMap[e.slug] || e.slug })),
     });
   } catch { return c.json({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
+
+// --------- Traffic stats ---------
 });
 
 // Media file serving — public
 app.get('/api/media/file/:slug/:filename', serveMediaFile);
+
+// Upload — public (admin sends JWT in XHR)
+app.post('/api/upload/direct/:slug/:filename', uploadDirect);
 
 // ====== Protected routes ======
 app.use('/api/*', authMiddleware);
