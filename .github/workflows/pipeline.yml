@@ -78,12 +78,12 @@ jobs:
           echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
           node scripts/upload.js
 
-      # ── 5. Strip large files (>25MB, served from R2) ──
-      - name: Strip large files
+      # ── 5. Strip media from dist (served from R2) ──
+      - name: Strip media from dist
         run: |
-          echo "Removing files >25MB (served from R2)..."
-          find dist -type f -size +25M -exec rm -v {} \;
-          echo "Stripped"
+          echo "Removing media files from dist/ (served from R2)..."
+          find dist -type d -name media -exec rm -rf {} + 2>/dev/null || true
+          echo "Media stripped — Pages only needs HTML/CSS/JS/data"
 
       # ── 6. Copy Functions + Deploy to CF Pages ──
       - name: Copy Functions to dist
@@ -98,4 +98,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist/ --project-name mosaic --branch main
+          command: pages deploy dist/ --project-name mosaic --branch main --commit-dirty=true
