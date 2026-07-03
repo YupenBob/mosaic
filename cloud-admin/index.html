@@ -4,54 +4,36 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.9'/%3E%3Crect x='26' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.65'/%3E%3Crect x='2' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.4'/%3E%3Crect x='26' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.75'/%3E%3C/svg%3E" />
-  <title>Mosaic Cloud Admin</title>
+  <title>Mosaic Admin</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="css/admin.css" />
-  <script>
-    // Config injected at build time
-    window.__API_BASE__ = 'https://mosaic-api.yupenbob.workers.dev/api';
-  </script>
+  <script>window.__API_BASE__ = 'https://mosaic-api.yupenbob.workers.dev/api';</script>
 </head>
 <body class="admin-body">
 
-<!-- Loading — shown during auth check, prevents flash -->
-<div id="loading-screen" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:var(--color-bg)">
+<div id="loading" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:var(--color-bg)">
   <i class="ri-loader-4-line" style="font-size:32px;color:var(--color-accent);animation:spin 1s linear infinite"></i>
 </div>
 
-<!-- Login Screen -->
+<!-- Login -->
 <div id="login-screen" class="login-overlay" style="display:none">
   <div class="login-box">
-    <div style="margin-bottom:16px">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity="0.9"/>
-          <rect x="26" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity="0.65"/>
-          <rect x="2" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity="0.4"/>
-          <rect x="26" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity="0.75"/>
-        </svg>
-      </div>
-      <h1>Mosaic Admin</h1>
-    <p>Enter your admin password to continue</p>
-    <input type="password" id="login-password" placeholder="Password" autofocus onkeydown="if(event.key==='Enter')window.mosaicLogin()" />
-    <button id="login-btn" class="btn-primary" onclick="window.mosaicLogin()">Sign In</button>
+    <svg width="48" height="48" viewBox="0 0 48 48"><rect x="2" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity=".9"/><rect x="26" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity=".65"/><rect x="2" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity=".4"/><rect x="26" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity=".75"/></svg>
+    <h1>Mosaic Admin</h1>
+    <input type="password" id="login-pw" placeholder="Password" onkeydown="if(event.key==='Enter')login()" />
+    <button class="btn-primary" onclick="login()">Sign In</button>
     <p id="login-error" style="color:#e74c3c;font-size:13px;display:none;margin-top:8px"></p>
   </div>
 </div>
 
-<!-- Main App (hidden until login) -->
+<!-- App -->
 <div id="app" style="display:none">
   <aside class="sidebar">
     <div class="sidebar-logo">
-        <svg width="22" height="22" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
-          <rect x="2" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity="0.9"/>
-          <rect x="26" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity="0.65"/>
-          <rect x="2" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity="0.4"/>
-          <rect x="26" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity="0.75"/>
-        </svg>
-        Mosaic Cloud
-      </div>
-    <nav class="sidebar-nav" id="sidebar-nav">
+      <svg width="22" height="22" viewBox="0 0 48 48"><rect x="2" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity=".9"/><rect x="26" y="2" width="20" height="20" rx="5" fill="#4361ee" opacity=".65"/><rect x="2" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity=".4"/><rect x="26" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity=".75"/></svg>
+      Mosaic
+    </div>
+    <nav class="sidebar-nav">
       <a href="#dashboard" class="nav-item" data-page="dashboard"><i class="ri-dashboard-line"></i> Dashboard</a>
       <a href="#posts" class="nav-item" data-page="posts"><i class="ri-article-line"></i> Posts</a>
       <a href="#editor" class="nav-item" data-page="editor"><i class="ri-edit-line"></i> Editor</a>
@@ -59,16 +41,11 @@
       <div class="sidebar-divider"></div>
       <a href="#config" class="nav-item" data-page="config"><i class="ri-settings-line"></i> Config</a>
       <a href="#taxonomy" class="nav-item" data-page="taxonomy"><i class="ri-price-tag-3-line"></i> Taxonomy</a>
-      <a href="#trash" class="nav-item" data-page="trash"><i class="ri-delete-bin-line"></i> Trash</a>
-      <a href="#deploy" class="nav-item" data-page="deploy"><i class="ri-rocket-line"></i> Deploy</a>
       <div class="sidebar-divider"></div>
-      <a href="#" id="logout-btn" class="nav-item" onclick="event.preventDefault();window.mosaicLogout()"><i class="ri-logout-box-line"></i> Sign Out</a>
+      <a href="#" onclick="logout()" class="nav-item"><i class="ri-logout-box-line"></i> Sign Out</a>
     </nav>
   </aside>
-
-  <main class="main-content" id="main-content">
-    <!-- Pages will be rendered here dynamically -->
-  </main>
+  <main class="main-content" id="main-content"></main>
 </div>
 
 <script type="module" src="js/admin.js"></script>
