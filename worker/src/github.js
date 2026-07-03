@@ -57,21 +57,30 @@ export async function createOrUpdatePost(c, slug, frontMatter, body, message) {
   return resp.json();
 }
 
-export async function deletePost(c, slug, message) {
-  // Get all files in post directory
-  const dirResp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts/${slug}`, { headers: headers(c) });
-  if (!dirResp.ok) throw new Error(`Post not found: ${slug}`);
-  const files = await dirResp.json();
-  const list = Array.isArray(files) ? files : [files];
-  // Delete each file
-  for (const f of list) {
-    await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${f.path}`, {
-      method: 'DELETE',
-      headers: { ...headers(c), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: message || `Delete ${slug}`, sha: f.sha }),
-    });
+async function deleteDir(c, dirPath, message) {
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${dirPath}`, { headers: headers(c) });
+  if (!resp.ok) return 0;
+  const items = await resp.json();
+  let count = 0;
+  for (const item of (Array.isArray(items) ? items : [items])) {
+    if (item.type === 'dir') {
+      count += await deleteDir(c, item.path, message);
+    } else {
+      const delResp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${item.path}`, {
+        method: 'DELETE',
+        headers: { ...headers(c), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, sha: item.sha }),
+      });
+      if (delResp.ok) count++;
+    }
   }
-  return { deleted: true, count: list.length };
+  return count;
+}
+
+export async function deletePost(c, slug, message) {
+  const msg = message || `Delete ${slug}`;
+  const count = await deleteDir(c, `content/posts/${slug}`, msg);
+  return { deleted: true, count };
 }
 
 // ====== Actions Dispatch ======
