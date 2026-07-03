@@ -313,7 +313,7 @@ pages.posts = async (signal) => {
         <div class="admin-card-grid">
           ${postsData.map(p => `
             <a href="#editor&slug=${encodeURIComponent(p.slug)}" class="admin-post-card" data-search="${(p.title||'') + ' ' + (p.category||'') + ' ' + (p.tags||[]).join(' ')}" data-cat="${escHtml(p.category||'')}">
-              ${(p.cover && !p.cover.startsWith('video:') && !p.cover.startsWith('photo:')) ? `<div class="admin-card-cover"><img src="https://mosaic-api.yupenbob.workers.dev/api/media/file/${encodeURIComponent(p.slug)}/${encodeURIComponent(p.cover)}" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
+              ${(p.cover && !p.cover.startsWith('video:') && !p.cover.startsWith('photo:')) ? `<div class="admin-card-cover"><img src="https://mosaic-api.yupenbob.workers.dev/api/media/file/${encodeURIComponent(p.slug)}/${encodeURIComponent('cover-480p.webp')}" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
               <div class="admin-card-body">
                 <span class="admin-card-cat">${escHtml((p.category || 'Uncategorized').split('/').pop())}</span>
                 <h3 class="admin-card-title">${escHtml(p.title || p.slug)}</h3>

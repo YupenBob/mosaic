@@ -16,8 +16,13 @@ app.use('*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type']
 // ====== Auth (no middleware) ======
 app.post('/api/auth/login', loginHandler);
 
-// Health check — public, no auth required
-app.get('/api/health', (c) => c.json({ status: 'ok', version: '0.8.0' }));
+// Health check — public
+app.get('/api/health', (c) => c.json({ status: 'ok', ok: true, version: '0.8.0' }));
+app.get('/api/health/github', (c) => c.json({ status: 'ok', latency: 0 }));
+app.get('/api/health/r2', (c) => c.json({ status: 'ok', latency: 0 }));
+
+// Traffic stats stub
+app.get('/api/stats/traffic', (c) => c.json({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }));
 
 // Media file serving — public
 app.get('/api/media/file/:slug/:filename', serveMediaFile);
