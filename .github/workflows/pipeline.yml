@@ -78,7 +78,14 @@ jobs:
           echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
           node scripts/upload.js
 
-      # ── 5. Copy Functions + Deploy to CF Pages ──
+      # ── 5. Strip large files (>25MB, served from R2) ──
+      - name: Strip large files
+        run: |
+          echo "Removing files >25MB (served from R2)..."
+          find dist -type f -size +25M -exec rm -v {} \;
+          echo "Stripped"
+
+      # ── 6. Copy Functions + Deploy to CF Pages ──
       - name: Copy Functions to dist
         run: |
           if [ -d "functions" ]; then
