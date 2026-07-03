@@ -35,7 +35,7 @@ const POSTS = fs.readdirSync(CONTENT).filter(d => fs.statSync(path.join(CONTENT,
 // ── Image compression ──
 const QUALITY = { 1080: 85, 720: 80, 480: 75 };
 const SIZES = [1080, 720, 480];
-const THUMB_W = 10; // LQIP placeholder — 10px wide, ~200 bytes
+const THUMB_W = 150; // LQIP placeholder — 150px wide, ~2KB
 
 async function compressPhotos(postDir, slug) {
   const photosDir = path.join(postDir, 'photos');
