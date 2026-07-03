@@ -122,24 +122,8 @@ app.post('/api/posts/:slug/duplicate', async (c) => {
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 
-// Media list
-app.get('/api/media/:slug/list', async (c) => {
-  try {
-    const resp = await fetch(`https://api.github.com/repos/${c.env.GITHUB_REPO}/contents/content/posts/${c.req.param('slug')}`, {
-      headers: { Authorization: `Bearer ${c.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'Mosaic/0.8' },
-    });
-    if (!resp.ok) return c.json({ photos: [], videos: [], music: [] });
-    const files = await resp.json();
-    const result = { photos: [], videos: [], music: [] };
-    (Array.isArray(files) ? files : [files]).forEach(f => {
-      if (!f.name || f.name === 'index.md') return;
-      if (/\.(jpg|jpeg|png|webp)$/i.test(f.name)) result.photos.push(f.name);
-      if (/\.(mp4|mov|mkv|webm)$/i.test(f.name)) result.videos.push(f.name);
-      if (/\.(mp3|flac|wav)$/i.test(f.name)) result.music.push(f.name);
-    });
-    return c.json(result);
-  } catch (e) { return c.json({ photos: [], videos: [], music: [] }); }
-});
+// Media list — from R2
+app.get('/api/media/:slug/list', listMedia);
 
 // Stats
 app.get('/api/stats', async (c) => {
