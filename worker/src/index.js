@@ -21,22 +21,45 @@ app.get('/api/health', (c) => c.json({ status: 'ok', ok: true, version: '0.8.0' 
 app.get('/api/health/github', (c) => c.json({ status: 'ok', latency: 0 }));
 app.get('/api/health/r2', (c) => c.json({ status: 'ok', latency: 0 }));
 
-// Traffic stats — based on post data (views would need tracking system)
+// Traffic stats — reads from R2 site-data/views.json
 app.get('/api/stats/traffic', async (c) => {
   try {
-    const posts = await listPosts(c);
+    let data = {};
+    try { const obj = await c.env.MEDIA.get('site-data/views.json'); if (obj) data = JSON.parse(await obj.text()); } catch {}
+
     const byCategory = {}, byTag = {};
-    posts.forEach(p => {
-      const cat = (p.category || 'uncategorized').split('/')[0].trim();
-      byCategory[cat] = (byCategory[cat] || 0) + 1;
-      (p.tags || []).forEach(t => { byTag[t] = (byTag[t] || 0) + 1; });
-    });
+    const byDay = {};
+    let total = 0;
+    const entries = [];
+
+    for (const [slug, val] of Object.entries(data)) {
+      const count = typeof val === 'number' ? val : (val.count || 0);
+      const history = typeof val === 'number' ? [] : (val.history || []);
+      const cat = typeof val === 'number' ? '' : (val.category || '');
+      const tags = typeof val === 'number' ? [] : (val.tags || []);
+
+      total += count;
+      entries.push({ slug, count, category: cat, tags });
+
+      const topCat = cat.split('/')[0].trim() || 'uncategorized';
+      byCategory[topCat] = (byCategory[topCat] || 0) + count;
+      for (const t of tags) { byTag[t] = (byTag[t] || 0) + count; }
+      for (const ts of history) { const d = ts.slice(0, 10); byDay[d] = (byDay[d] || 0) + 1; }
+    }
+
+    entries.sort((a, b) => b.count - a.count);
+
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
+      days.push({ date: d, count: byDay[d] || 0 });
+    }
+
     return c.json({
-      total: 0, posts: posts.length,
-      byDay: Array.from({length: 30}, (_, i) => ({ date: new Date(Date.now() - (29-i)*864e5).toISOString().slice(0,10), count: 0 })),
-      byCategory: Object.entries(byCategory).map(([name, count]) => ({ name, count })),
-      byTag: Object.entries(byTag).sort((a,b) => b[1]-a[1]).slice(0, 10).map(([name, count]) => ({ name, count })),
-      top5: posts.slice(0, 5).map(p => ({ slug: p.slug, count: 0 })),
+      total, posts: entries.length, byDay: days,
+      byCategory: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,c])=>({name:n,count:c})),
+      byTag: Object.entries(byTag).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>({name:n,count:c})),
+      top5: entries.slice(0, 5),
     });
   } catch { return c.json({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 });
