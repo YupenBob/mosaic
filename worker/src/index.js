@@ -106,8 +106,25 @@ app.post('/api/posts', async (c) => {
 
 app.delete('/api/posts/:slug', async (c) => {
   try {
+    const slug = c.req.param('slug');
     const { message } = await c.req.json().catch(() => ({}));
-    const result = await deletePost(c, c.req.param('slug'), message);
+
+    // Delete from GitHub
+    const result = await deletePost(c, slug, message);
+
+    // Delete from R2 (originals + processed)
+    let r2Count = 0;
+    for (const prefix of ['originals', 'processed']) {
+      try {
+        const list = await c.env.MEDIA.list({ prefix: `${prefix}/${slug}/` });
+        for (const obj of (list.objects || [])) {
+          await c.env.MEDIA.delete(obj.key);
+          r2Count++;
+        }
+      } catch {}
+    }
+    if (r2Count > 0) result.r2Deleted = r2Count;
+
     return c.json(result);
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
@@ -128,17 +145,27 @@ app.post('/api/build', async (c) => {
   } catch (e) { return c.json({ error: e.message, code: 'DISPATCH_ERROR' }, 502); }
 });
 
+app.get('/api/build/history', async (c) => {
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=10`, {
+      headers: { Authorization: `Bearer ${c.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'Mosaic/0.8' },
+    });
+    if (!resp.ok) return c.json({ runs: [] });
+    const data = await resp.json();
+    return c.json({ runs: (data.workflow_runs || []).map(r => ({
+      id: r.id, runNumber: r.run_number, status: r.status, conclusion: r.conclusion,
+      displayTitle: r.display_title, headBranch: r.head_branch, headSha: r.head_sha?.slice(0, 7),
+      commitMessage: r.head_commit?.message?.split('\n')[0] || '', htmlUrl: r.html_url,
+      createdAt: r.created_at, updatedAt: r.updated_at, event: r.event,
+    })) });
+  } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
+});
+
 app.get('/api/build/status', async (c) => {
   try {
     const run = await getLatestRun(c);
     if (!run) return c.json({ status: 'unknown' });
-    return c.json({
-      id: run.id,
-      status: run.status,
-      conclusion: run.conclusion,
-      url: run.html_url,
-      created_at: run.created_at,
-    });
+    return c.json(run);
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 
