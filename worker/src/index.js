@@ -49,8 +49,10 @@ app.get('/api/stats/traffic', async (c) => {
 
     entries.sort((a, b) => b.count - a.count);
 
-    // Enrich top entries with titles from post list
+    // Enrich top entries with titles from post list, filter deleted posts
     const posts = await listPosts(c).catch(() => []);
+    const validSlugs = new Set(posts.map(p => p.slug));
+    const validEntries = entries.filter(e => validSlugs.has(e.slug));
     const titleMap = Object.fromEntries(posts.map(p => [p.slug, p.title || p.slug]));
 
     const days = [];
@@ -63,7 +65,7 @@ app.get('/api/stats/traffic', async (c) => {
       total, posts: entries.length, byDay: days,
       byCategory: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,c])=>({name:n,count:c})),
       byTag: Object.entries(byTag).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>({name:n,count:c})),
-      top5: entries.slice(0, 5).map(e => ({ slug: e.slug, count: e.count, title: titleMap[e.slug] || e.slug })),
+      top5: validEntries.slice(0, 5).map(e => ({ slug: e.slug, count: e.count, title: titleMap[e.slug] || e.slug })),
     });
   } catch { return c.json({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 
@@ -236,14 +238,64 @@ app.get('/api/taxonomy', async (c) => {
 // Trash (stub — GitHub doesn't have trash, return empty)
 app.get('/api/trash', (c) => c.json([]));
 
-// Disk usage (stub)
-app.get('/api/disk', (c) => c.json({ content: 0, contentMB: '0' }));
+// Disk usage — real R2 stats
+app.get('/api/disk', async (c) => {
+  try {
+    let totalSize = 0, totalObjects = 0;
+    let cursor;
+    do {
+      const opts = { limit: 1000 };
+      if (cursor) opts.cursor = cursor;
+      const list = await c.env.MEDIA.list(opts);
+      for (const obj of list.objects || []) { totalSize += obj.size; totalObjects++; }
+      cursor = list.truncated ? list.cursor : null;
+    } while (cursor);
+    const GB = totalSize / 1024 / 1024 / 1024;
+    const cost = (GB * 0.015).toFixed(2); // R2 storage: $0.015/GB/month
+    return c.json({ size: totalSize, sizeMB: (totalSize / 1024 / 1024).toFixed(1), sizeGB: GB.toFixed(2), objects: totalObjects, cost: cost, currency: 'USD' });
+  } catch (e) { return c.json({ error: e.message, code: 'R2_ERROR' }, 502); }
+});
 
 // Recent files (stub)
 app.get('/api/recent-files', (c) => c.json([]));
 
 // Build logs (stub)
 app.get('/api/logs', (c) => c.json([]));
+
+// Cleanup — find and delete orphaned R2 objects
+app.get('/api/cleanup', async (c) => {
+  try {
+    const posts = await listPosts(c).catch(() => []);
+    const valid = new Set(posts.map(p => p.slug));
+    const orphans = []; let total = 0, cursor;
+    do { const opts = { limit: 500 }; if (cursor) opts.cursor = cursor;
+      const list = await c.env.MEDIA.list(opts);
+      for (const o of (list.objects||[])) {
+        const p = o.key.split('/');
+        if (p.length>=3&&(p[0]==='originals'||p[0]==='processed')&&!valid.has(p[1])) { orphans.push({key:o.key,size:o.size}); total+=o.size; }
+      }
+      cursor = list.truncated ? list.cursor : null;
+    } while (cursor);
+    return c.json({ orphans, totalSize: total, totalOrphans: orphans.length });
+  } catch (e) { return c.json({ error: e.message }, 502); }
+});
+
+app.delete('/api/cleanup', async (c) => {
+  try {
+    const posts = await listPosts(c).catch(() => []);
+    const valid = new Set(posts.map(p => p.slug));
+    let deleted=0, freed=0, cursor;
+    do { const opts = { limit: 500 }; if (cursor) opts.cursor = cursor;
+      const list = await c.env.MEDIA.list(opts);
+      for (const o of (list.objects||[])) {
+        const p = o.key.split('/');
+        if (p.length>=3&&(p[0]==='originals'||p[0]==='processed')&&!valid.has(p[1])) { await c.env.MEDIA.delete(o.key); deleted++; freed+=o.size; }
+      }
+      cursor = list.truncated ? list.cursor : null;
+    } while (cursor);
+    return c.json({ deleted, freed, freedMB: (freed / 1048576).toFixed(1) });
+  } catch (e) { return c.json({ error: e.message }, 502); }
+});
 
 // 404
 app.all('*', (c) => c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404));

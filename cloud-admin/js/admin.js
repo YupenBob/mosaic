@@ -119,12 +119,13 @@ async function renderPage(page, signal) {
 const pages = {};
 
 pages.dashboard = async (signal) => {
-  const [dashData, healthData, trafficData, healthGithub, healthR2, cfg] = await Promise.all([
+  const [dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg] = await Promise.all([
     stats.dashboard().catch(() => ({ posts: 0, categories: 0, tags: 0 })),
     health.check().catch(() => ({ status: 'error' })),
     stats.traffic().catch(() => ({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] })),
     health.github().catch(() => ({ status: 'error' })),
     health.r2().catch(() => ({ status: 'error' })),
+    disk.usage().catch(() => ({ sizeMB: '0', objects: 0, cost: '0' })),
     config.get().catch(() => ({})),
   ]);
   if (signal.aborted) return '';
@@ -134,52 +135,60 @@ pages.dashboard = async (signal) => {
   const todayViews = (trafficData.byDay || []).find(d => d.date === today)?.count || 0;
   const weekViews = (trafficData.byDay || []).slice(-7).reduce((s, d) => s + d.count, 0);
 
+    // Build recent activity feed
+    const activities = [];
+    const postResult = await postsApi.list().catch(() => ({ posts: [] }));
+    const postList = postResult.posts || postResult || [];
+    postList.slice(0, 5).forEach(p => {
+      if (p.date) activities.push({ icon: 'ri-article-line', text: escHtml(p.title || p.slug) + ' updated', time: p.date });
+    });
+    // Latest build
+    try {
+      const bs = await build.status().catch(() => null);
+      if (bs && bs.createdAt) activities.push({ icon: 'ri-tools-line', text: 'Build #' + (bs.runNumber || '?') + ' ' + (bs.conclusion || bs.status), time: bs.createdAt });
+    } catch {}
+
+    activities.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    const allHealthy = healthData.status === 'ok' && healthGithub.status === 'ok' && healthR2.status === 'ok';
+
   return {
     html: `
-      <h1 style="margin-bottom:20px">Dashboard</h1>
-
-      <!-- Health bar -->
-      <div class="dash-health-bar">
-        ${[{ name: 'API', status: healthData.status, info: healthData.version || 'v0.8' },
-           { name: 'GitHub', status: healthGithub.status, info: healthGithub.latency ? `${healthGithub.latency}ms` : '—' },
-           { name: 'R2', status: healthR2.status, info: healthR2.latency ? `${healthR2.latency}ms` : '—' },
-           { name: 'Build', status: 'ok', info: 'Active' }].map(h => `
-          <div class="dash-health-item">
-            <span class="dash-health-dot ${h.status === 'ok' ? 'healthy' : 'down'}"></span>
-            <span class="dash-health-name">${h.name}</span>
-            <span class="dash-health-info">${h.info}</span>
-          </div>`).join('')}
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <h1 style="margin:0">Dashboard</h1>
+        <span style="padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;background:${allHealthy?'rgba(46,204,113,0.1)':'rgba(231,76,60,0.1)'};color:${allHealthy?'#2ecc71':'#e74c3c'}">
+          ${allHealthy ? '● All systems healthy' : '● Issues detected'}
+        </span>
       </div>
 
-      <!-- Quick stats -->
-      <div class="dash-stats-row">
-        <div class="dash-stat-card" style="--accent:#4361ee">
-          <div class="dash-stat-icon"><i class="ri-article-line"></i></div>
-          <div class="dash-stat-num">${dashData.posts || 0}</div>
-          <div class="dash-stat-label">Posts</div>
+      <!-- Big numbers -->
+      <div class="dash-cards">
+        <div class="dash-big-card">
+          <span class="dash-big-num">${dashData.posts || 0}</span>
+          <span class="dash-big-label">Posts</span>
         </div>
-        <div class="dash-stat-card" style="--accent:#2ecc71">
-          <div class="dash-stat-icon"><i class="ri-price-tag-3-line"></i></div>
-          <div class="dash-stat-num">${dashData.categories || 0}</div>
-          <div class="dash-stat-label">Categories</div>
+        <div class="dash-big-card">
+          <span class="dash-big-num">${dashData.categories || 0}</span>
+          <span class="dash-big-label">Categories</span>
         </div>
-        <div class="dash-stat-card" style="--accent:#f0a500">
-          <div class="dash-stat-icon"><i class="ri-hashtag"></i></div>
-          <div class="dash-stat-num">${dashData.tags || 0}</div>
-          <div class="dash-stat-label">Tags</div>
+        <div class="dash-big-card">
+          <span class="dash-big-num">${dashData.tags || 0}</span>
+          <span class="dash-big-label">Tags</span>
         </div>
-        <div class="dash-stat-card" style="--accent:#9b59b6">
-          <div class="dash-stat-icon"><i class="ri-eye-line"></i></div>
-          <div class="dash-stat-num">${trafficData.total || 0}</div>
-          <div class="dash-stat-label">Total Views</div>
+        <div class="dash-big-card" style="--accent:#9b59b6">
+          <span class="dash-big-num">${trafficData.total || 0}</span>
+          <span class="dash-big-label">Total Views</span>
+        </div>
+        <div class="dash-big-card">
+          <span class="dash-big-num">${diskData.sizeMB || '0'} MB</span>
+          <span class="dash-big-label">R2 · ${diskData.objects||0} obj · $${diskData.cost||'0'}/mo</span>
         </div>
       </div>
 
-      <!-- Traffic sub-stats -->
-      <div class="dash-traffic-subs">
-        <div class="dash-traffic-sub"><span>Today</span><strong>${todayViews}</strong></div>
-        <div class="dash-traffic-sub"><span>This Week</span><strong>${weekViews}</strong></div>
-        <div class="dash-traffic-sub"><span>Articles</span><strong>${trafficData.posts || 0}</strong></div>
+      <!-- Actions -->
+      <div style="display:flex;gap:10px;margin-bottom:20px">
+        <button class="btn-primary" onclick="location.hash='editor'" style="padding:10px 20px;font-size:14px"><i class="ri-add-line"></i> New Post</button>
+        <button class="btn-secondary" onclick="doTriggerBuild()" style="padding:10px 20px;font-size:14px"><i class="ri-play-fill"></i> Build & Deploy</button>
+        ${siteUrl ? `<a href="${siteUrl}" target="_blank" class="btn-secondary" style="padding:10px 20px;text-decoration:none;font-size:14px"><i class="ri-external-link-line"></i> View Site</a>` : ''}
       </div>
 
       <!-- Charts row -->
@@ -189,37 +198,34 @@ pages.dashboard = async (signal) => {
           <div class="dash-chart-wrap"><canvas id="chart-traffic"></canvas></div>
         </div>
         <div class="dash-chart-card">
-          <h3>Categories</h3>
-          <div class="dash-chart-wrap"><canvas id="chart-categories"></canvas></div>
+          <h3>Categories & Tags</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="dash-chart-wrap" style="height:200px"><canvas id="chart-categories"></canvas></div>
+            <div class="dash-chart-wrap" style="height:200px"><canvas id="chart-tags"></canvas></div>
+          </div>
         </div>
       </div>
 
-      <!-- Top 5 + Tags -->
+      <!-- Bottom row -->
       <div class="dash-bottom">
         <div class="dash-chart-card">
-          <h3>Top Posts</h3>
+          <h3>Leaderboard · Top Posts</h3>
           ${(trafficData.top5 || []).length ? trafficData.top5.map((t, i) => `
-            <a href="#editor&slug=${encodeURIComponent(t.slug)}" class="dash-top-item">
-              <span class="dash-top-rank">#${i+1}</span>
-              <span class="dash-top-slug">${escHtml(t.slug)}</span>
-              <span class="dash-top-count">${t.count}</span>
-            </a>`).join('') : '<p style="color:var(--color-text-tertiary);padding:16px">No data yet</p>'}
+            <a href="#editor&slug=${encodeURIComponent(t.slug)}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-border-light);font-size:13px;text-decoration:none;color:inherit">
+              <span style="font-weight:700;color:${i===0?'#f0a500':i===1?'#86868b':i===2?'#cd7f32':'var(--color-text-tertiary)'};min-width:20px">#${i+1}</span>
+              <span style="flex:1">${escHtml(t.title || t.slug)}</span>
+              <span style="font-weight:600;color:var(--color-accent)">${t.count} views</span>
+            </a>`).join('') : '<p style="color:var(--color-text-tertiary);padding:8px 0">No data yet</p>'}
         </div>
-        <div class="dash-chart-card">
-          <h3>Tags</h3>
-          <div class="dash-chart-wrap"><canvas id="chart-tags"></canvas></div>
+        <div class="dash-chart-card"><h3>Recent Activity</h3>
+          ${activities.length ? activities.slice(0, 8).map(a => `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-border-light);font-size:13px">
+              <i class="${a.icon}" style="color:var(--color-text-tertiary);font-size:14px"></i>
+              <span style="flex:1">${a.text}</span>
+              <span style="color:var(--color-text-tertiary);font-size:11px">${formatTime(a.time)}</span>
+            </div>`).join('') : '<p style="color:var(--color-text-tertiary);padding:8px 0">No recent activity</p>'}
         </div>
       </div>
-
-      <!-- Site preview -->
-      ${siteUrl ? `
-      <div class="dash-preview">
-        <div class="dash-preview-header">
-          <h3>Site Preview</h3>
-          <a href="${siteUrl}" target="_blank" class="btn-sm" style="text-decoration:none">Open <i class="ri-external-link-line"></i></a>
-        </div>
-        <iframe src="${siteUrl}" sandbox="allow-scripts allow-same-origin" loading="lazy"></iframe>
-      </div>` : ''}
     `,
     onMount() {
       const dayLabels = (trafficData.byDay || []).map(d => d.date.slice(5));
@@ -228,11 +234,10 @@ pages.dashboard = async (signal) => {
       const catData = (trafficData.byCategory || []).map(c => c.count);
       const tagLabels = (trafficData.byTag || []).map(t => t.name);
       const tagData = (trafficData.byTag || []).map(t => t.count);
-
       const noData = (id) => { const el = document.getElementById(id); if (el) el.parentElement.innerHTML = '<div style=\"text-align:center;padding:40px;color:var(--color-text-tertiary)\"><i class=\"ri-bar-chart-line\" style=\"font-size:32px\"></i><p style=\"margin-top:8px\">No data yet</p></div>'; };
       if (dayData.some(v => v > 0)) makeChart('chart-traffic', 'line', dayLabels, dayData, '#4361ee'); else noData('chart-traffic');
       if (catData.some(v => v > 0)) makeChart('chart-categories', 'doughnut', catLabels, catData, ['#4361ee','#2ecc71','#f0a500','#9b59b6','#e74c3c','#1abc9c','#3498db','#e67e22','#95a5a6','#34495e']); else noData('chart-categories');
-      if (tagLabels.length && tagData.some(v => v > 0)) makeChart('chart-tags', 'bar', tagLabels, tagData, '#9b59b6'); else noData('chart-tags');
+      if (tagLabels.length && tagData.some(v => v > 0)) makeChart('chart-tags', 'doughnut', tagLabels, tagData, ['#4361ee','#2ecc71','#f0a500','#9b59b6','#e74c3c','#1abc9c','#3498db','#e67e22','#95a5a6','#34495e']); else noData('chart-tags');
     }
   };
 };
@@ -258,7 +263,7 @@ function makeChart(id, type, labels, data, colors) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: type === 'doughnut' } },
+      plugins: { legend: type === 'doughnut' ? { display: true, position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } : { display: false } },
       scales: type !== 'doughnut' ? {
         x: { display: type === 'bar' },
         y: { beginAtZero: true, ticks: { precision: 0 } }
@@ -298,7 +303,7 @@ pages.posts = async (signal) => {
           <tbody>
           ${postsData.map(p => `
             <tr data-search="${(p.title||'') + ' ' + (p.category||'') + ' ' + (p.tags||[]).join(' ')}" data-cat="${escHtml(p.category||'')}">
-              <td><a href="#editor&slug=${encodeURIComponent(p.slug)}" style="font-weight:500">${escHtml(p.title || p.slug)}</a></td>
+              <td><a href="#editor&slug=${encodeURIComponent(p.slug)}" style="font-weight:500;color:var(--color-text);text-decoration:none">${escHtml(p.title || p.slug)} <small style="color:var(--color-text-tertiary);font-weight:400">${escHtml(p.slug)}</small></a></td>
               <td>${escHtml(p.category || '')}</td>
               <td>${(p.tags || []).map(t => '#' + escHtml(t)).join(' ')}</td>
               <td style="font-size:12px;color:var(--color-text-tertiary)">${p.date ? p.date.split('T')[0] : ''}</td>
@@ -368,6 +373,8 @@ pages.editor = async (signal) => {
           <label>Description <textarea id="fm-desc" rows="2">${escHtml(fm.description || '')}</textarea></label>
           <label>Layout <select id="fm-layout">${layouts.map(l => `<option value="${l}" ${fm.layout === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
           <label>Cover <input type="text" id="fm-cover" value="${escHtml(fm.cover || '')}" placeholder="cover.jpg or video:0 or photo:0" /></label>
+        <label>Views <input type="number" id="fm-views" value="${fm.views||0}" /></label>
+        <label>Likes <input type="number" id="fm-likes" value="${fm.likes||0}" /></label>
         </div>
         <div class="editor-body">
           <textarea id="fm-body" style="width:100%;height:400px;font-family:var(--font-mono);font-size:14px;padding:12px;border:1px solid var(--color-border);border-radius:6px">${escHtml(post.body || '')}</textarea>
@@ -664,6 +671,90 @@ pages.deploy = () => `
   <button class="btn-primary" onclick="location.hash='build'"><i class="ri-tools-line"></i> Go to Build</button>
 `;
 
+pages.cleanup = async () => {
+  const API = window.__API_BASE__ || '/api';
+  const hp = { 'Authorization': 'Bearer ' + (localStorage.getItem('mosaic_token')||'') };
+  try {
+    const data = await fetch(API + '/cleanup', { headers: hp }).then(r => r.json());
+    const orphans = data.orphans || [];
+    const total = (data.totalSize / 1048576).toFixed(1);
+    return `
+      <div class="page-header"><h1>R2 Cleanup</h1></div>
+      <div style="background:var(--color-surface);border:1px solid var(--color-border-light);border-radius:10px;padding:16px 20px;margin-bottom:16px;font-size:13px;color:var(--color-text-secondary);line-height:1.6">
+        <i class="ri-information-line" style="color:var(--color-accent);margin-right:6px"></i>
+        When you delete a post, media files in R2 may be left behind. This page scans for orphaned files and lets you clean them up to free storage space.
+      </div>
+      <div class="dash-cards" style="grid-template-columns:1fr 1fr">
+        <div class="dash-big-card"><span class="dash-big-num">${data.totalOrphans||0}</span><span class="dash-big-label">Orphaned Files</span></div>
+        <div class="dash-big-card"><span class="dash-big-num">${total} MB</span><span class="dash-big-label">Wasted Space</span></div>
+      </div>
+      ${orphans.length ? `
+        <div style="margin-bottom:16px">
+          <button class="btn-primary" id="btn-cleanup" onclick="doCleanup()" style="padding:10px 24px;font-size:14px"><i class="ri-delete-bin-line"></i> Delete All Orphans</button>
+          <span style="margin-left:12px;font-size:13px;color:var(--color-text-tertiary)">${orphans.length} files will be permanently deleted</span>
+        </div>
+        <div class="dash-chart-card">
+          <h3>Orphan Files</h3>
+          ${orphans.slice(0, 100).map(o => `
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--color-border-light);font-size:13px">
+              <i class="ri-file-line" style="color:var(--color-text-tertiary)"></i>
+              <span style="flex:1;font-family:var(--font-mono);font-size:12px">${escHtml(o.key)}</span>
+              <span style="color:var(--color-text-tertiary);white-space:nowrap">${(o.size/1024).toFixed(1)} KB</span>
+            </div>`).join('')}
+          ${orphans.length > 100 ? `<p style="color:var(--color-text-tertiary);padding:8px 0">...and ${orphans.length - 100} more</p>` : ''}
+        </div>
+      ` : '<div style="text-align:center;padding:80px 20px;color:var(--color-text-tertiary)"><i class="ri-check-double-line" style="font-size:56px;color:#2ecc71;display:block;margin-bottom:12px"></i><p style="font-size:18px;color:var(--color-text)">All clean!</p><p style="margin-top:4px">No orphan files found in R2.</p></div>'}
+      <div id="cleanup-progress" style="display:none;margin-top:12px"></div>
+    `;
+  } catch (e) { return `<h1>Cleanup</h1><p class="error">${escHtml(e.message)}</p>`; }
+};
+
+window.doCleanup = async () => {
+  modalConfirm('Delete all orphaned R2 files?', 'This action cannot be undone. All files listed above will be permanently deleted from R2 storage.', async () => {
+    const API = window.__API_BASE__ || '/api';
+    const hp = { 'Authorization': 'Bearer ' + (localStorage.getItem('mosaic_token')||'') };
+    const progress = document.getElementById('cleanup-progress');
+    const btn = document.getElementById('btn-cleanup');
+    if (btn) btn.style.display = 'none';
+    if (progress) {
+      progress.style.display = 'block';
+      progress.innerHTML = '<div class="progress-bar" style="height:6px;background:var(--color-border-light);border-radius:3px;overflow:hidden"><div class="progress-fill" style="height:100%;width:0%;background:var(--color-accent);border-radius:3px;transition:width 0.3s"></div></div><p style="font-size:13px;color:var(--color-text-secondary);margin-top:8px">Deleting orphan files...</p>';
+    }
+    // Fake progress: 0→95% fast, then crawl
+    const fill = progress?.querySelector('.progress-fill');
+    let pct = 0;
+    const tick = () => { pct += Math.random() * 25 + 5; if (pct > 95) pct = 95; if (fill) fill.style.width = pct + '%'; if (pct < 95) setTimeout(tick, 200 + Math.random() * 300); };
+    tick();
+    try {
+      const result = await fetch(API + '/cleanup', { method: 'DELETE', headers: hp }).then(r => r.json());
+      if (fill) fill.style.width = '100%';
+      if (result.error) { if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + result.error + '</p>'; return; }
+      toast('Deleted ' + result.deleted + ' files, freed ' + result.freedMB + ' MB', 'success');
+      setTimeout(() => location.hash = 'cleanup', 500);
+    } catch (e) {
+      if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + e.message + '</p>';
+    }
+  });
+};
+
+function modalConfirm(title, msg, onOk) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal-box">
+    <div style="text-align:center;margin-bottom:12px"><i class="ri-error-warning-line" style="font-size:40px;color:#e74c3c"></i></div>
+    <h3 style="text-align:center;margin-bottom:8px">${title}</h3>
+    <p style="text-align:center;font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">${msg}</p>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="btn-secondary" id="modal-cancel" style="min-width:100px">Cancel</button>
+      <button class="btn-primary" id="modal-ok" style="min-width:100px;background:#e74c3c">Delete All</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#modal-cancel').onclick = () => overlay.remove();
+  overlay.querySelector('#modal-ok').onclick = () => { overlay.remove(); onOk(); };
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+}
+
 // ── Helpers ─────────────────────────────────
 function escHtml(s) {
   if (!s) return '';
@@ -692,8 +783,8 @@ async function loadExistingMedia(slug) {
       html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
         data.photos.map(f => `
           <div style="position:relative;border:1px solid var(--color-border-light);border-radius:6px;overflow:hidden;background:var(--color-surface)">
-            <img src="${'https://mosaic-api.yupenbob.workers.dev/api/media/file/' + encodeURIComponent(slug) + '/' + encodeURIComponent(f.name)}" alt="${escHtml(f.name)}" style="width:100px;height:100px;object-fit:cover;display:block" onerror="this.outerHTML=''" />
-            <div style="padding:2px 6px;font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.name)}">${escHtml(f.name)}</div>
+            <img src="${'https://mosaic-api.yupenbob.workers.dev/api/media/file/' + encodeURIComponent(slug) + '/' + encodeURIComponent(f.name)}" alt="${escHtml(f.name)}" style="width:200px;height:200px;object-fit:cover;display:block" onerror="this.outerHTML=''" />
+            <div style="padding:2px 6px;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.name)}">${escHtml(f.name)}</div>
             <button onclick="doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','photos')" style="width:100%;border:none;background:var(--color-surface);color:#e74c3c;font-size:11px;cursor:pointer;padding:2px;border-top:1px solid var(--color-border-light)">Delete</button>
           </div>`).join('') +
         '</div>';
@@ -833,7 +924,15 @@ function setupUploadZone() {
 
 // ── Global actions ─────────────────────────
 window.doSavePost = async () => {
-  const slug = document.getElementById('fm-slug').value;
+  let slug = document.getElementById('fm-slug').value;
+  if (!slug) {
+    const now = new Date();
+    slug = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0');
+    // Check collision with existing posts
+    const existingSlugs = (state.posts || []).map(p => p.slug);
+    if (existingSlugs.includes(slug)) { let n=1; while (existingSlugs.includes(slug+'-'+n)) n++; slug += '-'+n; }
+    document.getElementById('fm-slug').value = slug;
+  }
   const frontMatter = {
     title: document.getElementById('fm-title').value,
     date: document.getElementById('fm-date').value,
@@ -842,6 +941,8 @@ window.doSavePost = async () => {
     description: document.getElementById('fm-desc').value,
     layout: document.getElementById('fm-layout').value,
     cover: document.getElementById('fm-cover').value,
+    views: parseInt(document.getElementById('fm-views')?.value) || 0,
+    likes: parseInt(document.getElementById('fm-likes')?.value) || 0,
   };
   const body = document.getElementById('fm-body').value;
 
@@ -856,15 +957,17 @@ window.doSavePost = async () => {
 };
 
 window.doDeletePost = async (slug) => {
-  if (!confirm('Delete "' + slug + '"?')) return;
-  try { await postsApi.delete(slug); location.reload(); }
-  catch (err) { alert('Delete failed: ' + err.message); }
+  modalConfirm('Delete "' + slug + '"?', 'This will permanently delete this post and all its media from R2.', async () => {
+    try { await postsApi.delete(slug); location.reload(); }
+    catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+  });
 };
 
 window.doDeleteMedia = async (slug, file, type) => {
-  if (!confirm('Delete ' + file + '?')) return;
-  try { await mediaApi.delete(slug, file, type); location.reload(); }
-  catch (err) { alert('Delete failed: ' + err.message); }
+  modalConfirm('Delete ' + file + '?', 'This file will be permanently deleted from R2.', async () => {
+    try { await mediaApi.delete(slug, file, type); location.reload(); }
+    catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+  });
 };
 
 window.doTriggerBuild = async () => {
@@ -926,9 +1029,10 @@ window.doRestoreTrash = async (dir) => {
 };
 
 window.doPermanentDelete = async (dir) => {
-  if (!confirm('Permanently delete "' + dir + '"?')) return;
-  try { await trash.permanentDelete(dir); location.reload(); }
-  catch (err) { alert('Delete failed: ' + err.message); }
+  modalConfirm('Permanently delete "' + dir + '"?', 'This cannot be undone.', async () => {
+    try { await trash.permanentDelete(dir); location.reload(); }
+    catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+  });
 };
 
 window.switchPostsView = (view, silent) => {

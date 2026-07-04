@@ -129,6 +129,7 @@ for (const dir of postDirs) {
   }
 
   const stats = { views: data.views || 0, likes: data.likes || 0, dwell_time: data.dwell_time || 0 };
+  if (coverAspect > 1.5) coverAspect = 1.5;
   posts.push({ slug, title, date, category, tags, description, layout, videoMode, cover, coverAspect, coverSrcset, bodyHTML, photos, videos, stats });
 }
 
