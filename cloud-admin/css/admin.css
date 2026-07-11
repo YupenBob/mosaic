@@ -345,15 +345,16 @@ body {
    Config Page
    ═══════════════════════════════════════════ */
 .config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 16px;
+  columns: 2;
+  column-gap: 16px;
 }
 .config-section {
+  break-inside: avoid;
   background: var(--color-surface);
   border: 1px solid var(--color-border-light);
   border-radius: 10px;
   padding: 20px 24px;
+  margin-bottom: 16px;
 }
 .config-section-title {
   font-size: 15px;
@@ -484,7 +485,7 @@ body {
 }
 
 @media (max-width: 768px) {
-  .config-grid { grid-template-columns: 1fr; }
+  .config-grid { columns: 1; }
   .config-field { flex-direction: column; align-items: flex-start; gap: 6px; }
   .config-field input[type="text"],
   .config-field input[type="number"],
