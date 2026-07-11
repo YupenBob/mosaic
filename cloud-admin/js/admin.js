@@ -370,7 +370,7 @@ pages.dashboard = async (signal) => {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <h1 style="margin:0">${t('dashboard.title')}</h1>
         <span style="padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;background:${allHealthy?'rgba(46,204,113,0.1)':'rgba(231,76,60,0.1)'};color:${allHealthy?'#2ecc71':'#e74c3c'}">
-          ${allHealthy ? t('dashboard.healthy') : t('dashboard.issues')}
+          <i class="${allHealthy ? 'ri-check-line' : 'ri-close-line'}"></i> ${allHealthy ? t('dashboard.healthy') : t('dashboard.issues')}
         </span>
       </div>
 
@@ -792,7 +792,7 @@ pages.config = async (signal) => {
     html: `
       <div class="page-header"><h1>Site Configuration</h1><button class="btn-primary" onclick="doSaveConfig()"><i class="ri-save-line"></i> Save</button></div>
       <div class="config-grid">
-        ${sec('基本信息',
+        ${sec('<i class="ri-information-line"></i> 基本信息',
           txt('title', '站点标题', '浏览器标签页和页头显示', cfg) +
           txt('subtitle', '副标题', '标题下方的简短描述', cfg) +
           area('description', '站点描述', 'SEO 用，会出现在搜索引擎结果里', cfg) +
@@ -804,11 +804,11 @@ pages.config = async (signal) => {
           txt('favicon', '网站图标', '浏览器标签页上的小图标路径', cfg) +
           txt('dateFormat', '日期格式', '如 YYYY-MM-DD', cfg)
         )}
-        ${sec('作者信息',
+        ${sec('<i class="ri-user-line"></i> 作者信息',
           txt('author.name', '作者名', '显示在文章署名和 RSS 中', cfg) +
           txt('author.email', '邮箱', 'RSS feed 用到，可不填', cfg, 'email')
         )}
-        ${sec('主题与布局',
+        ${sec('<i class="ri-palette-line"></i> 主题与布局',
           sel('theme', '主题配色', '前台颜色模式', cfg, [['auto','自动（跟随系统）'],['light','浅色'],['dark','深色']]) +
           num('pageSize', '每页文章数', '首页和列表页每页显示多少篇', cfg) +
           num('gallerySingleThreshold', '画廊阈值', '少于这个数量的图片用单列大图展示', cfg) +
@@ -816,7 +816,7 @@ pages.config = async (signal) => {
           tog('cardShowStats', '卡片显示统计', '文章卡片上是否显示浏览/点赞数', cfg) +
           area('footerText', '页脚文字', '留空则不显示页脚', cfg)
         )}
-        ${sec('媒体画质',
+        ${sec('<i class="ri-image-line"></i> 媒体画质',
           `<div class="config-field">
             <label class="config-label"><span>图片压缩质量</span><small>数值越大画质越好，文件越大（1-100）</small></label>
             <div class="config-quality-group">
@@ -833,7 +833,7 @@ pages.config = async (signal) => {
             </div>
           </div>`
         )}
-        ${sec('功能开关',
+        ${sec('<i class="ri-toggle-line"></i> 功能开关',
           tog('enableBusuanzi', '不蒜子统计', '第三方访客计数（中国大陆访问较快）', cfg) +
           tog('enableVideoCompression', '视频压缩', '上传视频时自动转码 HLS', cfg) +
           num('searchMinChars', '搜索最少字数', '输入多少个字后触发搜索', cfg) +
@@ -845,14 +845,14 @@ pages.config = async (signal) => {
           tog('components.likes.enabled', '点赞按钮', '文章点赞互动', cfg) +
           tog('components.stats.enabled', '停留统计', '记录阅读时长', cfg)
         )}
-        ${sec('Giscus 评论',
+        ${sec('<i class="ri-chat-3-line"></i> Giscus 评论',
           `<p style="font-size:12px;color:var(--color-text-tertiary);margin:0 0 12px">在 <a href="https://giscus.app" target="_blank" style="color:var(--color-accent)">giscus.app</a> 配置后获取以下参数</p>` +
           txt('giscus.repo', 'GitHub 仓库', '如 username/repo', cfg) +
           txt('giscus.repoId', 'Repo ID', '安装 Giscus 后获得', cfg) +
           txt('giscus.category', '分类名', '存放评论的 Discussion 分类', cfg) +
           txt('giscus.categoryId', 'Category ID', '分类的 ID', cfg)
         )}
-        ${sec('生成插件',
+        ${sec('<i class="ri-puzzle-line"></i> 生成插件',
           tog('plugins.compress-images.enabled', '图片压缩', '构建时自动压缩图片为 WebP', cfg) +
           tog('plugins.compress-videos.enabled', '视频压缩', '构建时自动转码视频为 HLS', cfg) +
           tog('plugins.generate-feed.enabled', 'RSS 订阅', '生成 RSS/Atom feed', cfg) +
@@ -951,7 +951,7 @@ pages.cleanup = async () => {
 
       <!-- Orphan section -->
       <div class="dash-chart-card" style="margin-bottom:14px">
-        <h3>${t('cleanup.orphan')}</h3>
+        <h3><i class="ri-delete-bin-line"></i> ${t('cleanup.orphan')}</h3>
         <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">${t('cleanup.orphanDesc')}</p>
         <div class="dash-cards" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
           <div class="dash-big-card"><span class="dash-big-num">${data.totalOrphans||0}</span><span class="dash-big-label">${t('cleanup.orphanFiles')}</span></div>
@@ -969,7 +969,7 @@ pages.cleanup = async () => {
 
       <!-- Cache cleanup section -->
       <div class="dash-chart-card" style="margin-bottom:14px">
-        <h3>${t('cleanup.cacheCleanup')}</h3>
+        <h3><i class="ri-refresh-line"></i> ${t('cleanup.cacheCleanup')}</h3>
         <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">${t('cleanup.cacheDesc')}</p>
         <button class="btn-primary" id="btn-clear-cache" onclick="doClearCache()" style="padding:10px 24px;font-size:14px;background:#e74c3c"><i class="ri-delete-bin-line"></i> ${t('cleanup.clearCache')}</button>
       </div>
@@ -1182,11 +1182,11 @@ async function handleUploadFiles(files) {
       });
       done++;
       itemEl.classList.add('upload-done');
-      itemEl.querySelector('.upload-item-status').textContent = 'Done';
-      itemEl.querySelector('.upload-item-meta').innerHTML = '<span style="color:#2ecc71">Done</span>';
+      itemEl.querySelector('.upload-item-status').innerHTML = '<i class="ri-check-line" style="color:#2ecc71"></i>';
+      itemEl.querySelector('.upload-item-meta').innerHTML = '<span style="color:#2ecc71">' + t('editor.done') + '</span>';
     } catch (err) {
       itemEl.classList.add('upload-error');
-      itemEl.querySelector('.upload-item-status').textContent = 'Failed';
+      itemEl.querySelector('.upload-item-status').innerHTML = '<i class="ri-close-line" style="color:#e74c3c"></i>';
       itemEl.querySelector('.upload-item-meta').innerHTML = '<span style="color:#e74c3c">' + escHtml(err.message) + '</span>';
     }
   }
