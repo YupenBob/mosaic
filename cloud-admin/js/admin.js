@@ -13,7 +13,7 @@ const I18N = {
     login: { title: 'Mosaic 管理后台', subtitle: '请输入管理员密码', placeholder: '密码', btn: '登录', signing: '登录中...', error: '登录失败' },
     nav: { dashboard: '仪表盘', posts: '文章', editor: '编辑器', build: '构建与部署', config: '站点设置', taxonomy: '分类与标签', cleanup: '清理', signOut: '退出登录' },
     dashboard: {
-      title: '仪表盘', healthy: '● 所有系统正常', issues: '● 存在异常',
+      title: '仪表盘', healthy: '所有系统正常', issues: '存在异常',
       posts: '文章', categories: '分类', tags: '标签', totalViews: '总浏览量', r2Usage: 'R2 存储',
       newPost: '新建文章', buildDeploy: '构建并部署', viewSite: '访问网站',
       traffic: '流量（30天）', catTag: '分类 & 标签', leaderboard: '排行榜 · 热门文章', recentActivity: '最近动态', noData: '暂无数据', noActivity: '暂无动态',
@@ -39,7 +39,7 @@ const I18N = {
     },
     config: {
       title: '站点设置', save: '保存设置', saved: '设置已保存', saveFailed: '保存失败',
-      general: '📋 基本信息', author: '👤 作者信息', theme: '🎨 主题与布局', media: '🖼️ 媒体画质', features: '🔌 功能开关', giscus: '💬 Giscus 评论', plugins: '🧩 生成插件',
+      general: '基本信息', author: '作者信息', theme: '主题与布局', media: '媒体画质', features: '功能开关', giscus: 'Giscus 评论', plugins: '生成插件',
       siteTitle: '站点标题', siteTitleHint: '浏览器标签页和页头显示',
       subtitle: '副标题', subtitleHint: '标题下方的简短描述',
       desc: '站点描述', descHint: 'SEO 用，会出现在搜索引擎结果里',
@@ -81,9 +81,9 @@ const I18N = {
     },
     taxonomy: { title: '分类与标签', categories: '分类', tags: '标签', none: '暂无', rename: '重命名' },
     cleanup: {
-      title: 'R2 清理', orphan: '🧹 孤儿文件清理', orphanDesc: '属于已删除文章的文件，可以安全删除',
+      title: 'R2 清理', orphan: '孤儿文件清理', orphanDesc: '属于已删除文章的文件，可以安全删除',
       orphanFiles: '个孤立文件', wastedSpace: '浪费空间', deleteOrphans: '删除所有孤儿文件', noOrphans: '一切干净！没有孤儿文件',
-      cacheCleanup: '🗑️ 缓存清理', cacheDesc: '删除所有 processed/ 缓存文件（压缩后的媒体）。原始文件保留，下次构建时会重新生成。',
+      cacheCleanup: '缓存清理', cacheDesc: '删除所有 processed/ 缓存文件（压缩后的媒体）。原始文件保留，下次构建时会重新生成。',
       clearCache: '清除压缩缓存',
       deleting: '删除中...', deletingCache: '删除缓存中...',
     },
@@ -106,7 +106,7 @@ const I18N = {
     login: { title: 'Mosaic Admin', subtitle: 'Enter your admin password', placeholder: 'Password', btn: 'Sign In', signing: 'Signing in...', error: 'Login failed' },
     nav: { dashboard: 'Dashboard', posts: 'Posts', editor: 'Editor', build: 'Build', config: 'Settings', taxonomy: 'Taxonomy', cleanup: 'Cleanup', signOut: 'Sign Out' },
     dashboard: {
-      title: 'Dashboard', healthy: '● All systems healthy', issues: '● Issues detected',
+      title: 'Dashboard', healthy: 'All systems healthy', issues: 'Issues detected',
       posts: 'Posts', categories: 'Categories', tags: 'Tags', totalViews: 'Total Views', r2Usage: 'R2',
       newPost: 'New Post', buildDeploy: 'Build & Deploy', viewSite: 'View Site',
       traffic: 'Traffic (30 days)', catTag: 'Categories & Tags', leaderboard: 'Leaderboard · Top Posts', recentActivity: 'Recent Activity', noData: 'No data yet', noActivity: 'No recent activity',
@@ -131,7 +131,7 @@ const I18N = {
     },
     config: {
       title: 'Site Configuration', save: 'Save', saved: 'Config saved!', saveFailed: 'Save failed',
-      general: '📋 General', author: '👤 Author', theme: '🎨 Theme & Layout', media: '🖼️ Media Quality', features: '🔌 Features', giscus: '💬 Giscus Comments', plugins: '🧩 Plugins',
+      general: 'General', author: 'Author', theme: 'Theme & Layout', media: 'Media Quality', features: 'Features', giscus: 'Giscus Comments', plugins: 'Plugins',
       siteTitle: 'Site Title', siteTitleHint: 'Shown in browser tab and header',
       subtitle: 'Subtitle', subtitleHint: 'Short description below the title',
       desc: 'Description', descHint: 'Used for SEO, appears in search results',
@@ -173,9 +173,9 @@ const I18N = {
     },
     taxonomy: { title: 'Categories & Tags', categories: 'Categories', tags: 'Tags', none: 'None', rename: 'Rename' },
     cleanup: {
-      title: 'R2 Cleanup', orphan: '🧹 Orphan Cleanup', orphanDesc: 'Files belonging to deleted posts. Safe to delete.',
+      title: 'R2 Cleanup', orphan: 'Orphan Cleanup', orphanDesc: 'Files belonging to deleted posts. Safe to delete.',
       orphanFiles: 'orphaned files', wastedSpace: 'Wasted Space', deleteOrphans: 'Delete All Orphans', noOrphans: 'All clean! No orphan files.',
-      cacheCleanup: '🗑️ Cache Cleanup', cacheDesc: 'Delete all processed/ cached files. Originals are kept. Files regenerate on next build.',
+      cacheCleanup: 'Cache Cleanup', cacheDesc: 'Delete all processed/ cached files. Originals are kept. Files regenerate on next build.',
       clearCache: 'Clear Processed Cache',
       deleting: 'Deleting...', deletingCache: 'Deleting cache...',
     },
@@ -792,7 +792,7 @@ pages.config = async (signal) => {
     html: `
       <div class="page-header"><h1>Site Configuration</h1><button class="btn-primary" onclick="doSaveConfig()"><i class="ri-save-line"></i> Save</button></div>
       <div class="config-grid">
-        ${sec('📋 基本信息',
+        ${sec('基本信息',
           txt('title', '站点标题', '浏览器标签页和页头显示', cfg) +
           txt('subtitle', '副标题', '标题下方的简短描述', cfg) +
           area('description', '站点描述', 'SEO 用，会出现在搜索引擎结果里', cfg) +
@@ -804,11 +804,11 @@ pages.config = async (signal) => {
           txt('favicon', '网站图标', '浏览器标签页上的小图标路径', cfg) +
           txt('dateFormat', '日期格式', '如 YYYY-MM-DD', cfg)
         )}
-        ${sec('👤 作者信息',
+        ${sec('作者信息',
           txt('author.name', '作者名', '显示在文章署名和 RSS 中', cfg) +
           txt('author.email', '邮箱', 'RSS feed 用到，可不填', cfg, 'email')
         )}
-        ${sec('🎨 主题与布局',
+        ${sec('主题与布局',
           sel('theme', '主题配色', '前台颜色模式', cfg, [['auto','自动（跟随系统）'],['light','浅色'],['dark','深色']]) +
           num('pageSize', '每页文章数', '首页和列表页每页显示多少篇', cfg) +
           num('gallerySingleThreshold', '画廊阈值', '少于这个数量的图片用单列大图展示', cfg) +
@@ -816,7 +816,7 @@ pages.config = async (signal) => {
           tog('cardShowStats', '卡片显示统计', '文章卡片上是否显示浏览/点赞数', cfg) +
           area('footerText', '页脚文字', '留空则不显示页脚', cfg)
         )}
-        ${sec('🖼️ 媒体画质',
+        ${sec('媒体画质',
           `<div class="config-field">
             <label class="config-label"><span>图片压缩质量</span><small>数值越大画质越好，文件越大（1-100）</small></label>
             <div class="config-quality-group">
@@ -833,7 +833,7 @@ pages.config = async (signal) => {
             </div>
           </div>`
         )}
-        ${sec('🔌 功能开关',
+        ${sec('功能开关',
           tog('enableBusuanzi', '不蒜子统计', '第三方访客计数（中国大陆访问较快）', cfg) +
           tog('enableVideoCompression', '视频压缩', '上传视频时自动转码 HLS', cfg) +
           num('searchMinChars', '搜索最少字数', '输入多少个字后触发搜索', cfg) +
@@ -845,14 +845,14 @@ pages.config = async (signal) => {
           tog('components.likes.enabled', '点赞按钮', '文章点赞互动', cfg) +
           tog('components.stats.enabled', '停留统计', '记录阅读时长', cfg)
         )}
-        ${sec('💬 Giscus 评论',
+        ${sec('Giscus 评论',
           `<p style="font-size:12px;color:var(--color-text-tertiary);margin:0 0 12px">在 <a href="https://giscus.app" target="_blank" style="color:var(--color-accent)">giscus.app</a> 配置后获取以下参数</p>` +
           txt('giscus.repo', 'GitHub 仓库', '如 username/repo', cfg) +
           txt('giscus.repoId', 'Repo ID', '安装 Giscus 后获得', cfg) +
           txt('giscus.category', '分类名', '存放评论的 Discussion 分类', cfg) +
           txt('giscus.categoryId', 'Category ID', '分类的 ID', cfg)
         )}
-        ${sec('🧩 生成插件',
+        ${sec('生成插件',
           tog('plugins.compress-images.enabled', '图片压缩', '构建时自动压缩图片为 WebP', cfg) +
           tog('plugins.compress-videos.enabled', '视频压缩', '构建时自动转码视频为 HLS', cfg) +
           tog('plugins.generate-feed.enabled', 'RSS 订阅', '生成 RSS/Atom feed', cfg) +
@@ -1182,11 +1182,11 @@ async function handleUploadFiles(files) {
       });
       done++;
       itemEl.classList.add('upload-done');
-      itemEl.querySelector('.upload-item-status').textContent = '✅';
+      itemEl.querySelector('.upload-item-status').textContent = 'Done';
       itemEl.querySelector('.upload-item-meta').innerHTML = '<span style="color:#2ecc71">Done</span>';
     } catch (err) {
       itemEl.classList.add('upload-error');
-      itemEl.querySelector('.upload-item-status').textContent = '❌';
+      itemEl.querySelector('.upload-item-status').textContent = 'Failed';
       itemEl.querySelector('.upload-item-meta').innerHTML = '<span style="color:#e74c3c">' + escHtml(err.message) + '</span>';
     }
   }
