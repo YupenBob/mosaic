@@ -5,7 +5,7 @@ category:
 tags: []
 description: 
 layout: default
-cover: 
+cover: video:0
 views: 0
 likes: 0
 ---
