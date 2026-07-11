@@ -11,9 +11,27 @@ function headers(c) {
   };
 }
 
+// ====== R2 Cache ======
+
+async function cacheGet(env, key, ttlMs) {
+  try {
+    const obj = await env.MEDIA.get(key);
+    if (!obj) return null;
+    const data = JSON.parse(await obj.text());
+    if (Date.now() - data._ts < ttlMs) return data._value;
+  } catch {}
+  return null;
+}
+
+async function cacheSet(env, key, value) {
+  try {
+    await env.MEDIA.put(key, JSON.stringify({ _ts: Date.now(), _value: value }), { httpMetadata: { contentType: 'application/json' } });
+  } catch {}
+}
+
 // ====== Contents API ======
 
-export async function listPosts(c) {
+async function listPostsUncached(c) {
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts`, { headers: headers(c) });
   if (!resp.ok) throw new Error(`GitHub listPosts: ${resp.status}`);
   const dirs = (await resp.json()).filter(f => f.type === 'dir');
@@ -27,6 +45,15 @@ export async function listPosts(c) {
       return { slug: d.name, title: fm.title || d.name, category: fm.category, tags: fm.tags || [], date: fm.date, description: fm.description, cover: fm.cover || '' };
     } catch { return { slug: d.name, title: d.name, cover: '' }; }
   }));
+}
+
+export async function listPosts(c) {
+  const cacheKey = 'site-data/cache/posts.json';
+  const cached = await cacheGet(c.env, cacheKey, 60000);
+  if (cached) return cached;
+  const fresh = await listPostsUncached(c);
+  await cacheSet(c.env, cacheKey, fresh);
+  return fresh;
 }
 
 export async function getPost(c, slug) {
@@ -187,10 +214,15 @@ export async function getRunHistory(c) {
 // ====== Config ======
 
 export async function getConfig(c) {
+  const cacheKey = 'site-data/cache/config.json';
+  const cached = await cacheGet(c.env, cacheKey, 120000);
+  if (cached) return cached;
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, { headers: headers(c) });
   if (!resp.ok) return {};
   const file = await resp.json();
-  return JSON.parse(decodeBase64(file.content));
+  const fresh = JSON.parse(decodeBase64(file.content));
+  await cacheSet(c.env, cacheKey, fresh);
+  return fresh;
 }
 
 export async function updateConfig(c, config, message) {
