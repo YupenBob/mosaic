@@ -14,10 +14,12 @@ const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');
-const R2_PUBLIC = process.env.R2_PUBLIC_URL || '';
-// Direct R2: https://mosaic-media.xsanye.cn/processed/slug/folder/file
-// Proxy fallback: /api/media/file/slug/file (Worker searches processed/ + originals/)
-const MEDIA_BASE = R2_PUBLIC || '/api/media/file';
+
+// Load config
+const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf-8'));
+
+// R2_PUBLIC priority: pipeline env > config.mediaBase > proxy fallback
+const R2_PUBLIC = process.env.R2_PUBLIC_URL || config.mediaBase || '';
 const pUrl = (slug, folder, filename) => {
   if (R2_PUBLIC) return `${R2_PUBLIC}/processed/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(filename)}`;
   return `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
@@ -26,9 +28,6 @@ const oUrl = (slug, folder, filename) => {
   if (R2_PUBLIC) return `${R2_PUBLIC}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(filename)}`;
   return `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
 };
-
-// Load config
-const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf-8'));
 const SITE = { ...config, language: config.language || 'zh-CN' };
 
 // Load i18n

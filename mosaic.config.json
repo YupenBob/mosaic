@@ -6,6 +6,7 @@
   "description": "A pure static multimedia site generator.",
   "url": "https://mosaic-b3z.pages.dev",
   "apiBase": "https://mosaic-api.yupenbob.workers.dev/api",
+  "mediaBase": "https://mosaic-media.xsanye.cn",
   "language": "zh-CN",
 
   "author": {

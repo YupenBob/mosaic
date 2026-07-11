@@ -226,6 +226,7 @@ const state = {
   authStatus: 'checking', // 'checking' | 'ok' | 'expired'
   abortController: null,
   posts: [],
+  mediaBase: window.__MEDIA_BASE__ || '/api/media/file',
 };
 
 // ── Router ─────────────────────────────────
@@ -342,6 +343,7 @@ pages.dashboard = async (signal) => {
   ]);
   if (signal.aborted) return '';
 
+  if (cfg.mediaBase) state.mediaBase = cfg.mediaBase;
   const siteUrl = cfg.url || '';
   const today = new Date().toISOString().slice(0, 10);
   const todayViews = (trafficData.byDay || []).find(d => d.date === today)?.count || 0;
@@ -540,7 +542,7 @@ pages.posts = async (signal) => {
         <div class="admin-card-grid">
           ${postsData.map(p => `
             <a href="#editor&slug=${encodeURIComponent(p.slug)}" class="admin-post-card" data-search="${(p.title||'') + ' ' + (p.category||'') + ' ' + (p.tags||[]).join(' ')}" data-cat="${escHtml(p.category||'')}">
-              ${(p.cover && !p.cover.startsWith('video:') && !p.cover.startsWith('photo:')) ? `<div class="admin-card-cover"><img src="${(window.__MEDIA_BASE__||'/api/media/file')}/processed/${encodeURIComponent(p.slug)}/covers/cover-480p.webp" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
+              ${(p.cover && !p.cover.startsWith('video:') && !p.cover.startsWith('photo:')) ? `<div class="admin-card-cover"><img src="${state.mediaBase}/processed/${encodeURIComponent(p.slug)}/covers/cover-480p.webp" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
               <div class="admin-card-body">
                 <span class="admin-card-cat">${escHtml((p.category || 'Uncategorized').split('/').pop())}</span>
                 <h3 class="admin-card-title">${escHtml(p.title || p.slug)}</h3>
@@ -804,6 +806,8 @@ pages.config = async (signal) => {
           txt('subtitle', '副标题', '标题下方的简短描述', cfg) +
           area('description', '站点描述', 'SEO 用，会出现在搜索引擎结果里', cfg) +
           txt('url', '站点网址', '完整的 URL，如 https://example.com', cfg, 'url') +
+          txt('apiBase', 'Worker API 地址', 'Cloudflare Worker 的完整 URL', cfg, 'url') +
+          txt('mediaBase', 'R2 媒体域名', '媒体文件直连的公开域名，如 https://media.example.com', cfg, 'url') +
           sel('language', '界面语言', '前台页面的默认语言', cfg, [['zh-CN','中文简体'],['en','English'],['ja','日本語']]) +
           `<div class="config-field"><label class="config-label"><span>${t('config.adminLang')}</span><small>${t('config.adminLangHint')}</small></label><select id="admin-lang-select" onchange="setLang(this.value)"><option value="zh-CN" ${(localStorage.getItem('mosaic_admin_lang')||'zh-CN')==='zh-CN'?'selected':''}>中文简体</option><option value="en" ${localStorage.getItem('mosaic_admin_lang')==='en'?'selected':''}>English</option></select></div>` +
           txt('favicon', '网站图标', '浏览器标签页上的小图标路径', cfg) +
