@@ -1126,8 +1126,10 @@ window.doCleanup = async () => {
       const result = await fetch(API + '/cleanup', { method: 'DELETE', headers: hp }).then(r => r.json());
       if (fill) fill.style.width = '100%';
       if (result.error) { if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + result.error + '</p>'; return; }
-      toast(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), 'success');
-      setTimeout(() => location.hash = 'cleanup', 500);
+      if (progress) {
+        progress.innerHTML = `<div style="text-align:center;padding:16px;color:#2ecc71;font-size:14px"><i class="ri-check-line"></i> ${t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' })}</div>`;
+        setTimeout(() => { progress.style.display = 'none'; if (btn) btn.style.display = ''; }, 2000);
+      }
     } catch (e) {
       if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + e.message + '</p>';
     }
@@ -1153,8 +1155,10 @@ window.doClearCache = async () => {
       const result = await fetch(API + '/processed-cache', { method: 'DELETE', headers: hp }).then(r => r.json());
       if (fill) fill.style.width = '100%';
       if (result.error) { if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + result.error + '</p>'; return; }
-      toast(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), 'success');
-      setTimeout(() => location.hash = 'cleanup', 500);
+      if (progress) {
+        progress.innerHTML = `<div style="text-align:center;padding:16px;color:#2ecc71;font-size:14px"><i class="ri-check-line"></i> ${t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' })}</div>`;
+        setTimeout(() => { progress.style.display = 'none'; if (btn) btn.style.display = ''; }, 2000);
+      }
     } catch (e) {
       if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + e.message + '</p>';
     }
