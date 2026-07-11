@@ -482,6 +482,7 @@ body {
   min-width: 0 !important;
   padding: 5px 6px !important;
   text-align: center;
+  color: var(--color-text);
 }
 
 @media (max-width: 768px) {
