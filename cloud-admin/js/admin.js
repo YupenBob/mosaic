@@ -332,14 +332,16 @@ async function renderPage(page, signal) {
 const pages = {};
 
 pages.dashboard = async (signal) => {
+  // Timeout helper — fast fail slow API calls so the page renders quickly
+  const quick = (p, fallback, ms = 5000) => Promise.race([p.catch(() => fallback), new Promise(r => setTimeout(() => r(fallback), ms))]);
   const [dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg] = await Promise.all([
-    stats.dashboard().catch(() => ({ posts: 0, categories: 0, tags: 0 })),
-    health.check().catch(() => ({ status: 'error' })),
-    stats.traffic().catch(() => ({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] })),
-    health.github().catch(() => ({ status: 'error' })),
-    health.r2().catch(() => ({ status: 'error' })),
-    disk.usage().catch(() => ({ sizeMB: '0', objects: 0, cost: '0' })),
-    config.get().catch(() => ({})),
+    quick(stats.dashboard(), { posts: 0, categories: 0, tags: 0 }),
+    quick(health.check(), { status: 'error' }),
+    quick(stats.traffic(), { total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }, 8000),
+    quick(health.github(), { status: 'error' }),
+    quick(health.r2(), { status: 'error' }),
+    quick(disk.usage(), { sizeMB: '...', objects: 0, cost: '0' }),
+    quick(config.get(), {}),
   ]);
   if (signal.aborted) return '';
 
@@ -351,14 +353,14 @@ pages.dashboard = async (signal) => {
 
     // Build recent activity feed
     const activities = [];
-    const postResult = await postsApi.list().catch(() => ({ posts: [] }));
+    const postResult = await quick(postsApi.list(), { posts: [] }, 8000);
     const postList = postResult.posts || postResult || [];
     postList.slice(0, 5).forEach(p => {
-      if (p.date) activities.push({ icon: 'ri-article-line', text: escHtml(p.title || p.slug) + ' updated', time: p.date });
+      if (p.date) activities.push({ icon: 'ri-article-line', text: escHtml(p.title || p.slug) + ' ' + t('dashboard.updated'), time: p.date });
     });
     // Latest build
     try {
-      const bs = await build.status().catch(() => null);
+      const bs = await quick(build.status().catch(() => null), null, 5000);
       if (bs && bs.createdAt) activities.push({ icon: 'ri-tools-line', text: 'Build #' + (bs.runNumber || '?') + ' ' + (bs.conclusion || bs.status), time: bs.createdAt });
     } catch {}
 
