@@ -4,7 +4,7 @@
   "title": "Mosaic",
   "subtitle": "你的个人B站",
   "description": "A pure static multimedia site generator.",
-  "url": "https://mosaic-b3z.pages.dev",
+  "url": "https://mosaic.xsanye.cn",
   "apiBase": "https://mosaic-api.xsanye.cn/api",
   "mediaBase": "https://mosaic-media.xsanye.cn",
   "language": "zh-CN",
