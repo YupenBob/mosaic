@@ -4,9 +4,9 @@
  */
 import { $, $$ } from './utils.js';
 
-const RESOLUTIONS = ['480p', '720p', '1080p'];
-const RES_LABELS = { '480p': '低清', '720p': '高清', '1080p': '原图' };
-const PRELOAD_RANGE = { 3: { '480p': 10, '720p': 3, '1080p': 1 } };
+const RESOLUTIONS = ['480p', '720p', '1080p', 'orig'];
+const RES_LABELS = { '480p': '低清', '720p': '中清', '1080p': '高清', 'orig': '原图' };
+const PRELOAD_RANGE = { 3: { '480p': 10, '720p': 3, '1080p': 1, 'orig': 0 } };
 
 let state = {
   photos: [],
@@ -22,6 +22,7 @@ export function initGallery() {
     src480: img.dataset.src480 || img.src,
     src720: img.dataset.src720 || img.src,
     src1080: img.dataset.src1080 || img.src,
+    srcOrig: img.dataset.srcOrig || img.src,
     index: i,
   }));
 
@@ -44,7 +45,8 @@ function detectResolution() {
 }
 
 function getSrc(photo, res) {
-  const key = 'src' + res.replace('p', ''); // '480p' → '480' to match photo.src480
+  if (res === 'orig') return photo.srcOrig || photo.src1080 || photo.src720 || photo.src480;
+  const key = 'src' + res.replace('p', '');
   return photo[key] || photo.src1080 || photo.src720 || photo.src480;
 }
 
@@ -301,6 +303,7 @@ function handleKeyboard(e) {
     case '1': switchQuality('480p'); break;
     case '2': switchQuality('720p'); break;
     case '3': switchQuality('1080p'); break;
+    case '4': switchQuality('orig'); break;
   }
 }
 

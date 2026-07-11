@@ -7,6 +7,218 @@
 import { auth, posts as postsApi, media as mediaApi, upload, build, stats, config, taxonomy, trash, disk, health, track } from '../src/api.js';
 import { getToken, setToken } from '../src/api.js';
 
+// ── i18n ────────────────────────────────────
+const I18N = {
+  'zh-CN': {
+    login: { title: 'Mosaic 管理后台', subtitle: '请输入管理员密码', placeholder: '密码', btn: '登录', signing: '登录中...', error: '登录失败' },
+    nav: { dashboard: '仪表盘', posts: '文章', editor: '编辑器', build: '构建与部署', config: '站点设置', taxonomy: '分类与标签', cleanup: '清理', signOut: '退出登录' },
+    dashboard: {
+      title: '仪表盘', healthy: '● 所有系统正常', issues: '● 存在异常',
+      posts: '文章', categories: '分类', tags: '标签', totalViews: '总浏览量', r2Usage: 'R2 存储',
+      newPost: '新建文章', buildDeploy: '构建并部署', viewSite: '访问网站',
+      traffic: '流量（30天）', catTag: '分类 & 标签', leaderboard: '排行榜 · 热门文章', recentActivity: '最近动态', noData: '暂无数据', noActivity: '暂无动态',
+      updated: '更新了',
+    },
+    posts: { title: '文章', search: '搜索文章...', allCats: '全部分类', newPost: '新建', delete: '删除', uncategorized: '未分类' },
+    editor: {
+      title: '编辑器', newPost: '新建文章', save: '保存',
+      slug: '标识符', title: '标题', date: '日期', category: '分类', tags: '标签', description: '描述', layout: '布局', cover: '封面', views: '浏览数', likes: '点赞数', body: '正文',
+      catHint: '用 / 分隔多级分类，如 photography/nature',
+      upload: '上传媒体', uploadHint: '拖拽文件到此处，或点击选择', uploading: '处理中...', done: '完成', existingMedia: '已有媒体', noMedia: '还没有上传文件，使用上方上传区域', loadMedia: '加载媒体中...', loadError: '无法加载媒体',
+      triggerBuild: '触发构建中...', buildQueued: '构建已加入队列',
+      buildFailed: '构建触发失败', filesUploaded: '文件已上传，构建后生效',
+      saveFailed: '保存失败', deleteMedia: '删除',
+    },
+    build: {
+      title: '构建与部署', trigger: '构建并部署', refresh: '刷新',
+      running: '运行中', queued: '等待中', success: '成功', failed: '失败', cancelled: '已取消', skipped: '已跳过', unknown: '未知',
+      branch: '分支', commit: '提交', event: '触发方式', time: '时间',
+      history: '构建历史', noBuild: '还没有构建记录', noBuildHint: '上传媒体到文章后触发第一次构建', viewOnGitHub: '在 GitHub 查看',
+      alreadyRunning: '构建正在进行中',
+      triggerFailed: '构建触发失败',
+    },
+    config: {
+      title: '站点设置', save: '保存设置', saved: '设置已保存', saveFailed: '保存失败',
+      general: '📋 基本信息', author: '👤 作者信息', theme: '🎨 主题与布局', media: '🖼️ 媒体画质', features: '🔌 功能开关', giscus: '💬 Giscus 评论', plugins: '🧩 生成插件',
+      siteTitle: '站点标题', siteTitleHint: '浏览器标签页和页头显示',
+      subtitle: '副标题', subtitleHint: '标题下方的简短描述',
+      desc: '站点描述', descHint: 'SEO 用，会出现在搜索引擎结果里',
+      url: '站点网址', urlHint: '完整的 URL，如 https://example.com',
+      lang: '界面语言', langHint: '前台页面的默认语言',
+      favicon: '网站图标', faviconHint: '浏览器标签页上的小图标路径',
+      dateFmt: '日期格式', dateFmtHint: '如 YYYY-MM-DD',
+      authorName: '作者名', authorNameHint: '显示在文章署名和 RSS 中',
+      email: '邮箱', emailHint: 'RSS feed 用到，可不填',
+      theme: '主题配色', themeHint: '前台颜色模式',
+      pageSize: '每页文章数', pageSizeHint: '首页和列表页每页显示多少篇',
+      galleryThresh: '画廊阈值', galleryThreshHint: '少于这个数量的图片用单列大图展示',
+      cardTags: '卡片显示标签', cardTagsHint: '文章卡片上是否显示标签',
+      cardStats: '卡片显示统计', cardStatsHint: '文章卡片上是否显示浏览/点赞数',
+      footer: '页脚文字', footerHint: '留空则不显示页脚',
+      imgQuality: '图片压缩质量', imgQualityHint: '数值越大画质越好，文件越大（1-100）',
+      videoQuality: '视频压缩参数', videoQualityHint: 'CRF 越小画质越好体积越大，preset 越快压缩速度越快',
+      busuanzi: '不蒜子统计', busuanziHint: '第三方访客计数',
+      videoCompress: '视频压缩', videoCompressHint: '上传视频时自动转码 HLS',
+      searchMin: '搜索最少字数', searchMinHint: '输入多少个字后触发搜索',
+      compSwitch: '组件开关', compSwitchHint: '控制前台各模块是否加载',
+      gallery: '图片画廊', galleryHint: '点击图片放大查看',
+      video: '视频播放器', videoHint: '自定义视频播放控件',
+      comments: '评论系统', commentsHint: 'Giscus 评论区',
+      search: '搜索功能', searchHint: '全站文章搜索',
+      likes: '点赞按钮', likesHint: '文章点赞互动',
+      stats: '停留统计', statsHint: '记录阅读时长',
+      giscusHint: '在 giscus.app 配置后获取以下参数',
+      giscusRepo: 'GitHub 仓库', giscusRepoHint: '如 username/repo',
+      giscusRepoId: 'Repo ID', giscusRepoIdHint: '安装 Giscus 后获得',
+      giscusCat: '分类名', giscusCatHint: '存放评论的 Discussion 分类',
+      giscusCatId: 'Category ID', giscusCatIdHint: '分类的 ID',
+      imgCompress: '图片压缩', imgCompressHint: '构建时自动压缩图片为 WebP',
+      videoCompressPlugin: '视频压缩', videoCompressPluginHint: '构建时自动转码视频为 HLS',
+      rss: 'RSS 订阅', rssHint: '生成 RSS/Atom feed',
+      sitemap: '网站地图', sitemapHint: '生成 sitemap.xml 给搜索引擎',
+      themeAuto: '自动（跟随系统）', themeLight: '浅色', themeDark: '深色',
+      adminLang: '后台语言', adminLangHint: '管理后台的界面语言',
+    },
+    taxonomy: { title: '分类与标签', categories: '分类', tags: '标签', none: '暂无', rename: '重命名' },
+    cleanup: {
+      title: 'R2 清理', orphan: '🧹 孤儿文件清理', orphanDesc: '属于已删除文章的文件，可以安全删除',
+      orphanFiles: '个孤立文件', wastedSpace: '浪费空间', deleteOrphans: '删除所有孤儿文件', noOrphans: '一切干净！没有孤儿文件',
+      cacheCleanup: '🗑️ 缓存清理', cacheDesc: '删除所有 processed/ 缓存文件（压缩后的媒体）。原始文件保留，下次构建时会重新生成。',
+      clearCache: '清除压缩缓存',
+      deleting: '删除中...', deletingCache: '删除缓存中...',
+    },
+    common: {
+      error: '错误', delete: '删除', cancel: '取消', confirm: '确认', save: '保存', loading: '加载中...',
+      deletePost: '确定要删除"{slug}"吗？这将永久删除该文章及其在 R2 中的所有媒体文件。',
+      deleteOrphan: '删除所有孤儿 R2 文件？此操作不可撤销，以上列出的所有文件将永久删除。',
+      deleteCache: '清除所有压缩缓存？这将删除全部 processed/ 文件。原始文件保留，下次构建时重新生成。不可撤销。',
+      deleteAll: '全部删除',
+      deleted: '已删除 {count} 个文件，释放 {size}',
+      permDelete: '永久删除"{dir}"？此操作不可撤销。',
+      renameCat: '重命名分类', renameTag: '重命名标签',
+      renameFrom: '将"{old}"重命名为：',
+      renamed: '已重命名 {old} → {new}',
+      renameFailed: '重命名失败',
+      restoreFailed: '恢复失败',
+    },
+  },
+  'en': {
+    login: { title: 'Mosaic Admin', subtitle: 'Enter your admin password', placeholder: 'Password', btn: 'Sign In', signing: 'Signing in...', error: 'Login failed' },
+    nav: { dashboard: 'Dashboard', posts: 'Posts', editor: 'Editor', build: 'Build', config: 'Settings', taxonomy: 'Taxonomy', cleanup: 'Cleanup', signOut: 'Sign Out' },
+    dashboard: {
+      title: 'Dashboard', healthy: '● All systems healthy', issues: '● Issues detected',
+      posts: 'Posts', categories: 'Categories', tags: 'Tags', totalViews: 'Total Views', r2Usage: 'R2',
+      newPost: 'New Post', buildDeploy: 'Build & Deploy', viewSite: 'View Site',
+      traffic: 'Traffic (30 days)', catTag: 'Categories & Tags', leaderboard: 'Leaderboard · Top Posts', recentActivity: 'Recent Activity', noData: 'No data yet', noActivity: 'No recent activity',
+      updated: 'updated',
+    },
+    posts: { title: 'Posts', search: 'Search posts...', allCats: 'All categories', newPost: 'New', delete: 'Delete', uncategorized: 'Uncategorized' },
+    editor: {
+      title: 'Editor', newPost: 'New Post', save: 'Save',
+      slug: 'Slug', title: 'Title', date: 'Date', category: 'Category', tags: 'Tags', description: 'Description', layout: 'Layout', cover: 'Cover', views: 'Views', likes: 'Likes', body: 'Body',
+      catHint: 'Use / for multi-level, e.g. photography/nature',
+      upload: 'Upload Media', uploadHint: 'Drag & drop files here, or click to select', uploading: 'Processing...', done: 'Done', existingMedia: 'Existing Media', noMedia: 'No media yet. Use the upload zone above.', loadMedia: 'Loading media...', loadError: 'Could not load media',
+      triggerBuild: 'Triggering build...', buildQueued: 'Build queued', buildFailed: 'Build trigger failed', filesUploaded: 'Files uploaded. Site will update after build.',
+      saveFailed: 'Save failed', deleteMedia: 'Delete',
+    },
+    build: {
+      title: 'Build & Deploy', trigger: 'Build & Deploy', refresh: 'Refresh',
+      running: 'Running', queued: 'Queued', success: 'Success', failed: 'Failed', cancelled: 'Cancelled', skipped: 'Skipped', unknown: 'Unknown',
+      branch: 'Branch', commit: 'Commit', event: 'Event', time: 'Time',
+      history: 'Build History', noBuild: 'No Builds Yet', noBuildHint: 'Upload media to a post and trigger your first build.', viewOnGitHub: 'View on GitHub',
+      alreadyRunning: 'Build already in progress',
+      triggerFailed: 'Build trigger failed',
+    },
+    config: {
+      title: 'Site Configuration', save: 'Save', saved: 'Config saved!', saveFailed: 'Save failed',
+      general: '📋 General', author: '👤 Author', theme: '🎨 Theme & Layout', media: '🖼️ Media Quality', features: '🔌 Features', giscus: '💬 Giscus Comments', plugins: '🧩 Plugins',
+      siteTitle: 'Site Title', siteTitleHint: 'Shown in browser tab and header',
+      subtitle: 'Subtitle', subtitleHint: 'Short description below the title',
+      desc: 'Description', descHint: 'Used for SEO, appears in search results',
+      url: 'Site URL', urlHint: 'Full URL, e.g. https://example.com',
+      lang: 'Language', langHint: 'Default language for the site frontend',
+      favicon: 'Favicon', faviconHint: 'Browser tab icon path',
+      dateFmt: 'Date Format', dateFmtHint: 'e.g. YYYY-MM-DD',
+      authorName: 'Author Name', authorNameHint: 'Shown in bylines and RSS',
+      email: 'Email', emailHint: 'Used in RSS feed, optional',
+      theme: 'Theme', themeHint: 'Frontend color mode',
+      pageSize: 'Posts Per Page', pageSizeHint: 'How many posts per page',
+      galleryThresh: 'Gallery Threshold', galleryThreshHint: 'Fewer than this uses single-column large images',
+      cardTags: 'Show Tags on Cards', cardTagsHint: 'Display tag chips on post cards',
+      cardStats: 'Show Stats on Cards', cardStatsHint: 'Display view/like counts on post cards',
+      footer: 'Footer Text', footerHint: 'Leave blank to hide footer',
+      imgQuality: 'Image Quality', imgQualityHint: 'Higher = better quality, larger files (1-100)',
+      videoQuality: 'Video Quality', videoQualityHint: 'Lower CRF = better quality, faster preset = quicker compression',
+      busuanzi: 'Busuanzi Analytics', busuanziHint: 'Third-party visitor counter',
+      videoCompress: 'Video Compression', videoCompressHint: 'Auto-transcode videos to HLS on upload',
+      searchMin: 'Search Min Chars', searchMinHint: 'Characters needed to trigger search',
+      compSwitch: 'Component Toggles', compSwitchHint: 'Enable/disable frontend modules',
+      gallery: 'Photo Gallery', galleryHint: 'Click-to-zoom image viewer',
+      video: 'Video Player', videoHint: 'Custom video playback controls',
+      comments: 'Comments', commentsHint: 'Giscus comment section',
+      search: 'Search', searchHint: 'Full-site article search',
+      likes: 'Like Button', likesHint: 'Post like interaction',
+      stats: 'Reading Stats', statsHint: 'Track reading time',
+      giscusHint: 'Configure at giscus.app first, then fill in:',
+      giscusRepo: 'GitHub Repo', giscusRepoHint: 'e.g. username/repo',
+      giscusRepoId: 'Repo ID', giscusRepoIdHint: 'From Giscus setup',
+      giscusCat: 'Category', giscusCatHint: 'Discussion category for comments',
+      giscusCatId: 'Category ID', giscusCatIdHint: 'Category ID from Giscus',
+      imgCompress: 'Image Compression', imgCompressHint: 'Auto-compress images to WebP on build',
+      videoCompressPlugin: 'Video Compression', videoCompressPluginHint: 'Auto-transcode videos to HLS on build',
+      rss: 'RSS Feed', rssHint: 'Generate RSS/Atom feed',
+      sitemap: 'Sitemap', sitemapHint: 'Generate sitemap.xml for search engines',
+      themeAuto: 'Auto (follow system)', themeLight: 'Light', themeDark: 'Dark',
+      adminLang: 'Admin Language', adminLangHint: 'Language for the admin panel UI',
+    },
+    taxonomy: { title: 'Categories & Tags', categories: 'Categories', tags: 'Tags', none: 'None', rename: 'Rename' },
+    cleanup: {
+      title: 'R2 Cleanup', orphan: '🧹 Orphan Cleanup', orphanDesc: 'Files belonging to deleted posts. Safe to delete.',
+      orphanFiles: 'orphaned files', wastedSpace: 'Wasted Space', deleteOrphans: 'Delete All Orphans', noOrphans: 'All clean! No orphan files.',
+      cacheCleanup: '🗑️ Cache Cleanup', cacheDesc: 'Delete all processed/ cached files. Originals are kept. Files regenerate on next build.',
+      clearCache: 'Clear Processed Cache',
+      deleting: 'Deleting...', deletingCache: 'Deleting cache...',
+    },
+    common: {
+      error: 'Error', delete: 'Delete', cancel: 'Cancel', confirm: 'Confirm', save: 'Save', loading: 'Loading...',
+      deletePost: 'Delete "{slug}"? This will permanently delete the post and all its media from R2.',
+      deleteOrphan: 'Delete all orphaned R2 files? This cannot be undone.',
+      deleteCache: 'Clear all processed cache? This deletes all processed/ files. Originals are kept. Cannot be undone.',
+      deleteAll: 'Delete All',
+      deleted: 'Deleted {count} files, freed {size}',
+      permDelete: 'Permanently delete "{dir}"? This cannot be undone.',
+      renameCat: 'Rename category', renameTag: 'Rename tag',
+      renameFrom: 'Rename "{old}" to:',
+      renamed: 'Renamed {old} → {new}',
+      renameFailed: 'Rename failed',
+      restoreFailed: 'Restore failed',
+    },
+  },
+};
+
+function t(path, vars = {}) {
+  const lang = localStorage.getItem('mosaic_admin_lang') || 'zh-CN';
+  let s = path.split('.').reduce((o, k) => o?.[k], I18N[lang]) || path.split('.').reduce((o, k) => o?.[k], I18N['zh-CN']) || path;
+  for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
+  return s;
+}
+
+function setLang(lang) {
+  localStorage.setItem('mosaic_admin_lang', lang);
+  // Re-render current page
+  const raw = location.hash.replace('#', '') || 'dashboard';
+  const [page, ...rest] = raw.split('&');
+  const params = Object.fromEntries(new URLSearchParams(rest.join('&')));
+  navigateTo(page, params);
+  // Update static i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+}
+
 // ── State ──────────────────────────────────
 const state = {
   page: '',
@@ -68,10 +280,10 @@ window.mosaicLogin = async function() {
   const password = document.getElementById('login-password').value;
   const errorEl = document.getElementById('login-error');
   const btn = document.getElementById('login-btn');
-  if (!password) { errorEl.style.display = 'block'; errorEl.textContent = 'Enter password'; return; }
+  if (!password) { errorEl.style.display = 'block'; errorEl.textContent = t('login.error'); return; }
 
   btn.disabled = true;
-  btn.innerHTML = '<i class="ri-loader-4-line" style="animation:spin 1s linear infinite"></i> Signing in...';
+  btn.innerHTML = '<i class="ri-loader-4-line" style="animation:spin 1s linear infinite"></i> ' + t('login.signing');
   errorEl.style.display = 'none';
 
   try {
@@ -84,10 +296,10 @@ window.mosaicLogin = async function() {
     onHashChange();
   } catch (err) {
     errorEl.style.display = 'block';
-    errorEl.textContent = 'Login failed: ' + err.message + ' (API: https://mosaic-api.yupenbob.workers.dev)';
+    errorEl.textContent = t('login.error') + ': ' + err.message;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Sign In';
+    btn.textContent = t('login.btn');
   }
 };
 
@@ -154,9 +366,9 @@ pages.dashboard = async (signal) => {
   return {
     html: `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <h1 style="margin:0">Dashboard</h1>
+        <h1 style="margin:0">${t('dashboard.title')}</h1>
         <span style="padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;background:${allHealthy?'rgba(46,204,113,0.1)':'rgba(231,76,60,0.1)'};color:${allHealthy?'#2ecc71':'#e74c3c'}">
-          ${allHealthy ? '● All systems healthy' : '● Issues detected'}
+          ${allHealthy ? t('dashboard.healthy') : t('dashboard.issues')}
         </span>
       </div>
 
@@ -164,41 +376,41 @@ pages.dashboard = async (signal) => {
       <div class="dash-cards">
         <div class="dash-big-card">
           <span class="dash-big-num">${dashData.posts || 0}</span>
-          <span class="dash-big-label">Posts</span>
+          <span class="dash-big-label">${t('dashboard.posts')}</span>
         </div>
         <div class="dash-big-card">
           <span class="dash-big-num">${dashData.categories || 0}</span>
-          <span class="dash-big-label">Categories</span>
+          <span class="dash-big-label">${t('dashboard.categories')}</span>
         </div>
         <div class="dash-big-card">
           <span class="dash-big-num">${dashData.tags || 0}</span>
-          <span class="dash-big-label">Tags</span>
+          <span class="dash-big-label">${t('dashboard.tags')}</span>
         </div>
         <div class="dash-big-card" style="--accent:#9b59b6">
           <span class="dash-big-num">${trafficData.total || 0}</span>
-          <span class="dash-big-label">Total Views</span>
+          <span class="dash-big-label">${t('dashboard.totalViews')}</span>
         </div>
         <div class="dash-big-card">
           <span class="dash-big-num">${diskData.sizeMB || '0'} MB</span>
-          <span class="dash-big-label">R2 · ${diskData.objects||0} obj · $${diskData.cost||'0'}/mo</span>
+          <span class="dash-big-label">${t('dashboard.r2Usage')} · ${diskData.objects||0} obj · $${diskData.cost||'0'}/mo</span>
         </div>
       </div>
 
       <!-- Actions -->
       <div style="display:flex;gap:10px;margin-bottom:20px">
-        <button class="btn-primary" onclick="location.hash='editor'" style="padding:10px 20px;font-size:14px"><i class="ri-add-line"></i> New Post</button>
-        <button class="btn-secondary" onclick="doTriggerBuild()" style="padding:10px 20px;font-size:14px"><i class="ri-play-fill"></i> Build & Deploy</button>
-        ${siteUrl ? `<a href="${siteUrl}" target="_blank" class="btn-secondary" style="padding:10px 20px;text-decoration:none;font-size:14px"><i class="ri-external-link-line"></i> View Site</a>` : ''}
+        <button class="btn-primary" onclick="location.hash='editor'" style="padding:10px 20px;font-size:14px"><i class="ri-add-line"></i> ${t('dashboard.newPost')}</button>
+        <button class="btn-secondary" onclick="doTriggerBuild()" style="padding:10px 20px;font-size:14px"><i class="ri-play-fill"></i> ${t('dashboard.buildDeploy')}</button>
+        ${siteUrl ? `<a href="${siteUrl}" target="_blank" class="btn-secondary" style="padding:10px 20px;text-decoration:none;font-size:14px"><i class="ri-external-link-line"></i> ${t('dashboard.viewSite')}</a>` : ''}
       </div>
 
       <!-- Charts row -->
       <div class="dash-charts">
         <div class="dash-chart-card">
-          <h3>Traffic (30 days)</h3>
+          <h3>${t('dashboard.traffic')}</h3>
           <div class="dash-chart-wrap"><canvas id="chart-traffic"></canvas></div>
         </div>
         <div class="dash-chart-card">
-          <h3>Categories & Tags</h3>
+          <h3>${t('dashboard.catTag')}</h3>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="dash-chart-wrap" style="height:200px"><canvas id="chart-categories"></canvas></div>
             <div class="dash-chart-wrap" style="height:200px"><canvas id="chart-tags"></canvas></div>
@@ -209,15 +421,24 @@ pages.dashboard = async (signal) => {
       <!-- Bottom row -->
       <div class="dash-bottom">
         <div class="dash-chart-card">
-          <h3>Leaderboard · Top Posts</h3>
+          <h3>${t('dashboard.leaderboard')}</h3>
           ${(trafficData.top5 || []).length ? trafficData.top5.map((t, i) => `
             <a href="#editor&slug=${encodeURIComponent(t.slug)}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-border-light);font-size:13px;text-decoration:none;color:inherit">
               <span style="font-weight:700;color:${i===0?'#f0a500':i===1?'#86868b':i===2?'#cd7f32':'var(--color-text-tertiary)'};min-width:20px">#${i+1}</span>
               <span style="flex:1">${escHtml(t.title || t.slug)}</span>
               <span style="font-weight:600;color:var(--color-accent)">${t.count} views</span>
-            </a>`).join('') : '<p style="color:var(--color-text-tertiary);padding:8px 0">No data yet</p>'}
+            </a>`).join('') : `<p style="color:var(--color-text-tertiary);padding:8px 0">${t('dashboard.noData')}</p>`}
         </div>
-        <div class="dash-chart-card"><h3>Recent Activity</h3>
+        <div class="dash-chart-card"><h3>${t('dashboard.recentActivity')}</h3>
+          ${activities.length ? activities.slice(0, 8).map(a => `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-border-light);font-size:13px">
+              <i class="${a.icon}" style="color:var(--color-text-tertiary);font-size:14px"></i>
+              <span style="flex:1">${a.text}</span>
+              <span style="color:var(--color-text-tertiary);font-size:11px">${formatTime(a.time)}</span>
+            </div>`).join('') : `<p style="color:var(--color-text-tertiary);padding:8px 0">${t('dashboard.noActivity')}</p>`}
+        </div>
+      </div>
+    `,
           ${activities.length ? activities.slice(0, 8).map(a => `
             <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-border-light);font-size:13px">
               <i class="${a.icon}" style="color:var(--color-text-tertiary);font-size:14px"></i>
@@ -280,20 +501,20 @@ pages.posts = async (signal) => {
   return {
     html: `
       <div class="page-header">
-        <h1>Posts (${postsData.length})</h1>
+        <h1>${t('posts.title')} (${postsData.length})</h1>
         <div style="display:flex;gap:8px">
           <div class="view-toggle">
             <button class="view-toggle-btn active" data-view="table" onclick="switchPostsView('table')"><i class="ri-list-check"></i></button>
             <button class="view-toggle-btn" data-view="cards" onclick="switchPostsView('cards')"><i class="ri-layout-grid-line"></i></button>
           </div>
-          <button class="btn-primary" onclick="location.hash='editor'"><i class="ri-add-line"></i> New</button>
+          <button class="btn-primary" onclick="location.hash='editor'"><i class="ri-add-line"></i> ${t('posts.newPost')}</button>
         </div>
       </div>
       <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <input type="text" id="post-search" placeholder="Search posts..." style="flex:1;min-width:200px;max-width:320px;padding:8px;border:1px solid var(--color-border);border-radius:6px"
+        <input type="text" id="post-search" placeholder="${t('posts.search')}" style="flex:1;min-width:200px;max-width:320px;padding:8px;border:1px solid var(--color-border);border-radius:6px"
           oninput="filterPosts(this.value)" />
         <select id="post-cat-filter" onchange="filterPostsByCat(this.value)" style="padding:8px;border:1px solid var(--color-border);border-radius:6px;font-size:13px">
-          <option value="">All categories</option>
+          <option value="">${t('posts.allCats')}</option>
           ${buildCatOptions(postsData)}
         </select>
       </div>
@@ -319,7 +540,7 @@ pages.posts = async (signal) => {
         <div class="admin-card-grid">
           ${postsData.map(p => `
             <a href="#editor&slug=${encodeURIComponent(p.slug)}" class="admin-post-card" data-search="${(p.title||'') + ' ' + (p.category||'') + ' ' + (p.tags||[]).join(' ')}" data-cat="${escHtml(p.category||'')}">
-              ${(p.cover && !p.cover.startsWith('video:') && !p.cover.startsWith('photo:')) ? `<div class="admin-card-cover"><img src="https://mosaic-api.yupenbob.workers.dev/api/media/file/${encodeURIComponent(p.slug)}/${encodeURIComponent('cover-480p.webp')}" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
+              ${(p.cover && !p.cover.startsWith('video:') && !p.cover.startsWith('photo:')) ? `<div class="admin-card-cover"><img src="${(window.__MEDIA_BASE__||'/api/media/file')}/processed/${encodeURIComponent(p.slug)}/covers/cover-480p.webp" alt="${escHtml(p.title)}" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:32px;color:var(--color-text-tertiary)"></i></div>'}
               <div class="admin-card-body">
                 <span class="admin-card-cat">${escHtml((p.category || 'Uncategorized').split('/').pop())}</span>
                 <h3 class="admin-card-title">${escHtml(p.title || p.slug)}</h3>
@@ -358,23 +579,23 @@ pages.editor = async (signal) => {
   return {
     html: `
       <div class="page-header">
-        <h1>${slug ? 'Edit: ' + escHtml(fm.title || slug) : 'New Post'}</h1>
+        <h1>${slug ? escHtml(fm.title || slug) : t('editor.newPost')}</h1>
         <div style="display:flex;gap:8px">
-          <button class="btn-primary" onclick="doSavePost()"><i class="ri-save-line"></i> Save</button>
+          <button class="btn-primary" onclick="doSavePost()"><i class="ri-save-line"></i> ${t('editor.save')}</button>
         </div>
       </div>
       <div class="editor-layout">
         <div class="editor-fields">
-          <label>Slug <input type="text" id="fm-slug" value="${escHtml(slug)}" ${slug ? 'readonly' : ''} /></label>
-          <label>Title <input type="text" id="fm-title" value="${escHtml(fm.title || '')}" /></label>
-          <label>Date <input type="date" id="fm-date" value="${fm.date || new Date().toISOString().split('T')[0]}" /></label>
-          <label>Category <input type="text" id="fm-category" value="${escHtml(fm.category || '')}" placeholder="e.g. photography/nature" /><small style="color:var(--color-text-tertiary)">Use / for multi-level, e.g. photography/nature</small></label>
-          <label>Tags <input type="text" id="fm-tags" value="${(fm.tags || []).join(', ')}" /></label>
-          <label>Description <textarea id="fm-desc" rows="2">${escHtml(fm.description || '')}</textarea></label>
-          <label>Layout <select id="fm-layout">${layouts.map(l => `<option value="${l}" ${fm.layout === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-          <label>Cover <input type="text" id="fm-cover" value="${escHtml(fm.cover || '')}" placeholder="cover.jpg or video:0 or photo:0" /></label>
-        <label>Views <input type="number" id="fm-views" value="${fm.views||0}" /></label>
-        <label>Likes <input type="number" id="fm-likes" value="${fm.likes||0}" /></label>
+          <label>${t('editor.slug')} <input type="text" id="fm-slug" value="${escHtml(slug)}" ${slug ? 'readonly' : ''} /></label>
+          <label>${t('editor.title')} <input type="text" id="fm-title" value="${escHtml(fm.title || '')}" /></label>
+          <label>${t('editor.date')} <input type="date" id="fm-date" value="${fm.date || new Date().toISOString().split('T')[0]}" /></label>
+          <label>${t('editor.category')} <input type="text" id="fm-category" value="${escHtml(fm.category || '')}" placeholder="photography/nature" /><small style="color:var(--color-text-tertiary)">${t('editor.catHint')}</small></label>
+          <label>${t('editor.tags')} <input type="text" id="fm-tags" value="${(fm.tags || []).join(', ')}" /></label>
+          <label>${t('editor.description')} <textarea id="fm-desc" rows="2">${escHtml(fm.description || '')}</textarea></label>
+          <label>${t('editor.layout')} <select id="fm-layout">${layouts.map(l => `<option value="${l}" ${fm.layout === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label>${t('editor.cover')} <input type="text" id="fm-cover" value="${escHtml(fm.cover || '')}" placeholder="cover.jpg or video:0 or photo:0" /></label>
+        <label>${t('editor.views')} <input type="number" id="fm-views" value="${fm.views||0}" /></label>
+        <label>${t('editor.likes')} <input type="number" id="fm-likes" value="${fm.likes||0}" /></label>
         </div>
         <div class="editor-body">
           <textarea id="fm-body" style="width:100%;height:400px;font-family:var(--font-mono);font-size:14px;padding:12px;border:1px solid var(--color-border);border-radius:6px">${escHtml(post.body || '')}</textarea>
@@ -413,9 +634,9 @@ pages.build = async (signal) => {
   return {
     html: `
       <div class="page-header">
-        <h1>Build & Deploy</h1>
+        <h1>${t('build.title')}</h1>
         <div style="display:flex;gap:8px">
-          <button class="btn-primary" onclick="doTriggerBuild()"><i class="ri-play-fill"></i> Build & Deploy</button>
+          <button class="btn-primary" onclick="doTriggerBuild()"><i class="ri-play-fill"></i> ${t('build.trigger')}</button>
           <button class="btn-secondary" onclick="location.reload()"><i class="ri-refresh-line"></i></button>
         </div>
       </div>
@@ -488,7 +709,7 @@ function renderStatusCard(run) {
 
 function renderRunHistory(runs) {
   return `
-    <h2 style="margin-bottom:12px">Build History</h2>
+    <h2 style="margin-bottom:12px">${t('build.history')}</h2>
     <div style="display:flex;flex-direction:column;gap:2px">
       ${runs.map((r, i) => {
         const s = getStatusDef(r.status, r.conclusion);
@@ -511,9 +732,9 @@ function renderEmptyState() {
   return `
     <div style="text-align:center;padding:48px 24px;background:var(--color-surface);border:2px dashed var(--color-border);border-radius:10px;margin-bottom:20px">
       <i class="ri-tools-line" style="font-size:48px;color:var(--color-text-tertiary)"></i>
-      <h2 style="margin:12px 0 4px">No Builds Yet</h2>
-      <p style="color:var(--color-text-secondary);margin-bottom:16px">Upload media to a post and trigger your first build.</p>
-      <button class="btn-primary" onclick="doTriggerBuild()"><i class="ri-play-fill"></i> Build & Deploy</button>
+      <h2 style="margin:12px 0 4px">${t('build.noBuild')}</h2>
+      <p style="color:var(--color-text-secondary);margin-bottom:16px">${t('build.noBuildHint')}</p>
+      <button class="btn-primary" onclick="doTriggerBuild()"><i class="ri-play-fill"></i> ${t('build.trigger')}</button>
     </div>
   `;
 }
@@ -574,25 +795,77 @@ pages.config = async (signal) => {
   try { cfg = await config.get(); } catch {}
   if (signal.aborted) return '';
 
-  const fields = [
-    ['title', 'Site Title', 'text'],
-    ['subtitle', 'Subtitle', 'text'],
-    ['description', 'Description', 'textarea'],
-    ['url', 'Site URL', 'text'],
-    ['language', 'Language', 'text'],
-    ['pageSize', 'Posts Per Page', 'number'],
-    ['gallerySingleThreshold', 'Gallery Threshold', 'number'],
-  ];
-
-  return `
-    <div class="page-header"><h1>Site Configuration</h1><button class="btn-primary" onclick="doSaveConfig()"><i class="ri-save-line"></i> Save</button></div>
-    <div class="config-form">
-      ${fields.map(([key, label, type]) => renderConfigField(key, cfg[key], label, type)).join('')}
-      <h3 style="margin-top:20px">Giscus Comments</h3>
-      ${renderConfigField('giscus.repo', cfg.giscus?.repo || '', 'GitHub Repo')}
-      ${renderConfigField('giscus.category', cfg.giscus?.category || 'Announcements', 'Category')}
-    </div>
-  `;
+  return {
+    html: `
+      <div class="page-header"><h1>Site Configuration</h1><button class="btn-primary" onclick="doSaveConfig()"><i class="ri-save-line"></i> Save</button></div>
+      <div class="config-grid">
+        ${sec('📋 基本信息',
+          txt('title', '站点标题', '浏览器标签页和页头显示', cfg) +
+          txt('subtitle', '副标题', '标题下方的简短描述', cfg) +
+          area('description', '站点描述', 'SEO 用，会出现在搜索引擎结果里', cfg) +
+          txt('url', '站点网址', '完整的 URL，如 https://example.com', cfg, 'url') +
+          sel('language', '界面语言', '前台页面的默认语言', cfg, [['zh-CN','中文简体'],['en','English'],['ja','日本語']]) +
+          `<div class="config-field"><label class="config-label"><span>${t('config.adminLang')}</span><small>${t('config.adminLangHint')}</small></label><select id="admin-lang-select" onchange="setLang(this.value)"><option value="zh-CN" ${(localStorage.getItem('mosaic_admin_lang')||'zh-CN')==='zh-CN'?'selected':''}>中文简体</option><option value="en" ${localStorage.getItem('mosaic_admin_lang')==='en'?'selected':''}>English</option></select></div>` +
+          txt('favicon', '网站图标', '浏览器标签页上的小图标路径', cfg) +
+          txt('dateFormat', '日期格式', '如 YYYY-MM-DD', cfg)
+        )}
+        ${sec('👤 作者信息',
+          txt('author.name', '作者名', '显示在文章署名和 RSS 中', cfg) +
+          txt('author.email', '邮箱', 'RSS feed 用到，可不填', cfg, 'email')
+        )}
+        ${sec('🎨 主题与布局',
+          sel('theme', '主题配色', '前台颜色模式', cfg, [['auto','自动（跟随系统）'],['light','浅色'],['dark','深色']]) +
+          num('pageSize', '每页文章数', '首页和列表页每页显示多少篇', cfg) +
+          num('gallerySingleThreshold', '画廊阈值', '少于这个数量的图片用单列大图展示', cfg) +
+          tog('cardShowTags', '卡片显示标签', '文章卡片上是否显示标签', cfg) +
+          tog('cardShowStats', '卡片显示统计', '文章卡片上是否显示浏览/点赞数', cfg) +
+          area('footerText', '页脚文字', '留空则不显示页脚', cfg)
+        )}
+        ${sec('🖼️ 媒体画质',
+          `<div class="config-field">
+            <label class="config-label"><span>图片压缩质量</span><small>数值越大画质越好，文件越大（1-100）</small></label>
+            <div class="config-quality-group">
+              <label>480p<input type="number" data-config="imageQuality.480p" value="${cfgGet(cfg,'imageQuality.480p',75)}" min="1" max="100" /></label>
+              <label>720p<input type="number" data-config="imageQuality.720p" value="${cfgGet(cfg,'imageQuality.720p',80)}" min="1" max="100" /></label>
+              <label>1080p<input type="number" data-config="imageQuality.1080p" value="${cfgGet(cfg,'imageQuality.1080p',85)}" min="1" max="100" /></label>
+            </div>
+          </div>` +
+          `<div class="config-field">
+            <label class="config-label"><span>视频压缩参数</span><small>CRF 越小画质越好体积越大，preset 越快压缩速度越快</small></label>
+            <div class="config-quality-group">
+              <label>CRF<input type="number" data-config="videoQuality.crf" value="${cfgGet(cfg,'videoQuality.crf',23)}" min="0" max="51" style="width:60px" /></label>
+              <select data-config="videoQuality.preset" style="width:100px">${['ultrafast','superfast','veryfast','faster','fast','medium','slow'].map(p => `<option value="${p}" ${cfgGet(cfg,'videoQuality.preset','fast')===p?'selected':''}>${p}</option>`).join('')}</select>
+            </div>
+          </div>`
+        )}
+        ${sec('🔌 功能开关',
+          tog('enableBusuanzi', '不蒜子统计', '第三方访客计数（中国大陆访问较快）', cfg) +
+          tog('enableVideoCompression', '视频压缩', '上传视频时自动转码 HLS', cfg) +
+          num('searchMinChars', '搜索最少字数', '输入多少个字后触发搜索', cfg) +
+          `<div class="config-field" style="border-bottom:none;padding-top:12px"><label class="config-label"><span style="font-weight:600">组件开关</span><small>控制前台各模块是否加载</small></label></div>` +
+          tog('components.gallery.enabled', '图片画廊', '点击图片放大查看', cfg) +
+          tog('components.video.enabled', '视频播放器', '自定义视频播放控件', cfg) +
+          tog('components.comments.enabled', '评论系统', 'Giscus 评论区', cfg) +
+          tog('components.search.enabled', '搜索功能', '全站文章搜索', cfg) +
+          tog('components.likes.enabled', '点赞按钮', '文章点赞互动', cfg) +
+          tog('components.stats.enabled', '停留统计', '记录阅读时长', cfg)
+        )}
+        ${sec('💬 Giscus 评论',
+          `<p style="font-size:12px;color:var(--color-text-tertiary);margin:0 0 12px">在 <a href="https://giscus.app" target="_blank" style="color:var(--color-accent)">giscus.app</a> 配置后获取以下参数</p>` +
+          txt('giscus.repo', 'GitHub 仓库', '如 username/repo', cfg) +
+          txt('giscus.repoId', 'Repo ID', '安装 Giscus 后获得', cfg) +
+          txt('giscus.category', '分类名', '存放评论的 Discussion 分类', cfg) +
+          txt('giscus.categoryId', 'Category ID', '分类的 ID', cfg)
+        )}
+        ${sec('🧩 生成插件',
+          tog('plugins.compress-images.enabled', '图片压缩', '构建时自动压缩图片为 WebP', cfg) +
+          tog('plugins.compress-videos.enabled', '视频压缩', '构建时自动转码视频为 HLS', cfg) +
+          tog('plugins.generate-feed.enabled', 'RSS 订阅', '生成 RSS/Atom feed', cfg) +
+          tog('plugins.generate-sitemap.enabled', '网站地图', '生成 sitemap.xml 给搜索引擎', cfg)
+        )}
+      </div>
+    `,
+  };
 };
 
 pages.taxonomy = async (signal) => {
@@ -679,38 +952,40 @@ pages.cleanup = async () => {
     const orphans = data.orphans || [];
     const total = (data.totalSize / 1048576).toFixed(1);
     return `
-      <div class="page-header"><h1>R2 Cleanup</h1></div>
-      <div style="background:var(--color-surface);border:1px solid var(--color-border-light);border-radius:10px;padding:16px 20px;margin-bottom:16px;font-size:13px;color:var(--color-text-secondary);line-height:1.6">
-        <i class="ri-information-line" style="color:var(--color-accent);margin-right:6px"></i>
-        When you delete a post, media files in R2 may be left behind. This page scans for orphaned files and lets you clean them up to free storage space.
-      </div>
-      <div class="dash-cards" style="grid-template-columns:1fr 1fr">
-        <div class="dash-big-card"><span class="dash-big-num">${data.totalOrphans||0}</span><span class="dash-big-label">Orphaned Files</span></div>
-        <div class="dash-big-card"><span class="dash-big-num">${total} MB</span><span class="dash-big-label">Wasted Space</span></div>
-      </div>
-      ${orphans.length ? `
-        <div style="margin-bottom:16px">
-          <button class="btn-primary" id="btn-cleanup" onclick="doCleanup()" style="padding:10px 24px;font-size:14px"><i class="ri-delete-bin-line"></i> Delete All Orphans</button>
-          <span style="margin-left:12px;font-size:13px;color:var(--color-text-tertiary)">${orphans.length} files will be permanently deleted</span>
+      <div class="page-header"><h1>${t('cleanup.title')}</h1></div>
+
+      <!-- Orphan section -->
+      <div class="dash-chart-card" style="margin-bottom:14px">
+        <h3>${t('cleanup.orphan')}</h3>
+        <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">${t('cleanup.orphanDesc')}</p>
+        <div class="dash-cards" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+          <div class="dash-big-card"><span class="dash-big-num">${data.totalOrphans||0}</span><span class="dash-big-label">${t('cleanup.orphanFiles')}</span></div>
+          <div class="dash-big-card"><span class="dash-big-num">${total} MB</span><span class="dash-big-label">${t('cleanup.wastedSpace')}</span></div>
         </div>
-        <div class="dash-chart-card">
-          <h3>Orphan Files</h3>
-          ${orphans.slice(0, 100).map(o => `
-            <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--color-border-light);font-size:13px">
-              <i class="ri-file-line" style="color:var(--color-text-tertiary)"></i>
-              <span style="flex:1;font-family:var(--font-mono);font-size:12px">${escHtml(o.key)}</span>
-              <span style="color:var(--color-text-tertiary);white-space:nowrap">${(o.size/1024).toFixed(1)} KB</span>
-            </div>`).join('')}
-          ${orphans.length > 100 ? `<p style="color:var(--color-text-tertiary);padding:8px 0">...and ${orphans.length - 100} more</p>` : ''}
-        </div>
-      ` : '<div style="text-align:center;padding:80px 20px;color:var(--color-text-tertiary)"><i class="ri-check-double-line" style="font-size:56px;color:#2ecc71;display:block;margin-bottom:12px"></i><p style="font-size:18px;color:var(--color-text)">All clean!</p><p style="margin-top:4px">No orphan files found in R2.</p></div>'}
+        ${orphans.length ? `
+          <div style="margin-bottom:8px">
+            <button class="btn-primary" id="btn-cleanup" onclick="doCleanup()" style="padding:10px 24px;font-size:14px"><i class="ri-delete-bin-line"></i> ${t('cleanup.deleteOrphans')}</button>
+            <span style="margin-left:12px;font-size:13px;color:var(--color-text-tertiary)">${orphans.length} files</span>
+          </div>
+          ${orphans.slice(0, 20).map(o => `<div style="display:flex;align-items:center;gap:10px;padding:4px 0;font-size:12px"><span style="font-family:var(--font-mono)">${escHtml(o.key)}</span><span style="color:var(--color-text-tertiary);margin-left:auto">${(o.size/1024).toFixed(1)}KB</span></div>`).join('')}
+          ${orphans.length > 20 ? `<p style="color:var(--color-text-tertiary);font-size:12px">...and ${orphans.length - 20} more</p>` : ''}
+        ` : `<p style="color:var(--color-text-tertiary);padding:12px 0">${t('cleanup.noOrphans')}</p>`}
+      </div>
+
+      <!-- Cache cleanup section -->
+      <div class="dash-chart-card" style="margin-bottom:14px">
+        <h3>${t('cleanup.cacheCleanup')}</h3>
+        <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">${t('cleanup.cacheDesc')}</p>
+        <button class="btn-primary" id="btn-clear-cache" onclick="doClearCache()" style="padding:10px 24px;font-size:14px;background:#e74c3c"><i class="ri-delete-bin-line"></i> ${t('cleanup.clearCache')}</button>
+      </div>
+
       <div id="cleanup-progress" style="display:none;margin-top:12px"></div>
     `;
   } catch (e) { return `<h1>Cleanup</h1><p class="error">${escHtml(e.message)}</p>`; }
 };
 
 window.doCleanup = async () => {
-  modalConfirm('Delete all orphaned R2 files?', 'This action cannot be undone. All files listed above will be permanently deleted from R2 storage.', async () => {
+  modalConfirm(t('common.deleteOrphan'), '', async () => {
     const API = window.__API_BASE__ || '/api';
     const hp = { 'Authorization': 'Bearer ' + (localStorage.getItem('mosaic_token')||'') };
     const progress = document.getElementById('cleanup-progress');
@@ -729,7 +1004,34 @@ window.doCleanup = async () => {
       const result = await fetch(API + '/cleanup', { method: 'DELETE', headers: hp }).then(r => r.json());
       if (fill) fill.style.width = '100%';
       if (result.error) { if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + result.error + '</p>'; return; }
-      toast('Deleted ' + result.deleted + ' files, freed ' + result.freedMB + ' MB', 'success');
+      toast(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), 'success');
+      setTimeout(() => location.hash = 'cleanup', 500);
+    } catch (e) {
+      if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + e.message + '</p>';
+    }
+  });
+};
+
+window.doClearCache = async () => {
+  modalConfirm(t('common.deleteCache'), '', async () => {
+    const API = window.__API_BASE__ || '/api';
+    const hp = { 'Authorization': 'Bearer ' + (localStorage.getItem('mosaic_token')||'') };
+    const progress = document.getElementById('cleanup-progress');
+    const btn = document.getElementById('btn-clear-cache');
+    if (btn) btn.style.display = 'none';
+    if (progress) {
+      progress.style.display = 'block';
+      progress.innerHTML = '<div class="progress-bar" style="height:6px;background:var(--color-border-light);border-radius:3px;overflow:hidden"><div class="progress-fill" style="height:100%;width:0%;background:#e74c3c;border-radius:3px;transition:width 0.3s"></div></div><p style="font-size:13px;color:var(--color-text-secondary);margin-top:8px">Deleting processed cache...</p>';
+    }
+    const fill = progress?.querySelector('.progress-fill');
+    let pct = 0;
+    const tick = () => { pct += Math.random() * 25 + 5; if (pct > 95) pct = 95; if (fill) fill.style.width = pct + '%'; if (pct < 95) setTimeout(tick, 200 + Math.random() * 300); };
+    tick();
+    try {
+      const result = await fetch(API + '/processed-cache', { method: 'DELETE', headers: hp }).then(r => r.json());
+      if (fill) fill.style.width = '100%';
+      if (result.error) { if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + result.error + '</p>'; return; }
+      toast(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), 'success');
       setTimeout(() => location.hash = 'cleanup', 500);
     } catch (e) {
       if (progress) progress.innerHTML = '<p style="color:var(--color-danger);font-size:13px">' + e.message + '</p>';
@@ -745,8 +1047,8 @@ function modalConfirm(title, msg, onOk) {
     <h3 style="text-align:center;margin-bottom:8px">${title}</h3>
     <p style="text-align:center;font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">${msg}</p>
     <div style="display:flex;gap:10px;justify-content:center">
-      <button class="btn-secondary" id="modal-cancel" style="min-width:100px">Cancel</button>
-      <button class="btn-primary" id="modal-ok" style="min-width:100px;background:#e74c3c">Delete All</button>
+      <button class="btn-secondary" id="modal-cancel" style="min-width:100px">${t('common.cancel')}</button>
+      <button class="btn-primary" id="modal-ok" style="min-width:100px;background:#e74c3c">${t('common.deleteAll')}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -761,14 +1063,29 @@ function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function renderConfigField(key, value, label, type = 'text') {
-  const isTextarea = type === 'textarea';
-  return `<label style="display:block;margin-bottom:12px">
-    <span style="font-size:13px;color:var(--color-text-secondary)">${label}</span>
-    ${isTextarea
-      ? `<textarea data-config="${key}" style="width:100%;margin-top:4px;padding:8px;border:1px solid var(--color-border);border-radius:6px" rows="3">${escHtml(value || '')}</textarea>`
-      : `<input type="${type}" data-config="${key}" value="${escHtml(value || '')}" style="width:100%;margin-top:4px;padding:8px;border:1px solid var(--color-border);border-radius:6px" />`}
-  </label>`;
+// ── Config helpers ──────────────────────────
+function cfgGet(obj, path, def = '') {
+  return path.split('.').reduce((o, k) => (o || {})[k], obj) ?? def;
+}
+function sec(title, body) {
+  return `<div class="config-section"><h3 class="config-section-title">${title}</h3><div class="config-fields">${body}</div></div>`;
+}
+function txt(key, label, hint, cfg, type = 'text') {
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><input type="${type}" data-config="${key}" value="${escHtml(String(cfgGet(cfg, key)))}" /></div>`;
+}
+function area(key, label, hint, cfg) {
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><textarea data-config="${key}" rows="2">${escHtml(String(cfgGet(cfg, key)))}</textarea></div>`;
+}
+function num(key, label, hint, cfg) {
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><input type="number" data-config="${key}" data-type="number" value="${cfgGet(cfg, key, 0)}" /></div>`;
+}
+function sel(key, label, hint, cfg, options) {
+  const val = cfgGet(cfg, key);
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><select data-config="${key}">${options.map(o => `<option value="${o[0]}" ${val === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select></div>`;
+}
+function tog(key, label, hint, cfg) {
+  const val = cfgGet(cfg, key, false);
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><label class="toggle-switch"><input type="checkbox" data-config="${key}" data-type="bool" ${val ? 'checked' : ''} /><span class="toggle-slider"></span></label></div>`;
 }
 
 // ── Existing media display ─────────────────
@@ -783,7 +1100,7 @@ async function loadExistingMedia(slug) {
       html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
         data.photos.map(f => `
           <div style="position:relative;border:1px solid var(--color-border-light);border-radius:6px;overflow:hidden;background:var(--color-surface)">
-            <img src="${'https://mosaic-api.yupenbob.workers.dev/api/media/file/' + encodeURIComponent(slug) + '/' + encodeURIComponent(f.name)}" alt="${escHtml(f.name)}" style="width:200px;height:200px;object-fit:cover;display:block" onerror="this.outerHTML=''" />
+            <img src="${escHtml(f.url || '')}" alt="${escHtml(f.name)}" style="width:200px;height:200px;object-fit:cover;display:block" onerror="this.outerHTML=''" />
             <div style="padding:2px 6px;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.name)}">${escHtml(f.name)}</div>
             <button onclick="doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','photos')" style="width:100%;border:none;background:var(--color-surface);color:#e74c3c;font-size:11px;cursor:pointer;padding:2px;border-top:1px solid var(--color-border-light)">Delete</button>
           </div>`).join('') +
@@ -953,13 +1270,13 @@ window.doSavePost = async () => {
       await postsApi.create({ slug, frontMatter, body });
     }
     location.hash = 'posts';
-  } catch (err) { alert('Save failed: ' + err.message); }
+  } catch (err) { toast(t('editor.saveFailed') + ': ' + err.message, 'error'); }
 };
 
 window.doDeletePost = async (slug) => {
-  modalConfirm('Delete "' + slug + '"?', 'This will permanently delete this post and all its media from R2.', async () => {
+  modalConfirm(t('common.deletePost', { slug: slug }), '', async () => {
     try { await postsApi.delete(slug); location.reload(); }
-    catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+    catch (err) { toast(t('common.delete') + ': ' + err.message, 'error'); }
   });
 };
 
@@ -973,21 +1290,21 @@ window.doDeleteMedia = async (slug, file, type) => {
 window.doTriggerBuild = async () => {
   const btn = document.querySelector('#build .btn-primary, .page-header .btn-primary');
   const origHTML = btn?.innerHTML || '';
-  if (btn) btn.innerHTML = '<span class="btn-spinner"></span> Triggering...';
+  if (btn) btn.innerHTML = '<span class="btn-spinner"></span> ' + t('common.loading');
 
   try {
     const result = await build.trigger();
-    const msg = `Build triggered via ${result.method || 'push'}! Check status below.`;
+    const msg = `Build triggered via ${result.method || 'push'}!`;
     if (result.wfError) toast('Fallback used: ' + result.wfError, 'info', 6000);
     toast(msg, 'success', 5000);
     if (location.hash !== '#build') location.hash = 'build';
   } catch (err) {
     const msg = err.message || '';
     if (msg.includes('already in progress') || msg.includes('BUILD_RUNNING')) {
-      toast('Build already in progress — check status below', 'info', 5000);
+      toast(t('build.alreadyRunning'), 'info', 5000);
       if (location.hash !== '#build') location.hash = 'build';
     } else {
-      toast('Build trigger failed: ' + msg, 'error', 8000);
+      toast(t('build.triggerFailed') + ': ' + msg, 'error', 8000);
     }
   } finally {
     if (btn) btn.innerHTML = origHTML;
@@ -998,29 +1315,36 @@ window.doSaveConfig = async () => {
   const data = {};
   document.querySelectorAll('[data-config]').forEach(el => {
     const keys = el.dataset.config.split('.');
+    const type = el.dataset.type || (el.type === 'number' ? 'number' : 'text');
+    let val;
+    if (type === 'bool') val = el.checked;
+    else if (type === 'number') val = parseInt(el.value) || 0;
+    else val = el.value;
     let obj = data;
     for (let i = 0; i < keys.length - 1; i++) {
       if (!obj[keys[i]]) obj[keys[i]] = {};
       obj = obj[keys[i]];
     }
-    obj[keys[keys.length - 1]] = el.value;
+    obj[keys[keys.length - 1]] = val;
   });
-  try { await config.update(data); alert('Config saved!'); }
-  catch (err) { alert('Save failed: ' + err.message); }
+  try {
+    await config.update(data);
+    toast(t('config.saved'), 'success');
+  } catch (err) { toast(t('config.saveFailed') + ': ' + err.message, 'error'); }
 };
 
 window.doRenameCategory = async (oldName) => {
   const newName = prompt('Rename category "' + oldName + '" to:', oldName);
   if (!newName || newName === oldName) return;
-  try { await taxonomy.renameCategory(oldName, newName); alert('Renamed ' + oldName + ' → ' + newName); location.reload(); }
-  catch (err) { alert('Rename failed: ' + err.message); }
+  try { await taxonomy.renameCategory(oldName, newName); toast(t('common.renamed', { old: oldName, new: newName }), 'success'); setTimeout(() => location.reload(), 500); }
+  catch (err) { toast(t('common.renameFailed') + ': ' + err.message, 'error'); }
 };
 
 window.doRenameTag = async (oldName) => {
   const newName = prompt('Rename tag "' + oldName + '" to:', oldName);
   if (!newName || newName === oldName) return;
-  try { await taxonomy.renameTag(oldName, newName); alert('Renamed ' + oldName + ' → ' + newName); location.reload(); }
-  catch (err) { alert('Rename failed: ' + err.message); }
+  try { await taxonomy.renameTag(oldName, newName); toast(t('common.renamed', { old: oldName, new: newName }), 'success'); setTimeout(() => location.reload(), 500); }
+  catch (err) { toast(t('common.renameFailed') + ': ' + err.message, 'error'); }
 };
 
 window.doRestoreTrash = async (dir) => {
@@ -1068,6 +1392,14 @@ window.filterPostsByCat = (cat) => {
 async function init() {
   const loadingEl = document.getElementById('loading-screen');
   const hideLoading = () => { if (loadingEl) loadingEl.style.display = 'none'; };
+
+  // Apply i18n to static HTML
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
 
   // Safety: hide loading after 5s no matter what
   setTimeout(hideLoading, 5000);

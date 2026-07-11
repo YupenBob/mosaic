@@ -21,25 +21,93 @@ app.get('/api/health', (c) => c.json({ status: 'ok', ok: true, version: '0.8.0' 
 app.get('/api/health/github', (c) => c.json({ status: 'ok', latency: 0 }));
 app.get('/api/health/r2', (c) => c.json({ status: 'ok', latency: 0 }));
 
-// Traffic stats — reads from R2 site-data/views.json
+// Helper: parse stats from R2 (stats.json first, fallback to views.json)
+async function getStats(env) {
+  let data = {};
+  try { const obj = await env.MEDIA.get('site-data/stats.json'); if (obj) data = JSON.parse(await obj.text()); } catch {}
+  if (!Object.keys(data).length) {
+    try { const obj = await env.MEDIA.get('site-data/views.json'); if (obj) data = JSON.parse(await obj.text()); } catch {}
+  }
+  return data;
+}
+
+// Track view — public (dedup by IP: 10min cooldown)
+app.post('/api/track/view/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  if (!slug) return c.json({ error: 'slug required' }, 400);
+  try {
+    const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+    const key = 'site-data/stats.json';
+    let data = {};
+    try { const obj = await c.env.MEDIA.get(key); if (obj) data = JSON.parse(await obj.text()); } catch {}
+
+    if (!data[slug]) data[slug] = { views: 0, likes: 0, history: [] };
+    else if (typeof data[slug] === 'number') data[slug] = { views: data[slug], likes: 0, history: [] };
+
+    // IP dedup: skip if same IP viewed in last 10 min
+    const recents = data[slug]._recentIps || {};
+    const now = Date.now();
+    if (recents[ip] && (now - recents[ip] < 600000)) {
+      return c.json({ ok: true, views: data[slug].views, likes: data[slug].likes, dedup: true });
+    }
+    recents[ip] = now;
+    // Purge stale IPs
+    for (const [k, t] of Object.entries(recents)) { if (now - t > 600000) delete recents[k]; }
+    data[slug]._recentIps = recents;
+
+    data[slug].views = (data[slug].views || 0) + 1;
+    data[slug].history = data[slug].history || [];
+    data[slug].history.push(new Date().toISOString());
+    if (data[slug].history.length > 500) data[slug].history = data[slug].history.slice(-500);
+
+    await c.env.MEDIA.put(key, JSON.stringify(data), { httpMetadata: { contentType: 'application/json' } });
+    return c.json({ ok: true, views: data[slug].views, likes: data[slug].likes });
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// Track like — public
+app.post('/api/track/like/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  if (!slug) return c.json({ error: 'slug required' }, 400);
+  let body = {};
+  try { body = await c.req.json(); } catch {}
+  const action = body.action || 'like';
+  try {
+    const key = 'site-data/stats.json';
+    let data = {};
+    try { const obj = await c.env.MEDIA.get(key); if (obj) data = JSON.parse(await obj.text()); } catch {}
+
+    if (!data[slug]) data[slug] = { views: 0, likes: 0, history: [] };
+    else if (typeof data[slug] === 'number') data[slug] = { views: data[slug], likes: 0, history: [] };
+
+    data[slug].likes = Math.max(0, (data[slug].likes || 0) + (action === 'like' ? 1 : -1));
+
+    await c.env.MEDIA.put(key, JSON.stringify(data), { httpMetadata: { contentType: 'application/json' } });
+    return c.json({ ok: true, likes: data[slug].likes, views: data[slug].views || 0 });
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// Traffic stats — reads from R2 site-data/stats.json (fallback views.json)
 app.get('/api/stats/traffic', async (c) => {
   try {
-    let data = {};
-    try { const obj = await c.env.MEDIA.get('site-data/views.json'); if (obj) data = JSON.parse(await obj.text()); } catch {}
+    const data = await getStats(c.env);
 
     const byCategory = {}, byTag = {};
     const byDay = {};
-    let total = 0;
+    let total = 0, totalLikes = 0;
     const entries = [];
 
     for (const [slug, val] of Object.entries(data)) {
-      const count = typeof val === 'number' ? val : (val.count || 0);
-      const history = typeof val === 'number' ? [] : (val.history || []);
-      const cat = typeof val === 'number' ? '' : (val.category || '');
-      const tags = typeof val === 'number' ? [] : (val.tags || []);
+      const entry = typeof val === 'number' ? { views: val, likes: 0, history: [] } : val;
+      const count = entry.views || entry.count || 0;
+      const likes = entry.likes || 0;
+      const history = entry.history || [];
+      const cat = entry.category || '';
+      const tags = entry.tags || [];
 
       total += count;
-      entries.push({ slug, count, category: cat, tags });
+      totalLikes += likes;
+      entries.push({ slug, count, likes, category: cat, tags });
 
       const topCat = cat.split('/')[0].trim() || 'uncategorized';
       byCategory[topCat] = (byCategory[topCat] || 0) + count;
@@ -49,7 +117,6 @@ app.get('/api/stats/traffic', async (c) => {
 
     entries.sort((a, b) => b.count - a.count);
 
-    // Enrich top entries with titles from post list, filter deleted posts
     const posts = await listPosts(c).catch(() => []);
     const validSlugs = new Set(posts.map(p => p.slug));
     const validEntries = entries.filter(e => validSlugs.has(e.slug));
@@ -62,14 +129,12 @@ app.get('/api/stats/traffic', async (c) => {
     }
 
     return c.json({
-      total, posts: entries.length, byDay: days,
+      total, totalLikes, posts: entries.length, byDay: days,
       byCategory: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,c])=>({name:n,count:c})),
       byTag: Object.entries(byTag).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>({name:n,count:c})),
-      top5: validEntries.slice(0, 5).map(e => ({ slug: e.slug, count: e.count, title: titleMap[e.slug] || e.slug })),
+      top5: validEntries.slice(0, 5).map(e => ({ slug: e.slug, count: e.count, likes: e.likes, title: titleMap[e.slug] || e.slug })),
     });
-  } catch { return c.json({ total: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
-
-// --------- Traffic stats ---------
+  } catch { return c.json({ total: 0, totalLikes: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 });
 
 // Media file serving — public
@@ -295,6 +360,25 @@ app.delete('/api/cleanup', async (c) => {
     } while (cursor);
     return c.json({ deleted, freed, freedMB: (freed / 1048576).toFixed(1) });
   } catch (e) { return c.json({ error: e.message }, 502); }
+});
+
+// Processed cache cleanup — delete all processed/ objects from R2
+app.delete('/api/processed-cache', async (c) => {
+  try {
+    let deleted = 0, freed = 0, cursor;
+    do {
+      const opts = { prefix: 'processed/', limit: 500 };
+      if (cursor) opts.cursor = cursor;
+      const list = await c.env.MEDIA.list(opts);
+      for (const obj of (list.objects || [])) {
+        await c.env.MEDIA.delete(obj.key);
+        deleted++;
+        freed += obj.size;
+      }
+      cursor = list.truncated ? list.cursor : null;
+    } while (cursor);
+    return c.json({ deleted, freed, freedMB: (freed / 1048576).toFixed(1) });
+  } catch (e) { return c.json({ error: e.message, code: 'R2_ERROR' }, 502); }
 });
 
 // 404

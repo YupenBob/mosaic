@@ -37,15 +37,28 @@ export async function uploadDirect(c) {
   return c.json({ ok: true, key, filename, folder });
 }
 
-// List media from R2 — searches both originals/ and processed/
+// List media from R2 — searches originals/
 export async function listMedia(c) {
   const slug = c.req.param('slug');
+  const r2Public = c.env.R2_PUBLIC_URL || '';
   const seen = new Set();
   const result = { photos: [], videos: [], music: [] };
 
-  const add = (name, url, size) => {
+  const folderFor = (name) => {
+    const ext = name.split('.').pop()?.toLowerCase();
+    if (['jpg','jpeg','png','webp','gif','svg'].includes(ext)) return 'photos';
+    if (['mp4','mov','mkv','webm'].includes(ext)) return 'videos';
+    if (['mp3','flac','wav','ogg'].includes(ext)) return 'music';
+    return 'others';
+  };
+
+  const add = (name, size) => {
     if (seen.has(name)) return;
     seen.add(name);
+    const folder = folderFor(name);
+    const url = r2Public
+      ? `${r2Public}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(name)}`
+      : `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`;
     const ext = name.split('.').pop()?.toLowerCase();
     if (['jpg','jpeg','png','webp','gif','svg'].includes(ext)) result.photos.push({ name, url, size });
     else if (['mp4','mov','mkv','webm'].includes(ext)) result.videos.push({ name, url, size });
@@ -53,12 +66,12 @@ export async function listMedia(c) {
   };
 
   try {
-    for (const prefix of ['processed', 'originals']) {
+    for (const prefix of ['originals']) {
       const list = await c.env.MEDIA.list({ prefix: `${prefix}/${slug}/` });
       for (const obj of (list.objects || [])) {
         const name = obj.key.split('/').pop();
         if (!name || name.startsWith('.')) continue;
-        add(name, `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`, obj.size);
+        add(name, obj.size);
       }
     }
   } catch (e) { /* return empty */ }

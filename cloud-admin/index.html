@@ -11,6 +11,7 @@
   <script>
     // Config injected at build time
     window.__API_BASE__ = 'https://mosaic-api.yupenbob.workers.dev/api';
+    window.__MEDIA_BASE__ = 'https://mosaic-media.xsanye.cn';
   </script>
 </head>
 <body class="admin-body">
@@ -31,10 +32,10 @@
           <rect x="26" y="26" width="20" height="20" rx="5" fill="#4361ee" opacity="0.75"/>
         </svg>
       </div>
-      <h1>Mosaic Admin</h1>
-    <p>Enter your admin password to continue</p>
-    <input type="password" id="login-password" placeholder="Password" autofocus onkeydown="if(event.key==='Enter')window.mosaicLogin()" />
-    <button id="login-btn" class="btn-primary" onclick="window.mosaicLogin()">Sign In</button>
+      <h1 data-i18n="login.title">Mosaic 管理后台</h1>
+    <p data-i18n="login.subtitle">请输入管理员密码</p>
+    <input type="password" id="login-password" data-i18n-placeholder="login.placeholder" placeholder="密码" autofocus onkeydown="if(event.key==='Enter')window.mosaicLogin()" />
+    <button id="login-btn" class="btn-primary" onclick="window.mosaicLogin()" data-i18n="login.btn">登录</button>
     <p id="login-error" style="color:#e74c3c;font-size:13px;display:none;margin-top:8px"></p>
   </div>
 </div>
@@ -52,15 +53,16 @@
         Mosaic Cloud
       </div>
     <nav class="sidebar-nav" id="sidebar-nav">
-      <a href="#dashboard" class="nav-item" data-page="dashboard"><i class="ri-dashboard-line"></i> Dashboard</a>
-      <a href="#posts" class="nav-item" data-page="posts"><i class="ri-article-line"></i> Posts</a>
-      <a href="#editor" class="nav-item" data-page="editor"><i class="ri-edit-line"></i> Editor</a>
-      <a href="#build" class="nav-item" data-page="build"><i class="ri-tools-line"></i> Build</a>
+      <a href="#dashboard" class="nav-item" data-page="dashboard"><i class="ri-dashboard-line"></i> <span data-i18n="nav.dashboard">仪表盘</span></a>
+      <a href="#posts" class="nav-item" data-page="posts"><i class="ri-article-line"></i> <span data-i18n="nav.posts">文章</span></a>
+      <a href="#editor" class="nav-item" data-page="editor"><i class="ri-edit-line"></i> <span data-i18n="nav.editor">编辑器</span></a>
+      <a href="#build" class="nav-item" data-page="build"><i class="ri-tools-line"></i> <span data-i18n="nav.build">构建与部署</span></a>
       <div class="sidebar-divider"></div>
-      <a href="#config" class="nav-item" data-page="config"><i class="ri-settings-line"></i> Config</a>
-      <a href="#taxonomy" class="nav-item" data-page="taxonomy"><i class="ri-price-tag-3-line"></i> Taxonomy</a>
+      <a href="#config" class="nav-item" data-page="config"><i class="ri-settings-line"></i> <span data-i18n="nav.config">站点设置</span></a>
+      <a href="#taxonomy" class="nav-item" data-page="taxonomy"><i class="ri-price-tag-3-line"></i> <span data-i18n="nav.taxonomy">分类与标签</span></a>
+      <a href="#cleanup" class="nav-item" data-page="cleanup"><i class="ri-delete-bin-line"></i> <span data-i18n="nav.cleanup">清理</span></a>
       <div class="sidebar-divider"></div>
-      <a href="#" id="logout-btn" class="nav-item" onclick="event.preventDefault();window.mosaicLogout()"><i class="ri-logout-box-line"></i> Sign Out</a>
+      <a href="#" id="logout-btn" class="nav-item" onclick="event.preventDefault();window.mosaicLogout()"><i class="ri-logout-box-line"></i> <span data-i18n="nav.signOut">退出登录</span></a>
     </nav>
   </aside>
 

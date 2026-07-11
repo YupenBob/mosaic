@@ -14,7 +14,18 @@ const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');
-const MEDIA_BASE = '/api/media/file'; // Pages Functions proxy — always relative
+const R2_PUBLIC = process.env.R2_PUBLIC_URL || '';
+// Direct R2: https://mosaic-media.xsanye.cn/processed/slug/folder/file
+// Proxy fallback: /api/media/file/slug/file (Worker searches processed/ + originals/)
+const MEDIA_BASE = R2_PUBLIC || '/api/media/file';
+const pUrl = (slug, folder, filename) => {
+  if (R2_PUBLIC) return `${R2_PUBLIC}/processed/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(filename)}`;
+  return `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
+};
+const oUrl = (slug, folder, filename) => {
+  if (R2_PUBLIC) return `${R2_PUBLIC}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(filename)}`;
+  return `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
+};
 
 // Load config
 const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf-8'));
@@ -54,11 +65,12 @@ for (const dir of postDirs) {
       const base = path.parse(f).name;
       photos.push({
         base,
-        src10p: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-10p.webp')}`,
-        src480: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-480p.webp')}`,
-        src720: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-720p.webp')}`,
-        src1080: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-1080p.webp')}`,
-        thumb: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-480p.webp')}`,
+        src10p: pUrl(slug, 'photos', base + '-10p.webp'),
+        src480: pUrl(slug, 'photos', base + '-480p.webp'),
+        src720: pUrl(slug, 'photos', base + '-720p.webp'),
+        src1080: pUrl(slug, 'photos', base + '-1080p.webp'),
+        srcOrig: oUrl(slug, 'photos', f),
+        thumb: pUrl(slug, 'photos', base + '-480p.webp'),
       });
     }
   }
@@ -71,7 +83,7 @@ for (const dir of postDirs) {
       if (!/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) continue;
       const rawBase = path.parse(f).name;
       const base = rawBase.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
-      const poster = `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-poster.jpg')}`;
+      const poster = pUrl(slug, 'videos', base + '-poster.jpg');
 
       // Check for compressed versions in dist/
       const sources = {};
@@ -82,16 +94,16 @@ for (const dir of postDirs) {
         hasHLS = fs.existsSync(masterM3U8);
         for (const res of ['4K','1080p','720p','480p','360p']) {
           const mp4 = path.join(outDir, `${base}-${res}.mp4`);
-          if (fs.existsSync(mp4)) sources[res] = `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-' + res + '.mp4')}`;
+          if (fs.existsSync(mp4)) sources[res] = pUrl(slug, 'videos', base + '-' + res + '.mp4');
         }
       }
 
       if (hasHLS) {
-        videos.push({ base, poster, hls: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(base + '-master.m3u8')}`, ...(Object.keys(sources).length ? { sources } : {}) });
+        videos.push({ base, poster, hls: pUrl(slug, 'videos', base + '-master.m3u8'), ...(Object.keys(sources).length ? { sources } : {}) });
       } else if (Object.keys(sources).length) {
         videos.push({ base, poster, sources });
       } else {
-        videos.push({ base, src: `${MEDIA_BASE}/${encodeURIComponent(slug)}/${encodeURIComponent(f)}`, poster });
+        videos.push({ base, src: oUrl(slug, 'videos', f), poster });
       }
     }
   }
@@ -112,16 +124,16 @@ for (const dir of postDirs) {
       } catch {}
     }
   }
-  // Check if compressed cover exists
-  if (cover && !cover.startsWith('/api/')) {
+  // Check if compressed cover exists (manual cover, not auto-detected from media)
+  if (cover && !cover.startsWith('http') && !cover.startsWith('/')) {
     const coverMeta = (() => { try { return JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'cover-meta.json'), 'utf-8')); } catch { return null; } })();
     if (coverMeta) {
       coverAspect = coverMeta.aspect || 1.778;
-      cover = `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-10p.webp`;
+      cover = pUrl(slug, 'covers', 'cover-10p.webp');
       coverSrcset = {
-        '480': `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-480p.webp`,
-        '720': `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-720p.webp`,
-        '1080': `${MEDIA_BASE}/${encodeURIComponent(slug)}/cover-1080p.webp`,
+        '480': pUrl(slug, 'covers', 'cover-480p.webp'),
+        '720': pUrl(slug, 'covers', 'cover-720p.webp'),
+        '1080': pUrl(slug, 'covers', 'cover-1080p.webp'),
       };
     } else {
       cover = ''; // No cover file on disk

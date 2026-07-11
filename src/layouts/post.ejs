@@ -82,14 +82,14 @@ function renderGallery(photos, threshold) {
   photos.forEach(function(p) {
     if (single) {
       h += '<div class="gallery-single-item">';
-      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" ';
+      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" data-src-orig="' + p.srcOrig + '" ';
       h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
       h += 'sizes="100vw" ';
       h += 'src="' + p.src10p + '" alt="Photo" loading="lazy" onload="this.classList.add(\'loaded\')" />';
       h += '</div>';
     } else {
       h += '<div class="gallery-item">';
-      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" ';
+      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" data-src-orig="' + p.srcOrig + '" ';
       h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
       h += 'sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" ';
       h += 'src="' + p.src10p + '" alt="Photo" loading="lazy" onload="this.classList.add(\'loaded\')" />';

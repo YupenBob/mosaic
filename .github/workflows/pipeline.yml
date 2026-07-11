@@ -8,6 +8,7 @@ on:
 env:
   NODE_VERSION: '20'
   R2_BUCKET: mosaic-media
+  R2_PUBLIC_URL: https://mosaic-media.xsanye.cn
 
 jobs:
   pipeline:
