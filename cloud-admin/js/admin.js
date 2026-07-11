@@ -704,6 +704,8 @@ pages.build = async (signal) => {
 function renderStatusCard(run) {
   const statusDef = getStatusDef(run.status, run.conclusion);
   const time = formatTime(run.createdAt);
+  const dur = buildDuration(run);
+  const durLabel = (run.status === 'in_progress' || run.status === 'queued') ? '已耗时 ' : '用时 ';
   return `
     <div style="background:var(--color-surface);border:1px solid var(--color-border-light);border-radius:10px;padding:20px 24px;margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
@@ -715,6 +717,7 @@ function renderStatusCard(run) {
         <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:${statusDef.bg};color:${statusDef.color}">
           ${statusDef.label}
         </span>
+        ${dur ? `<span style="font-size:12px;color:var(--color-text-tertiary)">${durLabel}${fmtDuration(dur)}</span>` : ''}
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;font-size:13px;color:var(--color-text-secondary)">
         <div><span style="color:var(--color-text-tertiary)">Branch</span><br><span style="font-family:var(--font-mono)">${escHtml(run.headBranch || 'main')}</span></div>
@@ -750,6 +753,7 @@ function renderRunHistory(runs) {
             <span style="font-family:var(--font-mono);font-weight:600;min-width:48px">#${r.runNumber}</span>
             <span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;background:${s.bg};color:${s.color};min-width:70px;text-align:center">${s.label}</span>
             <span style="flex:1;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(r.displayTitle || r.commitMessage || '')}</span>
+            ${(()=>{const d=buildDuration(r);return d?`<span style="font-size:11px;color:var(--color-text-tertiary);min-width:60px;text-align:right">用时 ${fmtDuration(d)}</span>`:'';})()}
             <span style="font-family:var(--font-mono);font-size:11px;color:var(--color-text-tertiary);min-width:56px;text-align:right">${escHtml(r.headSha || '')}</span>
             <span style="font-size:11px;color:var(--color-text-tertiary);min-width:80px;text-align:right">${time}</span>
             ${r.htmlUrl ? `<a href="${r.htmlUrl}" target="_blank" class="btn-sm" style="text-decoration:none">View details <i class="ri-external-link-line"></i></a>` : ''}
@@ -804,6 +808,23 @@ function buildCatOptions(postsData) {
       }).join('');
   }
   return render(tree, 0);
+}
+
+function fmtDuration(sec) {
+  if (!sec || sec < 0) return '';
+  if (sec < 60) return sec + 's';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m < 60) return m + 'm ' + s + 's';
+  const h = Math.floor(m / 60);
+  return h + 'h ' + (m % 60) + 'm ' + s + 's';
+}
+function buildDuration(run) {
+  if (!run.createdAt) return '';
+  const start = new Date(run.createdAt).getTime();
+  const end = run.status === 'in_progress' || run.status === 'queued'
+    ? Date.now() : (run.updatedAt ? new Date(run.updatedAt).getTime() : Date.now());
+  return Math.floor((end - start) / 1000);
 }
 
 function formatTime(ts) {
