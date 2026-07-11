@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { loginHandler, authMiddleware } from './auth.js';
-import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig } from './github.js';
+import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty } from './github.js';
 import { generatePresignedUrl, listMedia, serveMediaFile, uploadDirect } from './r2.js';
 
 const app = new Hono();
@@ -145,10 +145,27 @@ app.get('/api/media/file/:slug/:filename', async (c) => {
 });
 
 // Upload — public (admin sends JWT in XHR)
-app.post('/api/upload/direct/:slug/:filename', uploadDirect);
+app.post('/api/upload/direct/:slug/:filename', async (c) => {
+  const result = await uploadDirect(c);
+  c.executionCtx.waitUntil(markDirty(c.env));
+  return result;
+});
 
 // ====== Protected routes ======
 app.use('/api/*', authMiddleware);
+
+// Inject X-Dirty header on all API responses
+app.use('/api/*', async (c, next) => {
+  await next();
+  const dirty = await isDirty(c.env);
+  if (dirty) c.res.headers.set('X-Dirty', `${dirty.count}|${dirty.last}`);
+});
+
+// Dirty state query
+app.get('/api/dirty', async (c) => {
+  const dirty = await isDirty(c.env);
+  return c.json(dirty || { count: 0 });
+});
 
 // Posts CRUD
 app.get('/api/posts', async (c) => {
@@ -171,6 +188,7 @@ app.post('/api/posts', async (c) => {
     const { slug, frontMatter, body, message } = await c.req.json();
     if (!slug) return c.json({ error: 'slug required', code: 'INVALID_PARAMS' }, 400);
     const result = await createOrUpdatePost(c, slug, frontMatter, body, message);
+    c.executionCtx.waitUntil(markDirty(c.env));
     return c.json({ ok: true, slug, sha: result.content?.sha }, 201);
   } catch (e) { return c.json({ error: e.message, code: e.message.includes('exists') ? 'SLUG_CONFLICT' : 'GITHUB_ERROR' }, e.message.includes('exists') ? 409 : 502); }
 });
@@ -196,6 +214,7 @@ app.delete('/api/posts/:slug', async (c) => {
     }
     if (r2Count > 0) result.r2Deleted = r2Count;
 
+    c.executionCtx.waitUntil(markDirty(c.env));
     return c.json(result);
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
@@ -212,6 +231,7 @@ app.post('/api/build', async (c) => {
       return c.json({ error: 'Build already in progress', code: 'BUILD_RUNNING', run: { id: latest.id, url: latest.html_url } }, 409);
     }
     await dispatchBuild(c);
+    c.executionCtx.waitUntil(clearDirty(c.env));
     return c.json({ ok: true, message: 'Build triggered' });
   } catch (e) { return c.json({ error: e.message, code: 'DISPATCH_ERROR' }, 502); }
 });
@@ -252,6 +272,7 @@ app.put('/api/config', async (c) => {
   try {
     const { message, ...config } = await c.req.json();
     const result = await updateConfig(c, config, message);
+    c.executionCtx.waitUntil(markDirty(c.env));
     return c.json({ ok: true, sha: result.content?.sha });
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
@@ -270,6 +291,7 @@ app.post('/api/posts/:slug/duplicate', async (c) => {
     const { newSlug } = await c.req.json().catch(() => ({}));
     const slug = newSlug || `${c.req.param('slug')}-copy`;
     await createOrUpdatePost(c, slug, post.frontMatter, post.body, `Duplicate ${c.req.param('slug')} → ${slug}`);
+    c.executionCtx.waitUntil(markDirty(c.env));
     return c.json({ ok: true, slug });
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });

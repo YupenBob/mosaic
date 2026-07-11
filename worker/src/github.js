@@ -12,7 +12,6 @@ function headers(c) {
 }
 
 // ====== In-Memory Cache ======
-// Instant reads, zero R2 cost. Invalidated on write ops.
 let _postsCache = null;
 let _postsTime = 0;
 let _configCache = null;
@@ -20,6 +19,31 @@ let _configTime = 0;
 const CACHE_MS = { posts: 60000, config: 120000 };
 
 export function bustCache() { _postsCache = null; _configCache = null; }
+
+// ====== Dirty State (R2 + memory) ======
+const DIRTY_KEY = 'site-data/dirty.json';
+let _dirtyState = null; // { count: number, last: ISO string }
+
+export async function isDirty(env) {
+  if (_dirtyState) return _dirtyState;
+  try {
+    const obj = await env.MEDIA.get(DIRTY_KEY);
+    if (obj) _dirtyState = JSON.parse(await obj.text());
+  } catch {}
+  return _dirtyState;
+}
+
+export async function markDirty(env) {
+  const now = new Date().toISOString();
+  if (_dirtyState) { _dirtyState.count++; _dirtyState.last = now; }
+  else _dirtyState = { count: 1, last: now };
+  try { await env.MEDIA.put(DIRTY_KEY, JSON.stringify(_dirtyState), { httpMetadata: { contentType: 'application/json' } }); } catch {}
+}
+
+export async function clearDirty(env) {
+  _dirtyState = null;
+  try { await env.MEDIA.delete(DIRTY_KEY); } catch {}
+}
 
 // ====== Contents API ======
 

@@ -219,18 +219,31 @@ function setLang(lang) {
   });
 }
 
-// ── Dirty banner ───────────────────────────
-let _dirty = false;
-function setDirty() {
-  _dirty = true;
+// ── Dirty banner (driven by Worker) ─────────
+function showDirtyBanner(count, last) {
   const b = document.getElementById('dirty-banner');
-  if (b) b.style.display = 'block';
+  if (!b) return;
+  const ago = last ? formatTime(last) : '';
+  b.innerHTML = `<i class="ri-error-warning-line"></i> ${count} 项未构建的更改${ago ? '，最后修改 ' + ago : ''}。点击此处触发构建 <i class="ri-arrow-right-line"></i>`;
+  b.style.display = 'block';
 }
-window.clearDirty = function() {
-  _dirty = false;
+function hideDirtyBanner() {
   const b = document.getElementById('dirty-banner');
   if (b) b.style.display = 'none';
-};
+}
+async function checkDirty() {
+  const API = window.__API_BASE__ || '/api';
+  const token = getToken();
+  if (!token) return;
+  try {
+    const resp = await fetch(API + '/dirty', { headers: { Authorization: 'Bearer ' + token } });
+    if (resp.ok) {
+      const dirty = await resp.json();
+      if (dirty.count > 0) showDirtyBanner(dirty.count, dirty.last);
+      else hideDirtyBanner();
+    }
+  } catch {}
+}
 
 // ── State ──────────────────────────────────
 const state = {
@@ -1306,7 +1319,7 @@ async function handleUploadFiles(files) {
   }
 
   if (done > 0) {
-    setDirty();
+    checkDirty();
     loadExistingMedia(slug);
   }
 }
@@ -1369,14 +1382,14 @@ window.doSavePost = async () => {
     } else {
       await postsApi.create({ slug, frontMatter, body });
     }
-    setDirty();
+    checkDirty();
     location.hash = 'posts';
   } catch (err) { toast(t('editor.saveFailed') + ': ' + err.message, 'error'); }
 };
 
 window.doDeletePost = async (slug) => {
   modalConfirm(t('common.deletePost', { slug: slug }), '', async () => {
-    try { await postsApi.delete(slug); setDirty(); location.reload(); }
+    try { await postsApi.delete(slug); checkDirty(); location.reload(); }
     catch (err) { toast(t('common.delete') + ': ' + err.message, 'error'); }
   });
 };
@@ -1395,7 +1408,7 @@ window.doTriggerBuild = async () => {
 
   try {
     const result = await build.trigger();
-    clearDirty();
+    hideDirtyBanner();
     const msg = `Build triggered via ${result.method || 'push'}!`;
     if (result.wfError) toast('Fallback used: ' + result.wfError, 'info', 6000);
     toast(msg, 'success', 5000);
@@ -1454,7 +1467,7 @@ window.doSaveConfig = async () => {
   });
   try {
     await config.update(data);
-    setDirty();
+    checkDirty();
     toast(t('config.saved'), 'success');
   } catch (err) { toast(t('config.saveFailed') + ': ' + err.message, 'error'); }
 };
@@ -1544,6 +1557,7 @@ async function init() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     setupUploadZone();
+    checkDirty();
     onHashChange();
   } else {
     hideLoading();
