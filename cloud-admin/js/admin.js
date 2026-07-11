@@ -859,6 +859,15 @@ pages.config = async (signal) => {
       <div class="page-header"><h1>Site Configuration</h1><button class="btn-primary" onclick="doSaveConfig()"><i class="ri-save-line"></i> Save</button></div>
       <div class="config-grid">
         ${sec('<i class="ri-information-line"></i> 基本信息',
+          `<div class="config-field">
+            <label class="config-label"><span>网站图标</span><small>浏览器标签页上的小图标，支持 SVG/PNG/ICO，最大 100KB</small></label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <img id="favicon-preview" src="${escHtml(cfgGet(cfg, 'favicon') || '/assets/logo.svg')}" style="width:32px;height:32px;border-radius:4px;border:1px solid var(--color-border);object-fit:contain" onerror="this.style.display='none'" />
+              <input type="file" id="favicon-upload-input" accept=".svg,.png,.ico,image/svg+xml,image/png,image/x-icon" style="display:none" onchange="uploadFavicon(this)" />
+              <button type="button" class="btn-secondary" onclick="document.getElementById('favicon-upload-input').click()" style="font-size:12px;padding:5px 10px"><i class="ri-upload-2-line"></i> 上传新图标</button>
+            </div>
+            <input type="hidden" data-config="favicon" id="favicon-value" value="${escHtml(cfgGet(cfg, 'favicon'))}" />
+          </div>` +
           txt('title', '站点标题', '浏览器标签页和页头显示', cfg) +
           txt('subtitle', '副标题', '标题下方的简短描述', cfg) +
           area('description', '站点描述', 'SEO 用，会出现在搜索引擎结果里', cfg) +
@@ -867,7 +876,6 @@ pages.config = async (signal) => {
           txt('mediaBase', 'R2 媒体域名', '媒体文件直连的公开域名，如 https://media.example.com', cfg, 'url') +
           sel('language', '界面语言', '前台页面的默认语言', cfg, [['zh-CN','中文简体'],['en','English'],['ja','日本語']]) +
           `<div class="config-field"><label class="config-label"><span>${t('config.adminLang')}</span><small>${t('config.adminLangHint')}</small></label><select id="admin-lang-select" onchange="setLang(this.value)"><option value="zh-CN" ${(localStorage.getItem('mosaic_admin_lang')||'zh-CN')==='zh-CN'?'selected':''}>中文简体</option><option value="en" ${localStorage.getItem('mosaic_admin_lang')==='en'?'selected':''}>English</option></select></div>` +
-          txt('favicon', '网站图标', '浏览器标签页上的小图标路径', cfg) +
           txt('dateFormat', '日期格式', '如 YYYY-MM-DD', cfg)
         )}
         ${sec('<i class="ri-user-line"></i> 作者信息',
@@ -1382,6 +1390,29 @@ window.doTriggerBuild = async () => {
   } finally {
     if (btn) btn.innerHTML = origHTML;
   }
+};
+
+window.uploadFavicon = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 102400) { toast(t('config.saveFailed') + ': 文件不能超过 100KB', 'error'); return; }
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (!['svg','png','ico'].includes(ext)) { toast(t('config.saveFailed') + ': 仅支持 SVG/PNG/ICO', 'error'); return; }
+  const token = getToken();
+  const API = window.__API_BASE__ || '/api';
+  try {
+    const resp = await fetch(`${API}/upload/direct/site-data/favicon.${ext}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': file.type || 'image/svg+xml' },
+      body: file,
+    });
+    if (!resp.ok) throw new Error('Upload failed');
+    const mediaBase = state.mediaBase || window.__MEDIA_BASE__ || '';
+    const url = mediaBase ? `${mediaBase}/originals/site-data/others/favicon.${ext}` : `/api/media/file/site-data/favicon.${ext}`;
+    document.getElementById('favicon-preview').src = url;
+    document.getElementById('favicon-value').value = url;
+    toast('图标上传成功', 'success');
+  } catch (e) { toast('上传失败: ' + e.message, 'error'); }
 };
 
 window.doSaveConfig = async () => {

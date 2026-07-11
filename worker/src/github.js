@@ -11,23 +11,15 @@ function headers(c) {
   };
 }
 
-// ====== R2 Cache ======
+// ====== In-Memory Cache ======
+// Instant reads, zero R2 cost. Invalidated on write ops.
+let _postsCache = null;
+let _postsTime = 0;
+let _configCache = null;
+let _configTime = 0;
+const CACHE_MS = { posts: 60000, config: 120000 };
 
-async function cacheGet(env, key, ttlMs) {
-  try {
-    const obj = await env.MEDIA.get(key);
-    if (!obj) return null;
-    const data = JSON.parse(await obj.text());
-    if (Date.now() - data._ts < ttlMs) return data._value;
-  } catch {}
-  return null;
-}
-
-async function cacheSet(env, key, value) {
-  try {
-    await env.MEDIA.put(key, JSON.stringify({ _ts: Date.now(), _value: value }), { httpMetadata: { contentType: 'application/json' } });
-  } catch {}
-}
+export function bustCache() { _postsCache = null; _configCache = null; }
 
 // ====== Contents API ======
 
@@ -48,11 +40,10 @@ async function listPostsUncached(c) {
 }
 
 export async function listPosts(c) {
-  const cacheKey = 'site-data/cache/posts.json';
-  const cached = await cacheGet(c.env, cacheKey, 60000);
-  if (cached) return cached;
+  if (_postsCache && Date.now() - _postsTime < CACHE_MS.posts) return _postsCache;
   const fresh = await listPostsUncached(c);
-  await cacheSet(c.env, cacheKey, fresh);
+  _postsCache = fresh;
+  _postsTime = Date.now();
   return fresh;
 }
 
@@ -81,6 +72,7 @@ export async function createOrUpdatePost(c, slug, frontMatter, body, message) {
     body: JSON.stringify(payload),
   });
   if (!resp.ok) throw new Error(`GitHub createPost(${slug}): ${resp.status}`);
+  bustCache();
   return resp.json();
 }
 
@@ -107,6 +99,7 @@ async function deleteDir(c, dirPath, message) {
 export async function deletePost(c, slug, message) {
   const msg = message || `Delete ${slug}`;
   const count = await deleteDir(c, `content/posts/${slug}`, msg);
+  bustCache();
   return { deleted: true, count };
 }
 
@@ -214,14 +207,13 @@ export async function getRunHistory(c) {
 // ====== Config ======
 
 export async function getConfig(c) {
-  const cacheKey = 'site-data/cache/config.json';
-  const cached = await cacheGet(c.env, cacheKey, 120000);
-  if (cached) return cached;
+  if (_configCache && Date.now() - _configTime < CACHE_MS.config) return _configCache;
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, { headers: headers(c) });
   if (!resp.ok) return {};
   const file = await resp.json();
   const fresh = JSON.parse(decodeBase64(file.content));
-  await cacheSet(c.env, cacheKey, fresh);
+  _configCache = fresh;
+  _configTime = Date.now();
   return fresh;
 }
 
@@ -235,6 +227,7 @@ export async function updateConfig(c, config, message) {
     body: JSON.stringify({ message: message || 'Update config', content: encodeBase64(JSON.stringify(config, null, 2)), sha: file.sha }),
   });
   if (!resp.ok) throw new Error(`updateConfig: ${resp.status}`);
+  bustCache();
   return resp.json();
 }
 
