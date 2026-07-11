@@ -676,6 +676,21 @@ pages.build = async (signal) => {
       ${runs.length > 0 ? `<div id="build-history">${renderRunHistory(runs)}</div>` : ''}
     `,
     onMount() {
+      // Local 1s ticker for running build duration
+      let durTicker;
+      const tickDur = () => {
+        const el = document.getElementById('build-duration');
+        if (!el) return;
+        const start = el.dataset.start;
+        const status = el.dataset.status;
+        if (!start) return;
+        const sec = Math.floor((Date.now() - new Date(start).getTime()) / 1000);
+        if (status === 'in_progress' || status === 'queued') {
+          el.textContent = '已耗时 ' + fmtDuration(sec);
+        }
+      };
+      durTicker = setInterval(tickDur, 1000);
+
       let pollTimer;
       const poll = async () => {
         try {
@@ -696,7 +711,7 @@ pages.build = async (signal) => {
       };
       pollTimer = setInterval(poll, 5000);
       // Cleanup on page leave
-      const cleanup = () => clearInterval(pollTimer);
+      const cleanup = () => { clearInterval(pollTimer); clearInterval(durTicker); };
       window.addEventListener('hashchange', cleanup, { once: true });
     }
   };
@@ -718,7 +733,7 @@ function renderStatusCard(run) {
         <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:${statusDef.bg};color:${statusDef.color}">
           ${statusDef.label}
         </span>
-        ${dur ? `<span style="font-size:12px;color:var(--color-text-tertiary)">${durLabel}${fmtDuration(dur)}</span>` : ''}
+        ${dur ? `<span id="build-duration" data-start="${run.createdAt}" data-status="${run.status}" style="font-size:12px;color:var(--color-text-tertiary)">${durLabel}${fmtDuration(dur)}</span>` : ''}
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;font-size:13px;color:var(--color-text-secondary)">
         <div><span style="color:var(--color-text-tertiary)">Branch</span><br><span style="font-family:var(--font-mono)">${escHtml(run.headBranch || 'main')}</span></div>
