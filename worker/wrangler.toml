@@ -11,7 +11,6 @@ bucket_name = "mosaic-media"
 [vars]
 GITHUB_REPO = "YupenBob/mosaic"
 R2_BUCKET = "mosaic-media"
-R2_PUBLIC_URL = "https://mosaic-media.xsanye.cn"
 
 # Secrets (set via `wrangler secret put`)
 # ADMIN_PASSWORD

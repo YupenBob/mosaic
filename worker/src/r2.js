@@ -38,9 +38,9 @@ export async function uploadDirect(c) {
 }
 
 // List media from R2 — searches originals/
-export async function listMedia(c) {
+export async function listMedia(c, mediaBaseOverride) {
   const slug = c.req.param('slug');
-  const r2Public = c.env.R2_PUBLIC_URL || '';
+  const r2Public = c.env.R2_PUBLIC_URL || mediaBaseOverride || '';
   const seen = new Set();
   const result = { photos: [], videos: [], music: [] };
 

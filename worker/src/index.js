@@ -137,8 +137,12 @@ app.get('/api/stats/traffic', async (c) => {
   } catch { return c.json({ total: 0, totalLikes: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 });
 
-// Media file serving — public
-app.get('/api/media/file/:slug/:filename', serveMediaFile);
+// Media file serving — public (uses R2_PUBLIC_URL or falls back to config.mediaBase)
+app.get('/api/media/file/:slug/:filename', async (c) => {
+  let cfg = {};
+  try { cfg = await getConfig(c); } catch {}
+  return serveMediaFile(c, cfg.mediaBase);
+});
 
 // Upload — public (admin sends JWT in XHR)
 app.post('/api/upload/direct/:slug/:filename', uploadDirect);
@@ -270,8 +274,12 @@ app.post('/api/posts/:slug/duplicate', async (c) => {
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 
-// Media list — from R2
-app.get('/api/media/:slug/list', listMedia);
+// Media list — from R2 (uses R2_PUBLIC_URL or falls back to config.mediaBase)
+app.get('/api/media/:slug/list', async (c) => {
+  let cfg = {};
+  try { cfg = await getConfig(c); } catch {}
+  return listMedia(c, cfg.mediaBase);
+});
 
 // Stats
 app.get('/api/stats', async (c) => {
