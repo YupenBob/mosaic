@@ -482,7 +482,8 @@ body {
   min-width: 0 !important;
   padding: 5px 6px !important;
   text-align: center;
-  color: var(--color-text);
+  color: var(--color-text) !important;
+  -webkit-text-fill-color: var(--color-text) !important;
 }
 
 @media (max-width: 768px) {
