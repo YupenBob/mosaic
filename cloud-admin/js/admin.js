@@ -312,7 +312,9 @@ const mainEl = () => document.getElementById('main-content');
 async function renderPage(page, signal) {
   const m = mainEl();
   if (!m) return;
-  m.innerHTML = '<div style="text-align:center;padding:60px;color:var(--color-text-tertiary)"><i class="ri-loader-4-line" style="font-size:24px;animation:spin 1s linear infinite"></i></div>';
+  // Show skeleton first, fall back to spinner
+  const skel = pages[page]?.skeleton;
+  m.innerHTML = skel ? skel() : '<div style="text-align:center;padding:60px;color:var(--color-text-tertiary)"><i class="ri-loader-4-line" style="font-size:24px;animation:spin 1s linear infinite"></i></div>';
 
   const renderer = pages[page];
   if (!renderer) { if (!signal.aborted) m.innerHTML = '<h1>404</h1><p>Page not found</p>'; return; }
@@ -488,6 +490,28 @@ function makeChart(id, type, labels, data, colors) {
   });
 }
 
+pages.dashboard.skeleton = () => `
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <div class="skeleton skeleton-line" style="width:100px;height:28px;margin:0"></div>
+    <div class="skeleton skeleton-line" style="width:140px;height:24px;border-radius:12px;margin:0"></div>
+  </div>
+  <div class="dash-cards">
+    ${[1,2,3,4,5].map(() => `<div class="dash-big-card skeleton-card"><div class="skeleton skeleton-big-num"></div><div class="skeleton skeleton-big-label"></div></div>`).join('')}
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:20px">
+    <div class="skeleton skeleton-line" style="width:110px;height:36px;border-radius:6px"></div>
+    <div class="skeleton skeleton-line" style="width:140px;height:36px;border-radius:6px"></div>
+  </div>
+  <div class="dash-charts">
+    <div class="dash-chart-card"><div class="skeleton skeleton-line w40" style="height:18px"></div><div class="skeleton skeleton-chart"></div></div>
+    <div class="dash-chart-card"><div class="skeleton skeleton-line w40" style="height:18px"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="skeleton skeleton-chart"></div><div class="skeleton skeleton-chart"></div></div></div>
+  </div>
+  <div class="dash-bottom">
+    <div class="dash-chart-card skeleton-card"><div class="skeleton skeleton-line w40" style="height:18px"></div>${[1,2,3].map(() => `<div style="display:flex;align-items:center;gap:10px;padding:8px 0"><div class="skeleton skeleton-circle" style="width:20px;height:20px;min-width:20px"></div><div class="skeleton skeleton-line" style="flex:1"></div><div class="skeleton skeleton-line" style="width:60px"></div></div>`).join('')}</div>
+    <div class="dash-chart-card skeleton-card"><div class="skeleton skeleton-line w40" style="height:18px"></div>${[1,2,3].map(() => `<div style="display:flex;align-items:center;gap:10px;padding:8px 0"><div class="skeleton skeleton-circle" style="width:20px;height:20px;min-width:20px"></div><div class="skeleton skeleton-line" style="flex:1"></div><div class="skeleton skeleton-line" style="width:60px"></div></div>`).join('')}</div>
+  </div>
+`;
+
 pages.posts = async (signal) => {
   const result = await postsApi.list();
   if (signal.aborted) return '';
@@ -559,6 +583,11 @@ pages.posts = async (signal) => {
     }
   };
 };
+pages.posts.skeleton = () => `
+  <div class="page-header"><div class="skeleton skeleton-line" style="width:120px;height:28px"></div></div>
+  <div class="skeleton skeleton-line" style="width:300px;height:32px;margin-bottom:12px;border-radius:6px"></div>
+  <div class="skeleton-card">${[1,2,3,4,5].map(() => `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--color-border-light)"><div class="skeleton skeleton-line" style="flex:2"></div><div class="skeleton skeleton-line" style="flex:1"></div><div class="skeleton skeleton-line" style="flex:1"></div><div class="skeleton skeleton-line" style="width:80px"></div></div>`).join('')}</div>
+`;
 
 pages.editor = async (signal) => {
   const slug = state.params.slug || '';
@@ -612,6 +641,13 @@ pages.editor = async (signal) => {
     }
   };
 };
+pages.editor.skeleton = () => `
+  <div class="page-header"><div class="skeleton skeleton-line" style="width:100px;height:28px"></div></div>
+  <div class="editor-layout">
+    <div class="editor-fields skeleton-card">${[1,2,3,4,5,6,7,8].map(() => `<div class="skeleton skeleton-line" style="margin-bottom:12px"></div>`).join('')}</div>
+    <div class="editor-body skeleton-card"><div class="skeleton skeleton-box" style="height:300px"></div></div>
+  </div>
+`;
 
 pages.build = async (signal) => {
   let statusData = null, historyData = { runs: [] };
@@ -785,6 +821,12 @@ function formatTime(ts) {
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
 }
 
+pages.build.skeleton = () => `
+  <div class="page-header"><div class="skeleton skeleton-line" style="width:140px;height:28px"></div></div>
+  <div class="skeleton-card"><div class="skeleton skeleton-line w40" style="height:18px;margin-bottom:12px"></div>${['branch','commit','event','time'].map(() => `<div class="skeleton skeleton-line" style="margin-bottom:6px"></div>`).join('')}</div>
+  <div class="skeleton-card">${[1,2,3].map(() => `<div style="display:flex;gap:12px;padding:8px 0;align-items:center"><div class="skeleton skeleton-line" style="width:50px"></div><div class="skeleton skeleton-line" style="width:60px"></div><div class="skeleton skeleton-line" style="flex:1"></div></div>`).join('')}</div>
+`;
+
 pages.config = async (signal) => {
   let cfg = {};
   try { cfg = await config.get(); } catch {}
@@ -864,6 +906,13 @@ pages.config = async (signal) => {
     `,
   };
 };
+
+pages.config.skeleton = () => `
+  <div class="page-header"><div class="skeleton skeleton-line" style="width:140px;height:28px"></div></div>
+  <div class="config-grid">
+    ${[1,2,3,4,5,6,7].map(() => `<div class="config-section skeleton-card"><div class="skeleton skeleton-line w40" style="height:18px;margin-bottom:12px"></div>${[1,2,3,4].map(() => `<div style="display:flex;gap:12px;padding:8px 0;align-items:center"><div class="skeleton skeleton-line" style="flex:1"></div><div class="skeleton skeleton-line" style="width:160px"></div></div>`).join('')}</div>`).join('')}
+  </div>
+`;
 
 pages.taxonomy = async (signal) => {
   let tax = { categories: [], tags: [] };
@@ -980,6 +1029,11 @@ pages.cleanup = async () => {
     `;
   } catch (e) { return `<h1>Cleanup</h1><p class="error">${escHtml(e.message)}</p>`; }
 };
+pages.cleanup.skeleton = () => `
+  <div class="page-header"><div class="skeleton skeleton-line" style="width:100px;height:28px"></div></div>
+  <div class="skeleton-card"><div class="skeleton skeleton-line w40" style="height:18px;margin-bottom:8px"></div><div class="skeleton skeleton-line" style="margin-bottom:12px"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="skeleton skeleton-box"></div><div class="skeleton skeleton-box"></div></div></div>
+  <div class="skeleton-card" style="margin-top:14px"><div class="skeleton skeleton-line w40" style="height:18px;margin-bottom:8px"></div><div class="skeleton skeleton-line" style="margin-bottom:12px"></div></div>
+`;
 
 window.doCleanup = async () => {
   modalConfirm(t('common.deleteOrphan'), '', async () => {
