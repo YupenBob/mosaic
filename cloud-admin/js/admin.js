@@ -219,6 +219,19 @@ function setLang(lang) {
   });
 }
 
+// ── Dirty banner ───────────────────────────
+let _dirty = false;
+function setDirty() {
+  _dirty = true;
+  const b = document.getElementById('dirty-banner');
+  if (b) b.style.display = 'block';
+}
+window.clearDirty = function() {
+  _dirty = false;
+  const b = document.getElementById('dirty-banner');
+  if (b) b.style.display = 'none';
+};
+
 // ── State ──────────────────────────────────
 const state = {
   page: '',
@@ -1293,16 +1306,7 @@ async function handleUploadFiles(files) {
   }
 
   if (done > 0) {
-    const statusEl = document.createElement('div');
-    statusEl.style.cssText = 'margin-top:8px;font-weight:500';
-    statusEl.textContent = 'Triggering build...';
-    progressEl.appendChild(statusEl);
-    try {
-      await build.trigger();
-      statusEl.innerHTML = '<i class="ri-check-line" style="color:#2ecc71"></i> Build queued — check <a href="#build" style="color:var(--color-accent)">Build page</a> for status';
-    } catch (err) {
-      statusEl.innerHTML = `<i class="ri-close-line" style="color:#e74c3c"></i> Build trigger failed: ${escHtml(err.message)}. Files are uploaded but the site won't update until a build runs.`;
-    }
+    setDirty();
     loadExistingMedia(slug);
   }
 }
@@ -1365,13 +1369,14 @@ window.doSavePost = async () => {
     } else {
       await postsApi.create({ slug, frontMatter, body });
     }
+    setDirty();
     location.hash = 'posts';
   } catch (err) { toast(t('editor.saveFailed') + ': ' + err.message, 'error'); }
 };
 
 window.doDeletePost = async (slug) => {
   modalConfirm(t('common.deletePost', { slug: slug }), '', async () => {
-    try { await postsApi.delete(slug); location.reload(); }
+    try { await postsApi.delete(slug); setDirty(); location.reload(); }
     catch (err) { toast(t('common.delete') + ': ' + err.message, 'error'); }
   });
 };
@@ -1390,6 +1395,7 @@ window.doTriggerBuild = async () => {
 
   try {
     const result = await build.trigger();
+    clearDirty();
     const msg = `Build triggered via ${result.method || 'push'}!`;
     if (result.wfError) toast('Fallback used: ' + result.wfError, 'info', 6000);
     toast(msg, 'success', 5000);
@@ -1448,6 +1454,7 @@ window.doSaveConfig = async () => {
   });
   try {
     await config.update(data);
+    setDirty();
     toast(t('config.saved'), 'success');
   } catch (err) { toast(t('config.saveFailed') + ': ' + err.message, 'error'); }
 };

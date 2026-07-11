@@ -66,6 +66,11 @@
     </nav>
   </aside>
 
+  <!-- Dirty banner — shown when content changes need a build -->
+  <div id="dirty-banner" style="display:none;background:#f0a500;color:#fff;padding:10px 24px;font-size:13px;cursor:pointer;text-align:center" onclick="window.doTriggerBuild()">
+    <i class="ri-error-warning-line"></i> 内容已修改，需要构建才能在网站生效。点击此处触发构建 <i class="ri-arrow-right-line"></i>
+  </div>
+
   <main class="main-content" id="main-content">
     <!-- Pages will be rendered here dynamically -->
   </main>
