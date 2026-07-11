@@ -40,6 +40,11 @@
   </div>
 </div>
 
+<!-- Dirty banner — shown above app when content changes need a build -->
+<div id="dirty-banner" style="display:none;background:#f0a500;color:#fff;padding:8px 24px;font-size:13px;cursor:pointer;text-align:center;position:fixed;top:0;left:0;right:0;z-index:100" onclick="window.doTriggerBuild()">
+  <i class="ri-error-warning-line"></i> 内容已修改，需要构建才能在网站生效。点击此处触发构建 <i class="ri-arrow-right-line"></i>
+</div>
+
 <!-- Main App (hidden until login) -->
 <div id="app" style="display:none">
   <aside class="sidebar">
@@ -65,11 +70,6 @@
       <a href="#" id="logout-btn" class="nav-item" onclick="event.preventDefault();window.mosaicLogout()"><i class="ri-logout-box-line"></i> <span data-i18n="nav.signOut">退出登录</span></a>
     </nav>
   </aside>
-
-  <!-- Dirty banner — shown when content changes need a build -->
-  <div id="dirty-banner" style="display:none;background:#f0a500;color:#fff;padding:10px 24px;font-size:13px;cursor:pointer;text-align:center" onclick="window.doTriggerBuild()">
-    <i class="ri-error-warning-line"></i> 内容已修改，需要构建才能在网站生效。点击此处触发构建 <i class="ri-arrow-right-line"></i>
-  </div>
 
   <main class="main-content" id="main-content">
     <!-- Pages will be rendered here dynamically -->
