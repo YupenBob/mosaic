@@ -43,8 +43,8 @@
 <!-- Main App (hidden until login) -->
 <div id="app" style="display:none;flex-direction:column">
   <!-- Dirty banner — full width above sidebar+main -->
-  <div id="dirty-banner" style="display:none;background:#f0a500;color:#fff;padding:8px 24px;font-size:13px;cursor:pointer;text-align:center;flex-shrink:0" onclick="window.doTriggerBuild()">
-    <i class="ri-error-warning-line"></i> 内容已修改，需要构建才能在网站生效。点击此处触发构建 <i class="ri-arrow-right-line"></i>
+  <div id="dirty-banner" style="display:none;background:#f0a500;color:#fff;padding:8px 24px;font-size:13px;cursor:pointer;text-align:center;flex-shrink:0" onclick="location.hash='build'">
+    <i class="ri-error-warning-line"></i> 内容已修改，需要构建才能在网站生效。点击此处前往构建 <i class="ri-arrow-right-line"></i>
   </div>
 
   <div style="display:flex;flex:1;min-height:0">

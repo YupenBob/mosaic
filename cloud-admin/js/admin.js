@@ -1063,7 +1063,7 @@ pages.deploy = () => `
 
 pages.cleanup = async () => {
   const API = window.__API_BASE__ || '/api';
-  const hp = { 'Authorization': 'Bearer ' + (localStorage.getItem('mosaic_token')||'') };
+  const hp = { 'Authorization': 'Bearer ' + (getToken()||'') };
   try {
     const data = await fetch(API + '/cleanup', { headers: hp }).then(r => r.json());
     const orphans = data.orphans || [];
@@ -1109,7 +1109,7 @@ pages.cleanup.skeleton = () => `
 window.doCleanup = async () => {
   modalConfirm(t('common.deleteOrphan'), '', async () => {
     const API = window.__API_BASE__ || '/api';
-    const hp = { 'Authorization': 'Bearer ' + (localStorage.getItem('mosaic_token')||'') };
+    const hp = { 'Authorization': 'Bearer ' + (getToken()||'') };
     const progress = document.getElementById('cleanup-progress');
     const btn = document.getElementById('btn-cleanup');
     if (btn) btn.style.display = 'none';
@@ -1137,7 +1137,7 @@ window.doCleanup = async () => {
 window.doClearCache = async () => {
   modalConfirm(t('common.deleteCache'), '', async () => {
     const API = window.__API_BASE__ || '/api';
-    const hp = { 'Authorization': 'Bearer ' + (localStorage.getItem('mosaic_token')||'') };
+    const hp = { 'Authorization': 'Bearer ' + (getToken()||'') };
     const progress = document.getElementById('cleanup-progress');
     const btn = document.getElementById('btn-clear-cache');
     if (btn) btn.style.display = 'none';
