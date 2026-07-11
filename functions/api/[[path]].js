@@ -4,5 +4,5 @@
  */
 export async function onRequest(context) {
   const url = new URL(context.request.url);
-  return fetch(`https://mosaic-api.yupenbob.workers.dev${url.pathname}${url.search}`, context.request);
+  return fetch(`https://mosaic-api.xsanye.cn${url.pathname}${url.search}`, context.request);
 }
