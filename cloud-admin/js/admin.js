@@ -441,15 +441,6 @@ pages.dashboard = async (signal) => {
         </div>
       </div>
     `,
-          ${activities.length ? activities.slice(0, 8).map(a => `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-border-light);font-size:13px">
-              <i class="${a.icon}" style="color:var(--color-text-tertiary);font-size:14px"></i>
-              <span style="flex:1">${a.text}</span>
-              <span style="color:var(--color-text-tertiary);font-size:11px">${formatTime(a.time)}</span>
-            </div>`).join('') : '<p style="color:var(--color-text-tertiary);padding:8px 0">No recent activity</p>'}
-        </div>
-      </div>
-    `,
     onMount() {
       const dayLabels = (trafficData.byDay || []).map(d => d.date.slice(5));
       const dayData = (trafficData.byDay || []).map(d => d.count);
