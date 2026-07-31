@@ -130,39 +130,47 @@ export async function deletePost(c, slug, message) {
 // ====== Actions Dispatch ======
 
 export async function dispatchBuild(c) {
-  // Commit a trigger file to kick off push-based workflow (most reliable, no extra permissions)
-  const ts = new Date().toISOString();
-  const path = '.build-trigger';
-  const content = `${ts}\n`;
-
-  // Get existing file (if any) to get its SHA
-  let sha = '';
-  try {
-    const existing = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${path}`, { headers: headers(c) });
-    if (existing.ok) {
-      const f = await existing.json();
-      sha = f.sha;
+  // Prefer workflow_dispatch (no git history noise). Requires GITHUB_TOKEN with actions:write.
+  const dispatchResp = await fetch(
+    `${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/dispatches`,
+    {
+      method: 'POST',
+      headers: { ...headers(c), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: 'main' }),
     }
-  } catch {}
-
-  const payload = {
-    message: `Build trigger ${ts}`,
-    content: encodeBase64(content),
-  };
-  if (sha) payload.sha = sha;
-
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${path}`, {
-    method: 'PUT',
-    headers: { ...headers(c), 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`Build trigger commit failed: ${resp.status} — ${body.slice(0, 200)}`);
+  );
+  if (dispatchResp.ok || dispatchResp.status === 204) {
+    return { method: 'workflow_dispatch', status: dispatchResp.status };
   }
-
-  return { method: 'push_trigger', status: resp.status };
+  if (dispatchResp.status === 401 || dispatchResp.status === 403 || dispatchResp.status === 404) {
+    // Fallback: commit .build-trigger to kick off the push-based workflow
+    // (token without actions:write).
+    const ts = new Date().toISOString();
+    const path = '.build-trigger';
+    const content = `${ts}\n`;
+    let sha = '';
+    try {
+      const existing = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${path}`, { headers: headers(c) });
+      if (existing.ok) {
+        const f = await existing.json();
+        sha = f.sha;
+      }
+    } catch {}
+    const payload = { message: `Build trigger ${ts}`, content: encodeBase64(content) };
+    if (sha) payload.sha = sha;
+    const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${path}`, {
+      method: 'PUT',
+      headers: { ...headers(c), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      throw new Error(`Build trigger failed: ${resp.status} — ${body.slice(0, 200)}`);
+    }
+    return { method: 'push_trigger', status: resp.status };
+  }
+  const body = await dispatchResp.text().catch(() => '');
+  throw new Error(`workflow_dispatch failed: ${dispatchResp.status} — ${body.slice(0, 200)}`);
 }
 
 export async function getLatestRun(c) {
@@ -241,18 +249,79 @@ export async function getConfig(c) {
   return fresh;
 }
 
+function deepMerge(base, patch) {
+  if (Array.isArray(base) || Array.isArray(patch)) return patch ?? base;
+  if (!base || typeof base !== 'object' || !patch || typeof patch !== 'object') return patch ?? base;
+  const out = { ...base };
+  for (const [k, v] of Object.entries(patch)) {
+    out[k] = deepMerge(base[k], v);
+  }
+  return out;
+}
+
 export async function updateConfig(c, config, message) {
   const existing = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, { headers: headers(c) });
   if (!existing.ok) throw new Error('Config not found');
   const file = await existing.json();
+  const current = JSON.parse(decodeBase64(file.content));
+  // Deep merge: the admin form only sends edited fields; never drop nested sections
+  const merged = deepMerge(current, config);
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, {
     method: 'PUT',
     headers: { ...headers(c), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: message || 'Update config', content: encodeBase64(JSON.stringify(config, null, 2)), sha: file.sha }),
+    body: JSON.stringify({ message: message || 'Update config', content: encodeBase64(JSON.stringify(merged, null, 2)), sha: file.sha }),
   });
   if (!resp.ok) throw new Error(`updateConfig: ${resp.status}`);
   bustCache();
   return resp.json();
+}
+
+async function fetchRawFile(c, repoPath) {
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${repoPath}`, { headers: headers(c) });
+  if (!resp.ok) return null;
+  const file = await resp.json();
+  return { sha: file.sha, content: decodeBase64(file.content) };
+}
+
+async function putRawFile(c, repoPath, content, sha, message) {
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${repoPath}`, {
+    method: 'PUT',
+    headers: { ...headers(c), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, content: encodeBase64(content), sha }),
+  });
+  return resp.ok;
+}
+
+export async function renameCategory(c, oldName, newName, message) {
+  const posts = await listPosts(c);
+  let renamed = 0;
+  for (const p of posts) {
+    if ((p.category || '') !== oldName) continue;
+    const file = await fetchRawFile(c, `content/posts/${p.slug}/index.md`);
+    if (!file) continue;
+    const next = file.content.replace(/^category:.*$/m, `category: ${newName}`);
+    if (next === file.content) continue;
+    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Rename category ${oldName} to ${newName}`)) renamed++;
+  }
+  bustCache();
+  return renamed;
+}
+
+export async function renameTag(c, oldName, newName, message) {
+  const posts = await listPosts(c);
+  let renamed = 0;
+  for (const p of posts) {
+    const tags = (p.tags || []).map(t => String(t));
+    if (!tags.includes(oldName)) continue;
+    const file = await fetchRawFile(c, `content/posts/${p.slug}/index.md`);
+    if (!file) continue;
+    const newTags = tags.map(t => t === oldName ? newName : t);
+    const next = file.content.replace(/^tags:.*$/m, `tags: [${newTags.join(', ')}]`);
+    if (next === file.content) continue;
+    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Rename tag ${oldName} to ${newName}`)) renamed++;
+  }
+  bustCache();
+  return renamed;
 }
 
 // ====== UTF-8 safe base64 ======
