@@ -116,17 +116,6 @@ export const stats = {
   traffic: () => apiFetch('/stats/traffic'),
 };
 
-// ── Track ──────────────────────────────────
-export const track = {
-  view: (slug, category, tags) => apiFetch('/track/view', { method: 'POST', body: JSON.stringify({ slug, category, tags }) }),
-};
-
-// ── Likes ──────────────────────────────────
-export const likes = {
-  toggle: (slug) => apiFetch(`/like/${encodeURIComponent(slug)}`, { method: 'POST' }),
-  count: (slug) => apiFetch(`/like/${encodeURIComponent(slug)}/count`),
-};
-
 // ── Config ─────────────────────────────────
 export const config = {
   get: () => apiFetch('/config'),

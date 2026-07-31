@@ -44,14 +44,14 @@ npm install
 ## 第二步：本地跑通
 
 ```bash
-# 生成演示内容
-npm run demo
+# 压缩媒体（本地无媒体可跳过）
+npm run compress
 
 # 构建站点
 npm run build
 
 # 本地预览
-npx serve dist
+npm run serve
 # 打开 http://localhost:3000
 ```
 
@@ -154,10 +154,9 @@ npx wrangler r2 bucket cors set mosaic-media --file r2-cors.json -y
 cd cloud-admin
 ```
 
-修改 `index.html` 中第 12 行的 `__API_BASE__`：
-```js
-window.__API_BASE__ = 'https://mosaic-api.你的用户名.workers.dev/api';
-```
+`cloud-admin/index.html` 中 `window.__API_BASE__ = '/api'` 保持默认即可：
+`cloud-admin/functions/api/[[path]].js`（Pages Functions 代理）会把 `/api/*`
+转发到 Worker 自定义域名 `https://mosaic-api.xsanye.cn`，无需改前端代码。
 
 ```bash
 npx wrangler pages project create mosaic-admin --production-branch main
@@ -179,8 +178,6 @@ npx wrangler pages deploy ./
 | `R2_ACCESS_KEY` | R2 S3 Access Key |
 | `R2_SECRET_KEY` | R2 S3 Secret Key |
 | `R2_ENDPOINT` | `https://{ACCOUNT_ID}.r2.cloudflarestorage.com` |
-| `WORKER_API_BASE` | `https://mosaic-api.你的用户名.workers.dev` |
-| `SITE_URL` | `https://mosaic-xxx.pages.dev`（前台域名） |
 
 Setting these secrets enables the CI/CD pipeline to:
 1. Download media from R2
@@ -218,7 +215,8 @@ The build runs on GitHub Actions and takes 5–15 minutes depending on media vol
 
 1. Open your CF Pages domain (e.g. `https://mosaic-xxx.pages.dev`)
 2. Check that posts display with images and videos
-3. Right-click an image → Copy Link → should be `https://mosaic-api.xxx.workers.dev/api/media/file/...`
+3. Right-click an image → Copy Link → should be `https://mosaic-media.xsanye.cn/processed/...`
+   （或 `config.mediaBase` 配置的 R2 直连域名）
 4. Verify the admin panel can create/edit posts and trigger builds
 
 ---

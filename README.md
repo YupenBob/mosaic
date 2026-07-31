@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://mosaic-b3z.pages.dev"><strong>Demo</strong></a>
+  <a href="https://mosaic.xsanye.cn"><strong>Demo</strong></a>
 </p>
 
 ---
@@ -41,9 +41,9 @@ Markdown + 媒体 → GitHub Actions → 静态站点 (CF Pages)
 git clone https://github.com/YupenBob/mosaic.git
 cd mosaic
 npm install
-npm run demo          # 生成示例内容
+npm run compress      # 压缩媒体（本地无媒体可跳过）
 npm run build         # 构建站点
-npx serve dist        # 预览 http://localhost:3000
+npm run serve         # 预览 http://localhost:3000
 ```
 
 > 完整从零搭建指南见 **[docs/SETUP.md](docs/SETUP.md)**

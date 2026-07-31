@@ -4,13 +4,12 @@
   "description": "A pure static multimedia content sharing site — like Hexo but for photo & video posts",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.js",
-    "clean": "node scripts/build.js --clean",
-    "dev": "node scripts/build.js --watch",
-    "demo": "node scripts/generate-demo.js",
-    "stress": "node scripts/generate-stress-test.js"
+    "compress": "node scripts/compress.js",
+    "build": "node scripts/generate.js",
+    "serve": "npx serve dist"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "ejs": "^3.1.10",
     "fs-extra": "^11.3.0",
     "glob": "^11.0.1",
