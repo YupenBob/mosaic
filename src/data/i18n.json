@@ -14,6 +14,7 @@
   "photos_title": { "zh-CN": "照片", "en": "Photos" },
   "videos_title": { "zh-CN": "视频", "en": "Videos" },
   "playlist_label": { "zh-CN": "播放列表", "en": "Playlist" },
+  "music": { "zh-CN": "音乐", "en": "Music" },
   "views": { "zh-CN": "浏览", "en": "views" },
   "comments_title": { "zh-CN": "评论", "en": "Comments" }
 }

@@ -1,6 +1,5 @@
 <%
 /* Post detail page */
-const rp = typeof relativePath !== 'undefined' ? relativePath : '../../';
 const pageDataTitle = post.title + ' - ' + site.title;
 const ly = post.layout || 'default';
 
@@ -109,7 +108,7 @@ function renderGallery(photos, threshold) {
   <meta name="data-base" content="<%= rp %>data" />
   <meta name="api-base" content="/api" />
   <title><%= pageDataTitle %></title>
-  <link rel="icon" type="image/svg+xml" href="<%= rp %>assets/logo.svg" />
+  <link rel="icon" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
@@ -200,16 +199,29 @@ function renderGallery(photos, threshold) {
       <%- renderVideos(post.videos, post.videoMode || 'stacked') %>
     <% } %>
 
+    <% if (post.music && post.music.length) { %>
+    <section class="music-section">
+      <h2 class="section-title"><%= t('music') %></h2>
+      <div class="music-track-list">
+        <% post.music.forEach(function(track, i) { %>
+        <div class="music-track" data-index="<%= i %>" role="button" tabindex="0">
+          <i class="ri-music-2-line"></i>
+          <span class="music-track-title"><%= track.title %></span>
+          <span class="music-track-artist"><%= track.artist %></span>
+        </div>
+        <% }); %>
+      </div>
+    </section>
+    <script>window.__MUSIC_TRACKS=<%- JSON.stringify(post.music).replace(/</g, '\\u003c') %>;</script>
+    <% } %>
+
     <!-- Footer: Stats + Likes -->
     <footer class="post-footer">
       <div class="post-stats">
         <span class="post-stat-item">
           <i class="ri-eye-line"></i>
-          <% if (site.enableBusuanzi) { %>
-            <span id="busuanzi_value_page_pv">-</span> views
-          <% } else { %>
-            <%= post.stats.views %> views
-          <% } %>
+          <span id="mosaic-views-display"><%= post.stats.views %></span>
+          <% if (site.enableBusuanzi) { %><span> / </span><span id="busuanzi_value_page_pv">-</span><% } %>
         </span>
         <span class="post-stat-item">
           <i class="ri-time-line"></i>

@@ -8,14 +8,14 @@ const DWELL_STORAGE_KEY = 'mosaic_dwell';
 const SAVE_INTERVAL = 30000;
 const MAX_SESSION = 7200; // 2 hours max per session
 
-export function initStats() {
+export function initStats({ apiBase = '/api' } = {}) {
   const slug = document.body.dataset.slug;
   if (!slug) return;
 
   // Clean up old runaway values from earlier buggy versions
   cleanOldData(slug);
 
-  trackDwellTime(slug);
+  trackDwellTime(slug, apiBase);
   updateDisplayedStats(slug);
 }
 
@@ -27,7 +27,16 @@ function cleanOldData(slug) {
   }
 }
 
-function trackDwellTime(slug) {
+function reportDwell(slug, seconds, apiBase) {
+  try {
+    if (!navigator.sendBeacon || seconds <= 0) return;
+    const url = `${apiBase}/track/dwell/${encodeURIComponent(slug)}`;
+    const blob = new Blob([JSON.stringify({ seconds })], { type: 'application/json' });
+    navigator.sendBeacon(url, blob);
+  } catch { /* ignore */ }
+}
+
+function trackDwellTime(slug, apiBase) {
   const startTime = Date.now();
   let accumulated = 0; // Start fresh each session, don't accumulate across sessions
 
@@ -35,12 +44,14 @@ function trackDwellTime(slug) {
     const elapsed = Math.min(Math.floor((Date.now() - startTime) / 1000), MAX_SESSION);
     // Store elapsed time for this session (replaces, doesn't add)
     saveDwellTime(slug, elapsed);
+    reportDwell(slug, elapsed, apiBase);
   }, SAVE_INTERVAL);
 
   window.addEventListener('beforeunload', () => {
     clearInterval(interval);
     const elapsed = Math.min(Math.floor((Date.now() - startTime) / 1000), MAX_SESSION);
     saveDwellTime(slug, elapsed);
+    reportDwell(slug, elapsed, apiBase);
   });
 }
 

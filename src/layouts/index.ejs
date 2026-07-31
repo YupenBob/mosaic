@@ -1,6 +1,5 @@
 <%
 /* List page: shows card grid with filter bar */
-const rp = typeof relativePath !== 'undefined' ? relativePath : '';
 const pageDataTitle = typeof pageTitle !== 'undefined' ? pageTitle : site.title;
 const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site.description;
 %>
@@ -12,7 +11,7 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <meta name="description" content="<%= pageDesc %>" />
   <meta name="data-base" content="<%= rp %>data" />
   <title><%= pageDataTitle %></title>
-  <link rel="icon" type="image/svg+xml" href="<%= rp %>assets/logo.svg" />
+  <link rel="icon" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
@@ -130,9 +129,9 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
     <!-- Pagination -->
     <% if (totalPages > 1) { %>
     <div class="pagination">
-      <% if (currentPage <= 1) { %><button disabled><%= t('prev_page') %></button><% } else { %><a href="<%= rp %><%= prevPage %>"><%= t('prev_page') %></a><% } %>
+      <% if (currentPage <= 1) { %><button disabled><%= t('prev_page') %></button><% } else { %><a href="<%= rp %><%= prev %>"><%= t('prev_page') %></a><% } %>
       <span class="page-info"><%= currentPage %> / <%= totalPages %></span>
-      <% if (currentPage >= totalPages) { %><button disabled><%= t('next_page') %></button><% } else { %><a href="<%= rp %><%= nextPage %>"><%= t('next_page') %></a><% } %>
+      <% if (currentPage >= totalPages) { %><button disabled><%= t('next_page') %></button><% } else { %><a href="<%= rp %><%= next %>"><%= t('next_page') %></a><% } %>
     </div>
     <% } %>
   </div>

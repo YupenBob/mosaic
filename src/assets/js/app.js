@@ -29,11 +29,38 @@ register({ name: 'video', enabled: true, page: 'post',
   }
 });
 
+register({ name: 'music', enabled: true, page: 'post',
+  async init(el, cfg) {
+    if (document.querySelectorAll('.music-track').length > 0) {
+      const { initMusicPlayer } = await import('./music.js');
+      initMusicPlayer();
+    }
+  }
+});
+
 register({ name: 'likes', enabled: true, page: 'post',
   async init(el, cfg) {
     if ($('.like-button')) {
-      const { initLikes } = await import('./likes.js');
       const apiBase = document.querySelector('meta[name="api-base"]')?.content;
+      const slug = document.body.dataset.slug;
+      // Pull live view/like counts from the Worker and patch the SSR numbers
+      if (slug && apiBase) {
+        try {
+          const resp = await fetch(`${apiBase}/stats/${encodeURIComponent(slug)}`, { cache: 'no-store' });
+          if (resp.ok) {
+            const d = await resp.json();
+            const v = document.getElementById('mosaic-views-display');
+            if (v && d.views != null) v.textContent = d.views;
+            const l = document.getElementById('like-count-display');
+            if (l && d.likes != null) l.textContent = d.likes;
+            const likeBtn = document.querySelector('.like-button');
+            if (likeBtn && d.likes != null) likeBtn.dataset.count = d.likes;
+            const lc = likeBtn?.querySelector('.like-count');
+            if (lc && likeBtn && !likeBtn.classList.contains('liked') && d.likes != null) lc.textContent = d.likes;
+          }
+        } catch { /* keep SSR fallback */ }
+      }
+      const { initLikes } = await import('./likes.js');
       initLikes({ apiBase });
     }
   }
@@ -42,7 +69,8 @@ register({ name: 'likes', enabled: true, page: 'post',
 register({ name: 'stats', enabled: true, page: 'post',
   async init(el, cfg) {
     const { initStats } = await import('./stats.js');
-    initStats();
+    const apiBase = document.querySelector('meta[name="api-base"]')?.content;
+    initStats({ apiBase });
   }
 });
 
