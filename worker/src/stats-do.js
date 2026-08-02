@@ -112,7 +112,7 @@ export class StatsDurableObject {
     let body = {};
     try { body = await request.json(); } catch {}
     const slug = url.searchParams.get('slug') || body.slug || '';
-    if (!slug) return json({ error: 'slug required' }, 400);
+    if (!slug && path !== '/traffic') return json({ error: 'slug required' }, 400);
 
     if (path === '/view') {
       const ip = request.headers.get('X-Real-IP') || request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -130,12 +130,16 @@ export class StatsDurableObject {
       return json({ ok: true, dwell_time: result.dwell_time });
     }
     if (path === '/stats') {
-      const map = await this._load();
-      return json(entry(map, slug));
+      try {
+        const map = await this._load();
+        return json(entry(map, slug));
+      } catch (e) { return json({ error: e.message, stack: String(e.stack || e) }, 500); }
     }
     if (path === '/traffic') {
-      const map = await this._load();
-      return json(aggregate(map));
+      try {
+        const map = await this._load();
+        return json(aggregate(map));
+      } catch (e) { return json({ error: e.message, stack: String(e.stack || e) }, 500); }
     }
     return json({ error: 'Not found' }, 404);
   }
@@ -143,16 +147,12 @@ export class StatsDurableObject {
   async _load() {
     if (this._map) return this._map;
     let map = {};
-    try {
-      const stored = await this.state.storage.get(STORAGE_KEY);
-      if (stored && typeof stored === 'object') map = stored;
-    } catch {}
+    const stored = await this.state.storage.get(STORAGE_KEY);
+    if (stored && typeof stored === 'object') map = stored;
     if (Object.keys(map).length === 0) {
       // Seed from R2 (migration path for existing counters)
-      try {
-        const obj = await this.env.MEDIA.get('site-data/stats.json');
-        if (obj) map = JSON.parse(await obj.text());
-      } catch {}
+      const obj = await this.env.MEDIA.get('site-data/stats.json');
+      if (obj) map = JSON.parse(await obj.text());
     }
     this._map = map;
     return map;

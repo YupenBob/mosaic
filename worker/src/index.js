@@ -35,6 +35,13 @@ function statsURL(path, slug) {
   return new URL(`https://stats.local${path}${slug ? '?slug=' + encodeURIComponent(slug) : ''}`);
 }
 
+// Classic Durable Object namespace access (idFromName -> get -> stub.fetch)
+async function statsFetch(c, path, slug, init = {}) {
+  const id = c.env.STATS.idFromName('global');
+  const stub = c.env.STATS.get(id);
+  return stub.fetch(statsURL(path, slug), init);
+}
+
 // ── Parallel R2 traversal ──
 // R2 list cursors are sequential per prefix, but top-level prefixes are
 // independent, so scanning originals/ + processed/ + site-data/ in parallel
@@ -94,7 +101,7 @@ app.post('/api/track/view/:slug', async (c) => {
   const slug = c.req.param('slug');
   if (!slug) return c.json({ error: 'slug required' }, 400);
   try {
-    const resp = await c.env.STATS.fetch(statsURL('/view', slug), {
+    const resp = await statsFetch(c, '/view', slug, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Real-IP': clientIp(c) },
       body: '{}',
@@ -110,7 +117,7 @@ app.post('/api/track/like/:slug', async (c) => {
   let body = {};
   try { body = await c.req.json(); } catch {}
   try {
-    const resp = await c.env.STATS.fetch(statsURL('/like', slug), {
+    const resp = await statsFetch(c, '/like', slug, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: body.action || 'like' }),
@@ -126,7 +133,7 @@ app.post('/api/track/dwell/:slug', async (c) => {
   let body = {};
   try { body = await c.req.json(); } catch {}
   try {
-    const resp = await c.env.STATS.fetch(statsURL('/dwell', slug), {
+    const resp = await statsFetch(c, '/dwell', slug, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ seconds: parseInt(body.seconds) || 0 }),
@@ -135,19 +142,11 @@ app.post('/api/track/dwell/:slug', async (c) => {
   } catch (e) { return c.json({ error: e.message }, 500); }
 });
 
-// Live stats for a single post — public
-app.get('/api/stats/:slug', async (c) => {
-  const slug = c.req.param('slug');
-  try {
-    const resp = await c.env.STATS.fetch(statsURL('/stats', slug), { method: 'POST', body: '{}' });
-    return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
-  } catch (e) { return c.json({ error: e.message }, 500); }
-});
-
-// Traffic stats — aggregated by the Durable Object, enriched with post titles
+// Traffic stats — aggregated by the Durable Object, enriched with post titles.
+// NOTE: must be registered BEFORE /api/stats/:slug so the static path wins.
 app.get('/api/stats/traffic', async (c) => {
   try {
-    const resp = await c.env.STATS.fetch(statsURL('/traffic'), { method: 'POST', body: '{}' });
+    const resp = await statsFetch(c, '/traffic', null, { method: 'POST', body: '{}' });
     const data = await resp.json();
     const posts = await listPosts(c).catch(() => []);
     const validSlugs = new Set(posts.map((p) => p.slug));
@@ -158,6 +157,16 @@ app.get('/api/stats/traffic', async (c) => {
     return c.json(data);
   } catch { return c.json({ total: 0, totalLikes: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 });
+
+// Live stats for a single post — public
+app.get('/api/stats/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  try {
+    const resp = await statsFetch(c, '/stats', slug, { method: 'POST', body: '{}' });
+    return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
 // Media file serving — public (uses R2_PUBLIC_URL or falls back to config.mediaBase)
 app.get('/api/media/file/:slug/:filename', async (c) => {
   let cfg = {};

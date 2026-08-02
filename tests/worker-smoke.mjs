@@ -34,7 +34,8 @@ const statsState = {
 };
 const statsDO = new StatsDurableObject(statsState, { MEDIA: media });
 const STATS = {
-  fetch: (url, init) => statsDO.fetch(new Request(url, init)),
+  idFromName: () => 'global',
+  get: () => ({ fetch: (url, init) => statsDO.fetch(new Request(url, init)) }),
 };
 
 // ── Mock GitHub contents API ──
