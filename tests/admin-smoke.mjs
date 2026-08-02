@@ -17,7 +17,9 @@ if (!password) { console.error('ADMIN_PASSWORD not found in worker/.dev.vars'); 
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
-  await page.route(/(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
+  // Keep Chart.js (jsdelivr) reachable — the dashboard needs it; abort only
+  // slow/non-essential third parties.
+  await page.route(/(busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
   await page.goto(ADMIN_URL, { timeout: 30000, waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#login-screen', { timeout: 15000 });
   await page.fill('#login-password', password);
