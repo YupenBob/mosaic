@@ -91,7 +91,7 @@ for (const dir of postDirs) {
       if (fs.existsSync(outDir)) {
         const masterM3U8 = path.join(outDir, `${base}-master.m3u8`);
         hasHLS = fs.existsSync(masterM3U8);
-        for (const res of ['4K','1080p','720p','480p','360p']) {
+        for (const res of ['4K','1080p','720p','480p','360p','240p']) {
           const mp4 = path.join(outDir, `${base}-${res}.mp4`);
           if (fs.existsSync(mp4)) sources[res] = pUrl(slug, 'videos', base + '-' + res + '.mp4');
         }

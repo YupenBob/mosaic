@@ -132,6 +132,7 @@ const ALL_RES = [
   { name: '720p', height: 720, bw: 2000000, label: '1280x720' },
   { name: '480p', height: 480, bw: 800000, label: '854x480' },
   { name: '360p', height: 360, bw: 400000, label: '640x360' },
+  { name: '240p', height: 240, bw: 250000, label: '426x240' },
 ];
 
 async function compressVideo(file, postDir, slug) {
