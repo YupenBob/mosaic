@@ -95,13 +95,12 @@ async function compressCover(postDir, slug) {
   // Use a dedicated key so a first-photo cover isn't double-marked by compressPhotos
   const coverKey = `__cover__/${slug}`;
   const coverHash = md5(coverFile);
+  const outDir = path.join(DIST, 'posts', slug, 'media');
+  fs.mkdirSync(outDir, { recursive: true });
   const coverReady = ['cover-10p.webp', 'cover-480p.webp', 'cover-720p.webp', 'cover-1080p.webp', 'cover-meta.json']
     .map((n) => path.join(outDir, n)).every((p) => fs.existsSync(p));
   if (checksums[coverKey] === coverHash && coverReady) { console.log(`  SKIP cover (unchanged)`); return; }
   checksums[coverKey] = coverHash;
-
-  const outDir = path.join(DIST, 'posts', slug, 'media');
-  fs.mkdirSync(outDir, { recursive: true });
   for (const out of ['cover-10p.webp', 'cover-480p.webp', 'cover-720p.webp', 'cover-1080p.webp', 'cover-meta.json']) {
     fs.rmSync(path.join(outDir, out), { force: true });
   }
