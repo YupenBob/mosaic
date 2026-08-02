@@ -62,8 +62,10 @@ jobs:
       - name: Strip EXIF from originals
         run: |
           sudo apt-get install -y -qq libimage-exiftool-perl
-          find content/posts -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.tiff' -o -iname '*.tif' \) -exec exiftool -all= -overwrite_original {} +
-          echo "EXIF stripped from originals"
+          # Tolerate files whose extension doesn't match their content
+          # (exiftool refuses them; skip + log instead of failing the build)
+          find content/posts -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.tiff' -o -iname '*.tif' \) -exec sh -c 'exiftool -all= -overwrite_original "$1" 2>/dev/null || echo "skip(not-stripped): $1"' _ {} \;
+          echo "EXIF strip complete (skips above are non-fatal)"
 
       - name: Compress media
         env:
