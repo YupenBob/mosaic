@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="data-base" content="<%= rp %>data" />
   <title>404 - <%= site.title %></title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
+  <link rel="icon" type="image/svg+xml" sizes="any" href="<%= rp %>assets/logo.svg" />
+  <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
@@ -26,6 +28,7 @@
   </main>
   <footer class="footer">
     <div class="container">
+      <p class="footer-tagline"><%= site.subtitle || '' %></p>
       <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
     </div>
   </footer>

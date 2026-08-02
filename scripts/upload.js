@@ -60,6 +60,14 @@ try {
       total += fs.readdirSync(musicDir).length;
     }
   }
+
+  // Build data (posts.json etc.) -> site-data/ so the Worker can serve the
+  // post list from R2 (one GET) instead of N+1 GitHub contents calls.
+  const dataDir = path.join(DIST, 'data');
+  if (fs.existsSync(dataDir)) {
+    runUpload('site-data', `rclone copy "${dataDir}" "r2:mosaic-media/site-data/" --transfers 4 --checksum --retries 3`);
+    total += fs.readdirSync(dataDir).length;
+  }
   console.log(`Upload complete: ${total} files`);
 } catch (e) {
   console.error(`Upload failed: ${e.message}`);

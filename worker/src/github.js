@@ -63,9 +63,34 @@ async function listPostsUncached(c) {
   }));
 }
 
+async function listPostsFromR2(c) {
+  try {
+    const obj = await c.env.MEDIA.get('site-data/posts.json');
+    if (!obj) return null;
+    const posts = JSON.parse(await obj.text());
+    if (!Array.isArray(posts)) return null;
+    return posts.map((p) => ({
+      slug: p.slug,
+      title: p.title || p.slug,
+      category: p.category,
+      tags: p.tags || [],
+      date: p.date,
+      description: p.description,
+      cover: p.cover || '',
+    }));
+  } catch { return null; }
+}
+
 export async function listPosts(c) {
   if (_postsCache && Date.now() - _postsTime < CACHE_MS.posts) return _postsCache;
-  const fresh = await listPostsUncached(c);
+  let fresh = null;
+  // Prefer the build-time R2 cache (fast, no GitHub rate-limit cost). Fall
+  // back to GitHub when there are unbuilt changes (dirty) or the cache is missing.
+  try {
+    const dirty = await isDirty(c.env);
+    if (!dirty || !dirty.count) fresh = await listPostsFromR2(c);
+  } catch {}
+  if (!fresh) fresh = await listPostsUncached(c);
   _postsCache = fresh;
   _postsTime = Date.now();
   return fresh;

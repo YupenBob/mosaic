@@ -158,6 +158,17 @@ await record('concurrent views serialized (10/10 counted)', async () => {
 });
 
 // ── 6. Config deep merge ──
+await record('listPosts reads R2 posts cache (when not dirty)', async () => {
+  await media.put('site-data/posts.json', JSON.stringify([{ slug: 'cached', title: 'Cached Post' }]));
+  const r = await call('/api/posts', { token: TOKEN });
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.total, 1);
+  assert.equal(d.posts[0].slug, 'cached');
+  store.delete('site-data/posts.json');
+});
+
+// ── 7. Config deep merge ──
 await record('config deep merge (nested fields preserved)', async () => {
   const r = await call('/api/config', { method: 'PUT', token: TOKEN, body: { components: { gallery: { enabled: false } } } });
   assert.equal(r.status, 200);
@@ -220,4 +231,4 @@ await record('login rate limit (429 after 5 failures)', async () => {
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 11) process.exit(1);
+if (passed < 12) process.exit(1);

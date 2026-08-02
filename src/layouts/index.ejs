@@ -11,8 +11,9 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <meta name="description" content="<%= pageDesc %>" />
   <meta name="data-base" content="<%= rp %>data" />
   <title><%= pageDataTitle %></title>
-  <link rel="icon" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" />
+  <link rel="icon" type="image/svg+xml" sizes="any" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
+  <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
@@ -27,6 +28,7 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <meta property="og:type" content="website" />
   <meta property="og:url" content="<%= site.url || '' %>" />
   <meta property="og:site_name" content="<%= site.title %>" />
+  <meta property="og:image" content="<%= (site.url || '') %>/assets/og-card.png" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="<%= pageDataTitle %>" />
   <script type="application/ld+json">
@@ -139,6 +141,7 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
 
 <footer class="footer">
   <div class="container">
+    <p class="footer-tagline"><%= site.subtitle || '' %></p>
     <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
   </div>
 </footer>
