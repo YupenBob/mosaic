@@ -13,6 +13,11 @@ const API = (process.env.API || 'https://mosaic-api.xsanye.cn').replace(/\/+$/, 
 const MEDIA = (process.env.MEDIA || 'https://mosaic-media.xsanye.cn').replace(/\/+$/, '');
 const SKIP_ADMIN = !ADMIN || ADMIN === 'skip';
 
+test.beforeEach(async ({ page }) => {
+  // Abort slow/irrelevant third-party scripts so domcontentloaded isn't blocked by CDNs
+  await page.route(/(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
+});
+
 test('homepage loads and shows posts', async ({ page }) => {
   const response = await page.goto(SITE);
   expect(response.status()).toBe(200);

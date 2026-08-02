@@ -19,6 +19,9 @@ const abs = (href) => href.startsWith('http') ? href : new URL(href, SITE + '/')
 async function main() {
   const browser = await chromium.launch({ headless: true });
   let passed = 0, failed = 0;
+  const context = await browser.newContext();
+  // Abort slow/irrelevant third-party scripts so domcontentloaded isn't blocked by CDNs
+  await context.route(/(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
   const check = (name, ok, detail = '') => {
     if (ok) { passed++; console.log(`  PASS ${name}${detail ? ': ' + detail : ''}`); }
     else { failed++; console.log(`  FAIL ${name}${detail ? ': ' + detail : ''}`); }
@@ -35,7 +38,7 @@ async function main() {
 
     // ── 2. Site loads ──
     console.log('\nHomepage');
-    const page = await browser.newPage();
+    const page = await context.newPage();
     const resp = await page.goto(SITE, { timeout: 30000, waitUntil: 'domcontentloaded' });
     check('Homepage loads', !!resp && resp.status() === 200, `status=${resp?.status()}`);
     const title = await page.title();
