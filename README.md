@@ -93,7 +93,6 @@ layout: video-first
 ├── src/                 # 模板 + 前端资源
 ├── worker/              # Cloudflare Worker API
 ├── cloud-admin/         # 云端管理面板
-├── admin/               # 本地管理面板（开发用）
 ├── mosaic.config.json   # 站点配置
 └── docs/                # 文档
 ```

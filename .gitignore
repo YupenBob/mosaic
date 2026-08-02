@@ -6,10 +6,6 @@ test-results/
 Thumbs.db
 *.log
 .env
-admin/logs/
-admin/uploads/
-admin/node_modules/
-admin/package-lock.json
 worker/.dev.vars
 worker/.wrangler/
 content/.media-checksums.json

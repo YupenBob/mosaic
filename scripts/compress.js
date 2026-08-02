@@ -209,6 +209,36 @@ async function compressVideo(file, postDir, slug) {
   }
 }
 
+// ── Music compression: 128k/320k MP3 ──
+async function compressMusic(postDir, slug) {
+  const musicDir = path.join(postDir, 'music');
+  if (!fs.existsSync(musicDir)) return;
+  const outDir = path.join(DIST, 'posts', slug, 'media', 'music');
+  fs.mkdirSync(outDir, { recursive: true });
+
+  for (const f of fs.readdirSync(musicDir)) {
+    if (!/\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)) continue;
+    const base = path.parse(f).name;
+    const src = path.join(musicDir, f);
+    if (!changed(src)) { console.log(`  SKIP music ${f} (unchanged)`); continue; }
+    // Source changed: remove stale outputs for this track
+    for (const stale of fs.readdirSync(outDir)) {
+      if (stale.startsWith(base + '-')) fs.rmSync(path.join(outDir, stale), { force: true });
+    }
+    for (const [label, bitrate] of [['128k', '128k'], ['320k', '320k']]) {
+      const outPath = path.join(outDir, `${base}-${label}.mp3`);
+      try {
+        await new Promise((resolve, reject) => {
+          const proc = spawn('ffmpeg', ['-i', src, '-vn', '-c:a', 'libmp3lame', '-b:a', bitrate, '-y', outPath], { stdio: 'ignore' });
+          proc.on('close', (code) => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+          proc.on('error', reject);
+        });
+        console.log(`  ${f} -> ${label}`);
+      } catch (e) { console.error(`  MUSIC FAIL ${f} ${label}: ${e.message}`); }
+    }
+  }
+}
+
 // ── Main ──
 console.log(`Processing ${POSTS.length} posts...`);
 for (const slug of POSTS) {
@@ -226,6 +256,7 @@ for (const slug of POSTS) {
       }
     }
   }
+  await compressMusic(postDir, slug);
 }
 // Save checksums for next build
 fs.writeFileSync(CHECKSUMS_FILE, JSON.stringify(checksums, null, 2));

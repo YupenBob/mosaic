@@ -26,6 +26,24 @@ export function secretFor(c) {
   return null;
 }
 
+/**
+ * Resolve the real client IP.
+ * - The Pages Functions proxy forwards the visitor's CF-Connecting-IP as
+ *   X-Real-IP and signs it with X-Mosaic-Proxy (shared PROXY_SECRET), so the
+ *   Worker can trust it without letting direct callers spoof it.
+ * - When PROXY_SECRET is not configured (local dev), fall back to X-Real-IP /
+ *   CF-Connecting-IP as-is.
+ */
+export function clientIp(c) {
+  const proxySecret = c.env.PROXY_SECRET;
+  const viaProxy = c.req.header('X-Mosaic-Proxy') || '';
+  const realIp = c.req.header('X-Real-IP') || '';
+  if (proxySecret) {
+    return viaProxy === proxySecret && realIp ? realIp : (c.req.header('CF-Connecting-IP') || 'unknown');
+  }
+  return realIp || c.req.header('CF-Connecting-IP') || 'unknown';
+}
+
 // ── Login rate limiting (in-memory, per-isolate) ──
 const MAX_FAILS = 5;
 const LOCK_MS = 5 * 60 * 1000;
@@ -55,7 +73,7 @@ function resetFailures(ip) {
 
 export async function loginHandler(c) {
   const { password } = await c.req.json().catch(() => ({}));
-  const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+  const ip = clientIp(c);
   const adminPw = c.env.ADMIN_PASSWORD || '';
   const secret = secretFor(c);
 

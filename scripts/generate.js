@@ -115,12 +115,26 @@ for (const dir of postDirs) {
       if (!/\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)) continue;
       const base = path.parse(f).name;
       const artist = (data.author && data.author.name) || (SITE.author && SITE.author.name) || '';
+      // Prefer compressed MP3s from the pipeline, fall back to originals
+      const sources = {};
+      const musicOutDir = path.join(DIST, 'posts', slug, 'media', 'music');
+      if (fs.existsSync(musicOutDir)) {
+        for (const q of ['320k', '128k']) {
+          if (fs.existsSync(path.join(musicOutDir, `${base}-${q}.mp3`))) {
+            sources[q] = pUrl(slug, 'music', `${base}-${q}.mp3`);
+          }
+        }
+      }
+      if (!Object.keys(sources).length) {
+        sources['128k'] = oUrl(slug, 'music', f);
+        sources['320k'] = oUrl(slug, 'music', f);
+      }
       music.push({
         file: f,
         title: base,
         artist,
         cover: '',
-        sources: { '128k': oUrl(slug, 'music', f), '320k': oUrl(slug, 'music', f) },
+        sources,
         duration: 0,
         waveform: null,
       });
