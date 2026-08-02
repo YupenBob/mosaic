@@ -12,7 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const CONTENT = path.join(ROOT, 'content', 'posts');
 const DIST = path.join(ROOT, 'dist');
-const CHECKSUMS_FILE = path.join(ROOT, 'content', '.media-checksums.json');
+// Checksums live under dist/ so CI can cache them (override via CHECKSUMS_FILE env)
+const CHECKSUMS_FILE = process.env.CHECKSUMS_FILE || path.join(DIST, '.media-checksums.json');
 
 // Load existing checksums
 let checksums = {};
@@ -49,19 +50,20 @@ async function compressPhotos(postDir, slug) {
     const base = path.parse(f).name;
     const src = path.join(photosDir, f);
     if (!changed(src)) { console.log(`  SKIP ${f} (unchanged)`); continue; }
+    // Source changed: remove stale outputs so they are regenerated (and re-uploaded)
+    for (const out of [`${base}-10p.webp`, `${base}-480p.webp`, `${base}-720p.webp`, `${base}-1080p.webp`, `${base}-meta.json`]) {
+      fs.rmSync(path.join(outDir, out), { force: true });
+    }
     const img = sharp(src);
     const meta = await img.metadata();
     const aspect = meta.width / (meta.height || 1);
 
     // LQIP: 10px thumbnail for instant placeholder
-    const thumbOut = path.join(outDir, `${base}-10p.webp`);
-    if (!fs.existsSync(thumbOut)) await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(thumbOut);
+    await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(path.join(outDir, `${base}-10p.webp`));
 
     for (const w of SIZES) {
-      const out = path.join(outDir, `${base}-${w}p.webp`);
-      if (fs.existsSync(out)) continue;
       await img.clone().resize({ width: w, withoutEnlargement: true })
-        .webp({ quality: QUALITY[w] || 80 }).toFile(out);
+        .webp({ quality: QUALITY[w] || 80 }).toFile(path.join(outDir, `${base}-${w}p.webp`));
     }
     // Save meta
     fs.writeFileSync(path.join(outDir, `${base}-meta.json`), JSON.stringify({ aspect, width: meta.width, height: meta.height }));
@@ -86,22 +88,26 @@ async function compressCover(postDir, slug) {
     }
   }
   if (!coverFile) return;
-  if (!changed(coverFile)) { console.log(`  SKIP cover (unchanged)`); return; }
+  // Use a dedicated key so a first-photo cover isn't double-marked by compressPhotos
+  const coverKey = `__cover__/${slug}`;
+  const coverHash = md5(coverFile);
+  if (checksums[coverKey] === coverHash) { console.log(`  SKIP cover (unchanged)`); return; }
+  checksums[coverKey] = coverHash;
 
   const outDir = path.join(DIST, 'posts', slug, 'media');
   fs.mkdirSync(outDir, { recursive: true });
+  for (const out of ['cover-10p.webp', 'cover-480p.webp', 'cover-720p.webp', 'cover-1080p.webp', 'cover-meta.json']) {
+    fs.rmSync(path.join(outDir, out), { force: true });
+  }
   const img = sharp(coverFile);
   const meta = await img.metadata();
   const aspect = meta.width / (meta.height || 1);
 
   // LQIP
-  const thumbOut = path.join(outDir, 'cover-10p.webp');
-  if (!fs.existsSync(thumbOut)) await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(thumbOut);
+  await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(path.join(outDir, 'cover-10p.webp'));
   for (const w of SIZES) {
-    const out = path.join(outDir, `cover-${w}p.webp`);
-    if (fs.existsSync(out)) continue;
     await img.clone().resize({ width: w, withoutEnlargement: true })
-      .webp({ quality: QUALITY[w] || 80 }).toFile(out);
+      .webp({ quality: QUALITY[w] || 80 }).toFile(path.join(outDir, `cover-${w}p.webp`));
   }
   fs.writeFileSync(path.join(outDir, 'cover-meta.json'), JSON.stringify({ aspect, width: meta.width, height: meta.height }));
 }
@@ -128,6 +134,12 @@ async function compressVideo(file, postDir, slug) {
   const srcPath = path.join(postDir, 'videos', file);
   const outDir = path.join(DIST, 'posts', slug, 'media', 'videos');
   fs.mkdirSync(outDir, { recursive: true });
+  // Source changed: remove stale outputs for this video before regenerating
+  for (const stale of fs.readdirSync(outDir)) {
+    if (stale === baseName + '-poster.jpg' || stale.startsWith(baseName + '-')) {
+      fs.rmSync(path.join(outDir, stale), { force: true });
+    }
+  }
 
   const srcHeight = getSourceHeight(srcPath);
   const resList = ALL_RES.filter(r => r.height <= srcHeight);
@@ -141,7 +153,6 @@ async function compressVideo(file, postDir, slug) {
   // Transcode to each resolution
   for (const res of resList) {
     const outPath = path.join(outDir, `${baseName}-${res.name}.mp4`);
-    if (fs.existsSync(outPath)) { successRes.push(res.name); continue; }
     try {
       await new Promise((resolve, reject) => {
         const proc = spawn('ffmpeg', [
@@ -179,13 +190,11 @@ async function compressVideo(file, postDir, slug) {
   // Generate poster
   try {
     const posterPath = path.join(outDir, `${baseName}-poster.jpg`);
-    if (!fs.existsSync(posterPath)) {
-      await new Promise((resolve, reject) => {
-        const proc = spawn('ffmpeg', ['-i', srcPath, '-ss', '00:00:01', '-vframes', '1', '-vf', 'scale=-2:720', '-y', posterPath], { stdio: 'ignore' });
-        proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
-        proc.on('error', reject);
-      });
-    }
+    await new Promise((resolve, reject) => {
+      const proc = spawn('ffmpeg', ['-i', srcPath, '-ss', '00:00:01', '-vframes', '1', '-vf', 'scale=-2:720', '-y', posterPath], { stdio: 'ignore' });
+      proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+      proc.on('error', reject);
+    });
   } catch {}
 
   // Generate master playlist

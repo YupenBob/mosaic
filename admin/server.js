@@ -346,8 +346,8 @@ app.post('/api/actions/:name', async (req, res) => {
     const name = req.params.name;
     const actions = {
       'install': ['npm', ['install']],
-      'demo': ['node', ['scripts/generate-demo.js']],
-      'clean-build': ['node', ['scripts/build.js', '--clean']],
+      'compress': ['node', ['scripts/compress.js']],
+      'build': ['node', ['scripts/generate.js']],
     };
     const act = actions[name];
     if (!act) return res.status(400).json({ error: 'Unknown action' });

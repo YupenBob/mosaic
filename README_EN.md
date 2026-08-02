@@ -36,9 +36,9 @@ Most static site generators treat images as an afterthought. Mosaic puts **photo
 git clone https://github.com/YupenBob/mosaic.git
 cd mosaic
 npm install
-npm run demo          # generate demo content
+npm run compress      # compress media (skip if no local media)
 npm run build         # build the site
-npx serve dist        # preview at http://localhost:3000
+npm run serve         # preview at http://localhost:3000
 ```
 
 ## Features

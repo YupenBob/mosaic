@@ -107,6 +107,26 @@ for (const dir of postDirs) {
     }
   }
 
+  // ── Music ──
+  const music = [];
+  const musicDir = path.join(postPath, 'music');
+  if (fs.existsSync(musicDir)) {
+    for (const f of fs.readdirSync(musicDir).sort()) {
+      if (!/\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)) continue;
+      const base = path.parse(f).name;
+      const artist = (data.author && data.author.name) || (SITE.author && SITE.author.name) || '';
+      music.push({
+        file: f,
+        title: base,
+        artist,
+        cover: '',
+        sources: { '128k': oUrl(slug, 'music', f), '320k': oUrl(slug, 'music', f) },
+        duration: 0,
+        waveform: null,
+      });
+    }
+  }
+
   // ── Cover ──
   let cover = data.cover || '';
   let coverSrcset = null;
@@ -141,7 +161,7 @@ for (const dir of postDirs) {
 
   const stats = { views: data.views || 0, likes: data.likes || 0, dwell_time: data.dwell_time || 0 };
   if (coverAspect > 1.5) coverAspect = 1.5;
-  posts.push({ slug, title, date, category, tags, description, layout, videoMode, cover, coverAspect, coverSrcset, bodyHTML, photos, videos, stats });
+  posts.push({ slug, title, date, category, tags, description, layout, videoMode, cover, coverAspect, coverSrcset, bodyHTML, photos, videos, music, stats });
 }
 
 // Sort by date desc
@@ -185,16 +205,83 @@ const searchIndex = posts.map(p => ({
 }));
 fs.writeFileSync(path.join(DIST, 'data', 'search-index.json'), JSON.stringify(searchIndex));
 
+// ── RSS / Sitemap ──
+const plugins = SITE.plugins || {};
+const feedEnabled = plugins['generate-feed']?.enabled !== false;
+const sitemapEnabled = plugins['generate-sitemap']?.enabled !== false;
+
+function buildFeed() {
+  const base = (SITE.url || '').replace(/\/+$/, '');
+  const siteTitle = SITE.title || 'Mosaic';
+  const siteDesc = SITE.description || '';
+  const authorName = (SITE.author && SITE.author.name) || '';
+  const authorEmail = (SITE.author && SITE.author.email) || '';
+  const items = posts.map((p) => {
+    const link = `${base}/posts/${encodeURIComponent(p.slug)}/`;
+    const pubDate = p.date ? new Date(p.date).toUTCString() : new Date().toUTCString();
+    return [
+      '  <item>',
+      `    <title><![CDATA[${p.title || p.slug}]]></title>`,
+      `    <link>${link}</link>`,
+      `    <guid isPermaLink="true">${link}</guid>`,
+      `    <description><![CDATA[${p.description || ''}]]></description>`,
+      `    <pubDate>${pubDate}</pubDate>`,
+      authorName ? `    <dc:creator><![CDATA[${authorName}]]></dc:creator>` : '',
+      '  </item>',
+    ].filter(Boolean).join('\n');
+  }).join('\n');
+  const self = base ? `<atom:link href="${base}/feed.xml" rel="self" type="application/rss+xml"/>` : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">\n` +
+    `<channel>\n` +
+    `  <title><![CDATA[${siteTitle}]]></title>\n` +
+    `  <link>${base || '/'}</link>\n` +
+    `  <description><![CDATA[${siteDesc}]]></description>\n` +
+    (self ? `  ${self}\n` : '') +
+    (authorEmail && authorName ? `  <managingEditor>${authorEmail} (${authorName})</managingEditor>\n` : '') +
+    `${items}\n` +
+    `</channel>\n</rss>\n`;
+}
+
+function buildSitemap() {
+  const base = (SITE.url || '').replace(/\/+$/, '');
+  const lastmod = posts.length && posts[0].date
+    ? new Date(posts[0].date).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const locs = [
+    `${base}/`,
+    `${base}/404.html`,
+    ...categories.map((c) => `${base}/categories/${c.slug}/`),
+    ...tags.map((t) => `${base}/tags/${t.slug}/`),
+    ...posts.map((p) => `${base}/posts/${encodeURIComponent(p.slug)}/`),
+  ];
+  const urls = locs.map((loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
+
+if (feedEnabled) {
+  fs.writeFileSync(path.join(DIST, 'feed.xml'), buildFeed());
+}
+if (sitemapEnabled) {
+  if (SITE.url) {
+    fs.writeFileSync(path.join(DIST, 'sitemap.xml'), buildSitemap());
+  } else {
+    console.warn('Sitemap skipped: config.url is not set (sitemap requires absolute URLs)');
+  }
+}
+
 // ── EJS rendering ──
 const viewsDir = path.join(SRC, 'layouts');
-const relativePath = (from, to) => {
-  let rel = path.relative(path.dirname(from), to).replace(/\\/g, '/');
-  if (!rel.startsWith('.')) rel = './' + rel;
+// Prefix from the output page's directory back to dist/ root ('' | '../' | '../../')
+const relativePath = (outPath) => {
+  let rel = path.relative(path.dirname(outPath), DIST).replace(/\\/g, '/');
+  if (rel === '') return '';
   return rel.endsWith('/') ? rel : rel + '/';
 };
 
 function renderFile(template, outPath, data) {
-  const rp = relativePath(outPath, path.join(DIST, 'index.html'));
+  const rp = relativePath(outPath);
   const html = ejs.render(fs.readFileSync(path.join(viewsDir, template), 'utf-8'), {
     ...data, rp, site: SITE, t, i18n, categories, tags, lang: SITE.language || 'zh-CN',
     activeCategory: data.activeCategory || '',
@@ -202,8 +289,10 @@ function renderFile(template, outPath, data) {
     pageTitle: data.titleExtra ? SITE.title + (data.titleExtra || '') : SITE.title,
     pageDescription: SITE.description,
     currentPage: data.page || 1, totalPages: data.totalPages || 1,
-    prev: data.page > 1 ? (data.page === 2 ? 'index.html' : `page/${data.page - 1}/index.html`) : '',
-    next: data.page < data.totalPages ? `page/${data.page + 1}/index.html` : '',
+    ...(data.page ? {
+      prev: data.page > 1 ? (data.page === 2 ? 'index.html' : `page/${data.page - 1}/index.html`) : '',
+      next: data.page < data.totalPages ? `page/${data.page + 1}/index.html` : '',
+    } : {}),
   });
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, html);
@@ -222,7 +311,12 @@ for (let page = 1; page <= totalPages; page++) {
 // Post pages
 for (const post of posts) {
   const related = posts.filter(p => p.slug !== post.slug && ((p.category || '') === (post.category || '') || (p.tags || []).some(t => (post.tags || []).includes(t)))).slice(0, 4);
-  renderFile('post.ejs', path.join(DIST, 'posts', post.slug, 'index.html'), { post, posts, related });
+  const idx = posts.indexOf(post);
+  renderFile('post.ejs', path.join(DIST, 'posts', post.slug, 'index.html'), {
+    post, posts, related,
+    prev: posts[idx + 1] || null,
+    next: posts[idx - 1] || null,
+  });
 }
 
 // Category pages

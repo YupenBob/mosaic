@@ -4,7 +4,7 @@
  * - Auth checked once at startup, no flash
  * - Clean page lifecycle with mount/unmount
  */
-import { auth, posts as postsApi, media as mediaApi, upload, build, stats, config, taxonomy, trash, disk, health, track } from '../src/api.js';
+import { auth, posts as postsApi, media as mediaApi, upload, build, stats, config, taxonomy, trash, disk, health } from '../src/api.js';
 import { getToken, setToken } from '../src/api.js';
 
 // ── i18n ────────────────────────────────────
@@ -1446,7 +1446,7 @@ window.uploadFavicon = async function(input) {
     });
     if (!resp.ok) throw new Error('Upload failed');
     const mediaBase = state.mediaBase || window.__MEDIA_BASE__ || '';
-    const url = mediaBase ? `${mediaBase}/originals/site-data/others/favicon.${ext}` : `/api/media/file/site-data/favicon.${ext}`;
+    const url = mediaBase ? `${mediaBase}/site-data/favicon.${ext}` : `/api/media/file/site-data/favicon.${ext}`;
     document.getElementById('favicon-preview').src = url;
     document.getElementById('favicon-value').value = url;
     toast('图标上传成功', 'success');

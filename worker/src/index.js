@@ -1,14 +1,22 @@
-/**
+﻿/**
  * Mosaic Worker API — Cloudflare Workers entry point using Hono.
  * Routes: auth, posts CRUD, upload presign, build trigger/status, config.
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { loginHandler, authMiddleware } from './auth.js';
-import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty } from './github.js';
-import { generatePresignedUrl, listMedia, serveMediaFile, uploadDirect } from './r2.js';
+import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty, renameCategory, renameTag } from './github.js';
+import { generatePresignedUrl, listMedia, serveMediaFile, uploadDirect, deleteMediaFile } from './r2.js';
 
 const app = new Hono();
+// Run a fire-and-forget task; executionCtx only exists in Workers runtimes.
+function defer(c, fn) {
+  try {
+    const ctx = c.executionCtx;
+    if (ctx && typeof ctx.waitUntil === 'function') { ctx.waitUntil(fn()); return; }
+  } catch {}
+  fn();
+}
 
 // CORS for cloud-admin
 app.use('*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
@@ -87,6 +95,37 @@ app.post('/api/track/like/:slug', async (c) => {
   } catch (e) { return c.json({ error: e.message }, 500); }
 });
 
+// Track dwell time — public (capped at 2h per session)
+app.post('/api/track/dwell/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  if (!slug) return c.json({ error: 'slug required' }, 400);
+  let body = {};
+  try { body = await c.req.json(); } catch {}
+  const seconds = Math.min(Math.max(parseInt(body.seconds) || 0, 0), 7200);
+  try {
+    const key = 'site-data/stats.json';
+    let data = {};
+    try { const obj = await c.env.MEDIA.get(key); if (obj) data = JSON.parse(await obj.text()); } catch {}
+    if (!data[slug]) data[slug] = { views: 0, likes: 0, history: [] };
+    else if (typeof data[slug] === 'number') data[slug] = { views: data[slug], likes: 0, history: [] };
+    data[slug].dwell_time = Math.max(data[slug].dwell_time || 0, seconds);
+    await c.env.MEDIA.put(key, JSON.stringify(data), { httpMetadata: { contentType: 'application/json' } });
+    return c.json({ ok: true });
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// Live stats for a single post — public
+app.get('/api/stats/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  try {
+    const data = await getStats(c.env);
+    const entry = data[slug];
+    if (!entry) return c.json({ slug, views: 0, likes: 0, dwell_time: 0 });
+    const val = typeof entry === 'number' ? { views: entry, likes: 0 } : entry;
+    return c.json({ slug, views: val.views || 0, likes: val.likes || 0, dwell_time: val.dwell_time || 0 });
+  } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
 // Traffic stats — reads from R2 site-data/stats.json (fallback views.json)
 app.get('/api/stats/traffic', async (c) => {
   try {
@@ -147,7 +186,7 @@ app.get('/api/media/file/:slug/:filename', async (c) => {
 // Upload — public (admin sends JWT in XHR)
 app.post('/api/upload/direct/:slug/:filename', async (c) => {
   const result = await uploadDirect(c);
-  c.executionCtx.waitUntil(markDirty(c.env));
+  defer(c, () => markDirty(c.env));
   return result;
 });
 
@@ -188,7 +227,7 @@ app.post('/api/posts', async (c) => {
     const { slug, frontMatter, body, message } = await c.req.json();
     if (!slug) return c.json({ error: 'slug required', code: 'INVALID_PARAMS' }, 400);
     const result = await createOrUpdatePost(c, slug, frontMatter, body, message);
-    c.executionCtx.waitUntil(markDirty(c.env));
+    defer(c, () => markDirty(c.env));
     return c.json({ ok: true, slug, sha: result.content?.sha }, 201);
   } catch (e) { return c.json({ error: e.message, code: e.message.includes('exists') ? 'SLUG_CONFLICT' : 'GITHUB_ERROR' }, e.message.includes('exists') ? 409 : 502); }
 });
@@ -204,17 +243,25 @@ app.delete('/api/posts/:slug', async (c) => {
     // Delete from R2 (originals + processed)
     let r2Count = 0;
     for (const prefix of ['originals', 'processed']) {
-      try {
-        const list = await c.env.MEDIA.list({ prefix: `${prefix}/${slug}/` });
-        for (const obj of (list.objects || [])) {
-          await c.env.MEDIA.delete(obj.key);
-          r2Count++;
+      let cursor;
+      do {
+        try {
+          const opts = { prefix: `${prefix}/${slug}/`, limit: 1000 };
+          if (cursor) opts.cursor = cursor;
+          const list = await c.env.MEDIA.list(opts);
+          for (const obj of (list.objects || [])) {
+            await c.env.MEDIA.delete(obj.key);
+            r2Count++;
+          }
+          cursor = list.truncated ? list.cursor : null;
+        } catch {
+          cursor = null;
         }
-      } catch {}
+      } while (cursor);
     }
     if (r2Count > 0) result.r2Deleted = r2Count;
 
-    c.executionCtx.waitUntil(markDirty(c.env));
+    defer(c, () => markDirty(c.env));
     return c.json(result);
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
@@ -231,7 +278,7 @@ app.post('/api/build', async (c) => {
       return c.json({ error: 'Build already in progress', code: 'BUILD_RUNNING', run: { id: latest.id, url: latest.html_url } }, 409);
     }
     await dispatchBuild(c);
-    c.executionCtx.waitUntil(clearDirty(c.env));
+    defer(c, () => clearDirty(c.env));
     return c.json({ ok: true, message: 'Build triggered' });
   } catch (e) { return c.json({ error: e.message, code: 'DISPATCH_ERROR' }, 502); }
 });
@@ -272,7 +319,7 @@ app.put('/api/config', async (c) => {
   try {
     const { message, ...config } = await c.req.json();
     const result = await updateConfig(c, config, message);
-    c.executionCtx.waitUntil(markDirty(c.env));
+    defer(c, () => markDirty(c.env));
     return c.json({ ok: true, sha: result.content?.sha });
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
@@ -291,7 +338,7 @@ app.post('/api/posts/:slug/duplicate', async (c) => {
     const { newSlug } = await c.req.json().catch(() => ({}));
     const slug = newSlug || `${c.req.param('slug')}-copy`;
     await createOrUpdatePost(c, slug, post.frontMatter, post.body, `Duplicate ${c.req.param('slug')} → ${slug}`);
-    c.executionCtx.waitUntil(markDirty(c.env));
+    defer(c, () => markDirty(c.env));
     return c.json({ ok: true, slug });
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
@@ -301,6 +348,13 @@ app.get('/api/media/:slug/list', async (c) => {
   let cfg = {};
   try { cfg = await getConfig(c); } catch {}
   return listMedia(c, cfg.mediaBase);
+});
+
+// Delete a single media file (originals + processed)
+app.delete('/api/media/:slug/:file', async (c) => {
+  const result = await deleteMediaFile(c);
+  defer(c, () => markDirty(c.env));
+  return result;
 });
 
 // Stats
@@ -328,6 +382,28 @@ app.get('/api/taxonomy', async (c) => {
       tags: Object.entries(tags).map(([n, c]) => ({ name: n, count: c })),
     });
   } catch { return c.json({ categories: [], tags: [] }); }
+});
+
+// Rename category (rewrites frontmatter in every affected post)
+app.put('/api/taxonomy/category', async (c) => {
+  try {
+    const { oldName, newName, message } = await c.req.json().catch(() => ({}));
+    if (!oldName || !newName) return c.json({ error: 'oldName and newName required', code: 'INVALID_PARAMS' }, 400);
+    const renamed = await renameCategory(c, oldName, newName, message);
+    defer(c, () => markDirty(c.env));
+    return c.json({ ok: true, renamed });
+  } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
+});
+
+// Rename tag (rewrites frontmatter in every affected post)
+app.put('/api/taxonomy/tag', async (c) => {
+  try {
+    const { oldName, newName, message } = await c.req.json().catch(() => ({}));
+    if (!oldName || !newName) return c.json({ error: 'oldName and newName required', code: 'INVALID_PARAMS' }, 400);
+    const renamed = await renameTag(c, oldName, newName, message);
+    defer(c, () => markDirty(c.env));
+    return c.json({ ok: true, renamed });
+  } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 
 // Trash (stub — GitHub doesn't have trash, return empty)
