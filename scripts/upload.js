@@ -52,6 +52,13 @@ try {
       runUpload(`${slug}/covers`, `rclone copy "${mediaDir}" "r2:mosaic-media/processed/${slug}/covers/" --include "cover-*" --transfers 4 --checksum --retries 3`);
       total += coverFiles.length;
     }
+
+    // Upload music
+    const musicDir = path.join(mediaDir, 'music');
+    if (fs.existsSync(musicDir)) {
+      runUpload(`${slug}/music`, `rclone copy "${musicDir}" "r2:mosaic-media/processed/${slug}/music/" --transfers 2 --checksum --retries 3`);
+      total += fs.readdirSync(musicDir).length;
+    }
   }
   console.log(`Upload complete: ${total} files`);
 } catch (e) {

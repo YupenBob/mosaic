@@ -55,7 +55,7 @@ npm run serve         # preview at http://localhost:3000
 | **i18n** | Chinese / English UI. Configurable strings |
 | **RSS & Sitemap** | Auto Atom feed + SEO sitemap |
 | **Comments** | Giscus — GitHub Discussions, zero backend |
-| **Admin Panel** | `cd admin && npm start` — visual editor, media uploads, one-click build |
+| **Admin Panel** | Cloud-hosted SPA (`cloud-admin/`) — visual editor, media uploads, one-click build |
 
 ## Writing a Post
 
@@ -108,27 +108,20 @@ Upload `dist/` to Vercel, Netlify, Nginx, or any static host.
 
 ## Admin Panel
 
-Local web UI for content management. No CLI needed.
-
-```bash
-cd admin
-npm install
-npm start              # opens http://localhost:4000
-```
+Cloud-hosted SPA for content management. Deployed from `cloud-admin/`
+to Cloudflare Pages (project `mosaic-admin`, e.g. `https://mosaic-admin.xsanye.cn`).
+Log in with the admin password; `/api/*` is proxied to the Worker API
+by `cloud-admin/functions/api/[[path]].js`.
 
 | Page | Features |
 |------|----------|
-| Dashboard | Stats, disk usage, recent files, quick create |
-| Posts | Search, filter, sort, batch delete, thumbnails, double-click edit |
-| Editor | Split Markdown preview, drag-drop upload, autosave, word count |
-| Build | One-click build with SSE live logs, build history |
+| Dashboard | Stats, traffic chart, disk usage, leaderboard |
+| Posts | Search, filter, list view, delete |
+| Editor | Markdown + frontmatter editor, drag-drop media upload |
+| Build | One-click build & deploy, live status, history |
 | Config | Visual editor for all site settings |
 | Taxonomy | Category/tag management with batch rename |
-| Trash | Recoverable deletion |
-| Git | Status, commit & push from the UI |
-| Deploy | One-click deploy to GH Pages / CF / Vercel |
-
-Keyboard shortcuts: `Ctrl+S` save · `Ctrl+P` preview · `Ctrl+N` new · `Esc` back
+| Cleanup | Orphan file scan/delete, processed-cache clear |
 
 ## License
 

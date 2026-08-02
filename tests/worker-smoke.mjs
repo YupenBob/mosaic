@@ -7,6 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import app from '../worker/src/index.js';
+import { StatsDurableObject } from '../worker/src/stats-do.js';
 
 // ── Mock R2 ──
 const store = new Map();
@@ -21,6 +22,20 @@ const media = {
     const objects = [...store.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, size: store.get(key).length || 1 }));
     return { objects, truncated: false, cursor: null };
   },
+};
+
+// ── Mock Stats Durable Object (shared instance => serialized writes) ──
+const statsStore = new Map();
+const statsState = {
+  storage: {
+    get: async (k) => (statsStore.has(k) ? statsStore.get(k) : null),
+    put: async (k, v) => { statsStore.set(k, v); },
+  },
+};
+const statsDO = new StatsDurableObject(statsState, { MEDIA: media });
+const STATS = {
+  idFromName: () => 'global',
+  get: () => ({ fetch: (url, init) => statsDO.fetch(new Request(url, init)) }),
 };
 
 // ── Mock GitHub contents API ──
@@ -66,6 +81,7 @@ function env(overrides = {}) {
     DEV_MODE: 'false',
     R2_PUBLIC_URL: '',
     R2_BUCKET: 'mosaic-media',
+    STATS,
     ...overrides,
   };
 }
@@ -132,6 +148,15 @@ await record('track/dwell/stats (+7200 cap)', async () => {
   assert.equal(d2.dwell_time, 7200);
 });
 
+// ── 5b. Concurrent views are serialized by the Durable Object ──
+await record('concurrent views serialized (10/10 counted)', async () => {
+  await Promise.all([...Array(10)].map((_, i) =>
+    call('/api/track/view/race-post', { method: 'POST', headers: { 'CF-Connecting-IP': `10.1.0.${i}` } })
+  ));
+  const r = await (await call('/api/stats/race-post')).json();
+  assert.equal(r.views, 10);
+});
+
 // ── 6. Config deep merge ──
 await record('config deep merge (nested fields preserved)', async () => {
   const r = await call('/api/config', { method: 'PUT', token: TOKEN, body: { components: { gallery: { enabled: false } } } });
@@ -194,5 +219,5 @@ await record('login rate limit (429 after 5 failures)', async () => {
 
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
-console.log(`\nWorker smoke: ${passed}/10 groups passed`);
-if (passed < 10) process.exit(1);
+console.log(`\nWorker smoke: ${passed} groups passed`);
+if (passed < 11) process.exit(1);

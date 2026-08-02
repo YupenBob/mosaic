@@ -1,11 +1,20 @@
 name = "mosaic-api"
 main = "src/index.js"
-compatibility_date = "2025-06-01"
+compatibility_date = "2024-04-01"
 
 # R2 Bucket binding
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "mosaic-media"
+
+# Durable Object for race-free view/like/dwell counters
+[[durable_objects.bindings]]
+name = "STATS"
+class_name = "StatsDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StatsDurableObject"]
 
 # Environment variables
 [vars]

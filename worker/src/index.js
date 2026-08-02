@@ -4,9 +4,10 @@
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { loginHandler, authMiddleware } from './auth.js';
+import { loginHandler, authMiddleware, clientIp } from './auth.js';
 import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty, renameCategory, renameTag } from './github.js';
 import { generatePresignedUrl, listMedia, serveMediaFile, uploadDirect, deleteMediaFile } from './r2.js';
+import { StatsDurableObject } from './stats-do.js';
 
 const app = new Hono();
 // Run a fire-and-forget task; executionCtx only exists in Workers runtimes.
@@ -29,14 +30,70 @@ app.get('/api/health', (c) => c.json({ status: 'ok', ok: true, version: '0.8.0' 
 app.get('/api/health/github', (c) => c.json({ status: 'ok', latency: 0 }));
 app.get('/api/health/r2', (c) => c.json({ status: 'ok', latency: 0 }));
 
-// Helper: parse stats from R2 (stats.json first, fallback to views.json)
-async function getStats(env) {
-  let data = {};
-  try { const obj = await env.MEDIA.get('site-data/stats.json'); if (obj) data = JSON.parse(await obj.text()); } catch {}
-  if (!Object.keys(data).length) {
-    try { const obj = await env.MEDIA.get('site-data/views.json'); if (obj) data = JSON.parse(await obj.text()); } catch {}
-  }
-  return data;
+// Stats are served by the StatsDurableObject (single instance, serialized writes).
+function statsURL(path, slug) {
+  return new URL(`https://stats.local${path}${slug ? '?slug=' + encodeURIComponent(slug) : ''}`);
+}
+
+// Classic Durable Object namespace access (idFromName -> get -> stub.fetch)
+async function statsFetch(c, path, slug, init = {}) {
+  const id = c.env.STATS.idFromName('global');
+  const stub = c.env.STATS.get(id);
+  return stub.fetch(statsURL(path, slug), init);
+}
+
+// ── Parallel R2 traversal ──
+// R2 list cursors are sequential per prefix, but top-level prefixes are
+// independent, so scanning originals/ + processed/ + site-data/ in parallel
+// cuts full-bucket traversals (disk/cleanup) to ~1/3 of wall time.
+async function bucketUsage(env) {
+  const parts = await Promise.all(['originals/', 'processed/', 'site-data/'].map(async (prefix) => {
+    let size = 0, objects = 0, cursor;
+    do {
+      const opts = { prefix, limit: 1000 };
+      if (cursor) opts.cursor = cursor;
+      const list = await env.MEDIA.list(opts);
+      for (const obj of (list.objects || [])) { size += obj.size; objects++; }
+      cursor = list.truncated ? list.cursor : null;
+    } while (cursor);
+    return { size, objects };
+  }));
+  return {
+    size: parts.reduce((a, b) => a + b.size, 0),
+    objects: parts.reduce((a, b) => a + b.objects, 0),
+  };
+}
+
+let _diskCache = null, _diskAt = 0;
+async function getDiskUsage(env) {
+  if (_diskCache && Date.now() - _diskAt < 60000) return _diskCache;
+  _diskCache = await bucketUsage(env);
+  _diskAt = Date.now();
+  return _diskCache;
+}
+
+async function scanOrphans(env, valid, mode) {
+  const parts = await Promise.all(['originals/', 'processed/'].map(async (prefix) => {
+    let orphans = [], freed = 0, deleted = 0, cursor;
+    do {
+      const opts = { prefix, limit: 1000 };
+      if (cursor) opts.cursor = cursor;
+      const list = await env.MEDIA.list(opts);
+      for (const o of (list.objects || [])) {
+        const slug = o.key.split('/')[1];
+        if (!slug || valid.has(slug)) continue;
+        if (mode === 'delete') { await env.MEDIA.delete(o.key); deleted++; freed += o.size; }
+        else orphans.push({ key: o.key, size: o.size });
+      }
+      cursor = list.truncated ? list.cursor : null;
+    } while (cursor);
+    return { orphans, freed, deleted };
+  }));
+  return parts.reduce((acc, p) => ({
+    orphans: acc.orphans.concat(p.orphans),
+    freed: acc.freed + p.freed,
+    deleted: acc.deleted + p.deleted,
+  }), { orphans: [], freed: 0, deleted: 0 });
 }
 
 // Track view — public (dedup by IP: 10min cooldown)
@@ -44,32 +101,12 @@ app.post('/api/track/view/:slug', async (c) => {
   const slug = c.req.param('slug');
   if (!slug) return c.json({ error: 'slug required' }, 400);
   try {
-    const ip = c.req.header('CF-Connecting-IP') || 'unknown';
-    const key = 'site-data/stats.json';
-    let data = {};
-    try { const obj = await c.env.MEDIA.get(key); if (obj) data = JSON.parse(await obj.text()); } catch {}
-
-    if (!data[slug]) data[slug] = { views: 0, likes: 0, history: [] };
-    else if (typeof data[slug] === 'number') data[slug] = { views: data[slug], likes: 0, history: [] };
-
-    // IP dedup: skip if same IP viewed in last 10 min
-    const recents = data[slug]._recentIps || {};
-    const now = Date.now();
-    if (recents[ip] && (now - recents[ip] < 600000)) {
-      return c.json({ ok: true, views: data[slug].views, likes: data[slug].likes, dedup: true });
-    }
-    recents[ip] = now;
-    // Purge stale IPs
-    for (const [k, t] of Object.entries(recents)) { if (now - t > 600000) delete recents[k]; }
-    data[slug]._recentIps = recents;
-
-    data[slug].views = (data[slug].views || 0) + 1;
-    data[slug].history = data[slug].history || [];
-    data[slug].history.push(new Date().toISOString());
-    if (data[slug].history.length > 500) data[slug].history = data[slug].history.slice(-500);
-
-    await c.env.MEDIA.put(key, JSON.stringify(data), { httpMetadata: { contentType: 'application/json' } });
-    return c.json({ ok: true, views: data[slug].views, likes: data[slug].likes });
+    const resp = await statsFetch(c, '/view', slug, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Real-IP': clientIp(c) },
+      body: '{}',
+    });
+    return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
   } catch (e) { return c.json({ error: e.message }, 500); }
 });
 
@@ -79,19 +116,13 @@ app.post('/api/track/like/:slug', async (c) => {
   if (!slug) return c.json({ error: 'slug required' }, 400);
   let body = {};
   try { body = await c.req.json(); } catch {}
-  const action = body.action || 'like';
   try {
-    const key = 'site-data/stats.json';
-    let data = {};
-    try { const obj = await c.env.MEDIA.get(key); if (obj) data = JSON.parse(await obj.text()); } catch {}
-
-    if (!data[slug]) data[slug] = { views: 0, likes: 0, history: [] };
-    else if (typeof data[slug] === 'number') data[slug] = { views: data[slug], likes: 0, history: [] };
-
-    data[slug].likes = Math.max(0, (data[slug].likes || 0) + (action === 'like' ? 1 : -1));
-
-    await c.env.MEDIA.put(key, JSON.stringify(data), { httpMetadata: { contentType: 'application/json' } });
-    return c.json({ ok: true, likes: data[slug].likes, views: data[slug].views || 0 });
+    const resp = await statsFetch(c, '/like', slug, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: body.action || 'like' }),
+    });
+    return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
   } catch (e) { return c.json({ error: e.message }, 500); }
 });
 
@@ -101,79 +132,39 @@ app.post('/api/track/dwell/:slug', async (c) => {
   if (!slug) return c.json({ error: 'slug required' }, 400);
   let body = {};
   try { body = await c.req.json(); } catch {}
-  const seconds = Math.min(Math.max(parseInt(body.seconds) || 0, 0), 7200);
   try {
-    const key = 'site-data/stats.json';
-    let data = {};
-    try { const obj = await c.env.MEDIA.get(key); if (obj) data = JSON.parse(await obj.text()); } catch {}
-    if (!data[slug]) data[slug] = { views: 0, likes: 0, history: [] };
-    else if (typeof data[slug] === 'number') data[slug] = { views: data[slug], likes: 0, history: [] };
-    data[slug].dwell_time = Math.max(data[slug].dwell_time || 0, seconds);
-    await c.env.MEDIA.put(key, JSON.stringify(data), { httpMetadata: { contentType: 'application/json' } });
-    return c.json({ ok: true });
+    const resp = await statsFetch(c, '/dwell', slug, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seconds: parseInt(body.seconds) || 0 }),
+    });
+    return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
   } catch (e) { return c.json({ error: e.message }, 500); }
+});
+
+// Traffic stats — aggregated by the Durable Object, enriched with post titles.
+// NOTE: must be registered BEFORE /api/stats/:slug so the static path wins.
+app.get('/api/stats/traffic', async (c) => {
+  try {
+    const resp = await statsFetch(c, '/traffic', null, { method: 'POST', body: '{}' });
+    const data = await resp.json();
+    const posts = await listPosts(c).catch(() => []);
+    const validSlugs = new Set(posts.map((p) => p.slug));
+    const titleMap = Object.fromEntries(posts.map((p) => [p.slug, p.title || p.slug]));
+    data.top5 = (data.top5 || [])
+      .filter((e) => validSlugs.has(e.slug))
+      .map((e) => ({ ...e, title: titleMap[e.slug] || e.slug }));
+    return c.json(data);
+  } catch { return c.json({ total: 0, totalLikes: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 });
 
 // Live stats for a single post — public
 app.get('/api/stats/:slug', async (c) => {
   const slug = c.req.param('slug');
   try {
-    const data = await getStats(c.env);
-    const entry = data[slug];
-    if (!entry) return c.json({ slug, views: 0, likes: 0, dwell_time: 0 });
-    const val = typeof entry === 'number' ? { views: entry, likes: 0 } : entry;
-    return c.json({ slug, views: val.views || 0, likes: val.likes || 0, dwell_time: val.dwell_time || 0 });
+    const resp = await statsFetch(c, '/stats', slug, { method: 'POST', body: '{}' });
+    return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
   } catch (e) { return c.json({ error: e.message }, 500); }
-});
-
-// Traffic stats — reads from R2 site-data/stats.json (fallback views.json)
-app.get('/api/stats/traffic', async (c) => {
-  try {
-    const data = await getStats(c.env);
-
-    const byCategory = {}, byTag = {};
-    const byDay = {};
-    let total = 0, totalLikes = 0;
-    const entries = [];
-
-    for (const [slug, val] of Object.entries(data)) {
-      const entry = typeof val === 'number' ? { views: val, likes: 0, history: [] } : val;
-      const count = entry.views || entry.count || 0;
-      const likes = entry.likes || 0;
-      const history = entry.history || [];
-      const cat = entry.category || '';
-      const tags = entry.tags || [];
-
-      total += count;
-      totalLikes += likes;
-      entries.push({ slug, count, likes, category: cat, tags });
-
-      const topCat = cat.split('/')[0].trim() || 'uncategorized';
-      byCategory[topCat] = (byCategory[topCat] || 0) + count;
-      for (const t of tags) { byTag[t] = (byTag[t] || 0) + count; }
-      for (const ts of history) { const d = ts.slice(0, 10); byDay[d] = (byDay[d] || 0) + 1; }
-    }
-
-    entries.sort((a, b) => b.count - a.count);
-
-    const posts = await listPosts(c).catch(() => []);
-    const validSlugs = new Set(posts.map(p => p.slug));
-    const validEntries = entries.filter(e => validSlugs.has(e.slug));
-    const titleMap = Object.fromEntries(posts.map(p => [p.slug, p.title || p.slug]));
-
-    const days = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
-      days.push({ date: d, count: byDay[d] || 0 });
-    }
-
-    return c.json({
-      total, totalLikes, posts: entries.length, byDay: days,
-      byCategory: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,c])=>({name:n,count:c})),
-      byTag: Object.entries(byTag).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>({name:n,count:c})),
-      top5: validEntries.slice(0, 5).map(e => ({ slug: e.slug, count: e.count, likes: e.likes, title: titleMap[e.slug] || e.slug })),
-    });
-  } catch { return c.json({ total: 0, totalLikes: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 });
 
 // Media file serving — public (uses R2_PUBLIC_URL or falls back to config.mediaBase)
@@ -412,15 +403,7 @@ app.get('/api/trash', (c) => c.json([]));
 // Disk usage — real R2 stats
 app.get('/api/disk', async (c) => {
   try {
-    let totalSize = 0, totalObjects = 0;
-    let cursor;
-    do {
-      const opts = { limit: 1000 };
-      if (cursor) opts.cursor = cursor;
-      const list = await c.env.MEDIA.list(opts);
-      for (const obj of list.objects || []) { totalSize += obj.size; totalObjects++; }
-      cursor = list.truncated ? list.cursor : null;
-    } while (cursor);
+    const { size: totalSize, objects: totalObjects } = await getDiskUsage(c.env);
     const GB = totalSize / 1024 / 1024 / 1024;
     const cost = (GB * 0.015).toFixed(2); // R2 storage: $0.015/GB/month
     return c.json({ size: totalSize, sizeMB: (totalSize / 1024 / 1024).toFixed(1), sizeGB: GB.toFixed(2), objects: totalObjects, cost: cost, currency: 'USD' });
@@ -438,15 +421,8 @@ app.get('/api/cleanup', async (c) => {
   try {
     const posts = await listPosts(c).catch(() => []);
     const valid = new Set(posts.map(p => p.slug));
-    const orphans = []; let total = 0, cursor;
-    do { const opts = { limit: 500 }; if (cursor) opts.cursor = cursor;
-      const list = await c.env.MEDIA.list(opts);
-      for (const o of (list.objects||[])) {
-        const p = o.key.split('/');
-        if (p.length>=3&&(p[0]==='originals'||p[0]==='processed')&&!valid.has(p[1])) { orphans.push({key:o.key,size:o.size}); total+=o.size; }
-      }
-      cursor = list.truncated ? list.cursor : null;
-    } while (cursor);
+    const { orphans } = await scanOrphans(c.env, valid, 'list');
+    const total = orphans.reduce((a, o) => a + o.size, 0);
     return c.json({ orphans, totalSize: total, totalOrphans: orphans.length });
   } catch (e) { return c.json({ error: e.message }, 502); }
 });
@@ -455,15 +431,7 @@ app.delete('/api/cleanup', async (c) => {
   try {
     const posts = await listPosts(c).catch(() => []);
     const valid = new Set(posts.map(p => p.slug));
-    let deleted=0, freed=0, cursor;
-    do { const opts = { limit: 500 }; if (cursor) opts.cursor = cursor;
-      const list = await c.env.MEDIA.list(opts);
-      for (const o of (list.objects||[])) {
-        const p = o.key.split('/');
-        if (p.length>=3&&(p[0]==='originals'||p[0]==='processed')&&!valid.has(p[1])) { await c.env.MEDIA.delete(o.key); deleted++; freed+=o.size; }
-      }
-      cursor = list.truncated ? list.cursor : null;
-    } while (cursor);
+    const { deleted, freed } = await scanOrphans(c.env, valid, 'delete');
     return c.json({ deleted, freed, freedMB: (freed / 1048576).toFixed(1) });
   } catch (e) { return c.json({ error: e.message }, 502); }
 });
@@ -491,3 +459,4 @@ app.delete('/api/processed-cache', async (c) => {
 app.all('*', (c) => c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404));
 
 export default app;
+export { StatsDurableObject };
