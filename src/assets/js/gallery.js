@@ -172,7 +172,15 @@ function switchQuality(res) {
   updateQualityPills();
   // Brief label flash
   showQualityFlash(RES_LABELS[res] || res);
+  // Preserve zoom/pan across quality switches (same photo, new resolution)
+  const keep = { scale: zoomState.scale, panX: zoomState.panX, panY: zoomState.panY };
   updateImage();
+  if (keep.scale > 1) {
+    zoomState.scale = keep.scale;
+    zoomState.panX = keep.panX;
+    zoomState.panY = keep.panY;
+    applyTransform();
+  }
 }
 
 function showQualityFlash(label) {

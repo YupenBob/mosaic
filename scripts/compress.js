@@ -49,7 +49,11 @@ async function compressPhotos(postDir, slug) {
     if (!/\.(jpg|jpeg|png|webp|tiff)$/i.test(f)) continue;
     const base = path.parse(f).name;
     const src = path.join(photosDir, f);
-    if (!changed(src)) { console.log(`  SKIP ${f} (unchanged)`); continue; }
+    // Incremental skip only when outputs are already on disk (cache restore +
+    // fresh checkout must regenerate, otherwise generate.js loses the media)
+    const photoReady = ['-10p.webp', '-480p.webp', '-720p.webp', '-1080p.webp', '-meta.json']
+      .map((s) => path.join(outDir, base + s)).every((p) => fs.existsSync(p));
+    if (!changed(src) && photoReady) { console.log(`  SKIP ${f} (unchanged)`); continue; }
     // Source changed: remove stale outputs so they are regenerated (and re-uploaded)
     for (const out of [`${base}-10p.webp`, `${base}-480p.webp`, `${base}-720p.webp`, `${base}-1080p.webp`, `${base}-meta.json`]) {
       fs.rmSync(path.join(outDir, out), { force: true });
@@ -91,7 +95,9 @@ async function compressCover(postDir, slug) {
   // Use a dedicated key so a first-photo cover isn't double-marked by compressPhotos
   const coverKey = `__cover__/${slug}`;
   const coverHash = md5(coverFile);
-  if (checksums[coverKey] === coverHash) { console.log(`  SKIP cover (unchanged)`); return; }
+  const coverReady = ['cover-10p.webp', 'cover-480p.webp', 'cover-720p.webp', 'cover-1080p.webp', 'cover-meta.json']
+    .map((n) => path.join(outDir, n)).every((p) => fs.existsSync(p));
+  if (checksums[coverKey] === coverHash && coverReady) { console.log(`  SKIP cover (unchanged)`); return; }
   checksums[coverKey] = coverHash;
 
   const outDir = path.join(DIST, 'posts', slug, 'media');
@@ -220,7 +226,9 @@ async function compressMusic(postDir, slug) {
     if (!/\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)) continue;
     const base = path.parse(f).name;
     const src = path.join(musicDir, f);
-    if (!changed(src)) { console.log(`  SKIP music ${f} (unchanged)`); continue; }
+    const musicReady = [`${base}-128k.mp3`, `${base}-320k.mp3`]
+      .map((n) => path.join(outDir, n)).every((p) => fs.existsSync(p));
+    if (!changed(src) && musicReady) { console.log(`  SKIP music ${f} (unchanged)`); continue; }
     // Source changed: remove stale outputs for this track
     for (const stale of fs.readdirSync(outDir)) {
       if (stale.startsWith(base + '-')) fs.rmSync(path.join(outDir, stale), { force: true });
@@ -251,7 +259,9 @@ for (const slug of POSTS) {
     for (const f of fs.readdirSync(videosDir)) {
       if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) {
         const src = path.join(videosDir, f);
-        if (!changed(src)) { console.log(`  SKIP ${f} (unchanged)`); continue; }
+        const base = path.parse(f).name.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
+        const masterPath = path.join(DIST, 'posts', slug, 'media', 'videos', `${base}-master.m3u8`);
+        if (!changed(src) && fs.existsSync(masterPath)) { console.log(`  SKIP ${f} (unchanged)`); continue; }
         await compressVideo(f, postDir, slug);
       }
     }

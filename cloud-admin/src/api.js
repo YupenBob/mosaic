@@ -142,7 +142,6 @@ export const trash = {
 // ── Disk & Files ───────────────────────────
 export const disk = {
   usage: () => apiFetch('/disk'),
-  recentFiles: () => apiFetch('/recent-files'),
 };
 
 // ── Health ─────────────────────────────────

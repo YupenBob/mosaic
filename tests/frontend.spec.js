@@ -73,6 +73,25 @@ test('Worker health endpoint responds', async ({ page }) => {
   console.log('Worker health:', JSON.stringify(json));
 });
 
+test('mobile viewport: video post loads with HLS source', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'mobile emulation only supported in chromium');
+  // Let hls.js load from the CDN for this test (the global beforeEach aborts it)
+  await page.unrouteAll();
+  await page.route(/(busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
+  await page.setViewportSize({ width: 390, height: 844 });
+  const resp = await page.goto(`${SITE}/posts/20260711222352/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+  expect(resp.status()).toBe(200);
+  await page.waitForSelector('video.video-element', { timeout: 15000 });
+  const hlsSource = await page.locator('source[type="application/x-mpegURL"]').first().getAttribute('src');
+  expect(hlsSource).toBeTruthy();
+  const playlistResp = await page.request.get(hlsSource, { timeout: 20000 });
+  expect(playlistResp.status()).toBe(200);
+  await page.waitForTimeout(3000);
+  const hlsLoaded = await page.evaluate(() => typeof window.Hls !== 'undefined');
+  expect(hlsLoaded).toBe(true);
+  console.log(`Mobile HLS: source=${hlsSource} status=${playlistResp.status()} hls.js=${hlsLoaded}`);
+});
+
 test('admin login page loads', async ({ page }) => {
   test.skip(SKIP_ADMIN, 'ADMIN unset');
   const response = await page.goto(ADMIN);

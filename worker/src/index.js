@@ -410,12 +410,6 @@ app.get('/api/disk', async (c) => {
   } catch (e) { return c.json({ error: e.message, code: 'R2_ERROR' }, 502); }
 });
 
-// Recent files (stub)
-app.get('/api/recent-files', (c) => c.json([]));
-
-// Build logs (stub)
-app.get('/api/logs', (c) => c.json([]));
-
 // Cleanup — find and delete orphaned R2 objects
 app.get('/api/cleanup', async (c) => {
   try {
