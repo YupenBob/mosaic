@@ -945,6 +945,7 @@ pages.config = async (signal) => {
             <div class="config-quality-group">
               <label>CRF<input type="number" data-config="videoQuality.crf" value="${cfgGet(cfg,'videoQuality.crf',23)}" min="0" max="51" style="width:60px" /></label>
               <select data-config="videoQuality.preset" style="width:100px">${['ultrafast','superfast','veryfast','faster','fast','medium','slow'].map(p => `<option value="${p}" ${cfgGet(cfg,'videoQuality.preset','fast')===p?'selected':''}>${p}</option>`).join('')}</select>
+              <label>最高画质<select data-config="videoQuality.maxHeight" data-type="number" style="width:100px">${[[2160,'4K'],[1080,'1080p'],[720,'720p'],[480,'480p'],[360,'360p'],[240,'240p']].map(([v,l]) => `<option value="${v}" ${Number(cfgGet(cfg,'videoQuality.maxHeight',1080))===v?'selected':''}>${l}</option>`).join('')}</select></label>
             </div>
           </div>`
         )}
