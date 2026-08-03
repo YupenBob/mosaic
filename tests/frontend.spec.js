@@ -84,12 +84,14 @@ test('mobile viewport: video post loads with HLS source', async ({ page, browser
   await page.waitForSelector('video.video-element', { timeout: 15000 });
   const hlsSource = await page.locator('source[type="application/x-mpegURL"]').first().getAttribute('src');
   expect(hlsSource).toBeTruthy();
-  const playlistResp = await page.request.get(hlsSource, { timeout: 20000 });
+  const hlsUrl = hlsSource.startsWith('http') ? hlsSource : new URL(hlsSource, SITE).href;
+  const playlistResp = await page.request.get(hlsUrl, { timeout: 20000 });
   expect(playlistResp.status()).toBe(200);
+  expect(playlistResp.headers()['access-control-allow-origin']).toBe('*');
   await page.waitForTimeout(3000);
   const hlsLoaded = await page.evaluate(() => typeof window.Hls !== 'undefined');
   expect(hlsLoaded).toBe(true);
-  console.log(`Mobile HLS: source=${hlsSource} status=${playlistResp.status()} hls.js=${hlsLoaded}`);
+  console.log(`Mobile HLS: source=${hlsUrl} status=${playlistResp.status()} acao=${playlistResp.headers()['access-control-allow-origin']} hls.js=${hlsLoaded}`);
 });
 
 test('admin login page loads', async ({ page }) => {

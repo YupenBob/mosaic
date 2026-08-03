@@ -152,6 +152,9 @@ export async function serveMediaFile(c) {
             'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
             'Cache-Control': 'public, max-age=86400',
             'ETag': obj.httpEtag || '',
+            // Media fetched via hls.js (XHR/fetch) requires CORS; R2's own
+            // edge responses sometimes omit it on cached range responses.
+            'Access-Control-Allow-Origin': '*',
           },
         });
       }
@@ -174,6 +177,7 @@ export async function serveMediaFile(c) {
               'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
               'Cache-Control': 'public, max-age=31536000',
               'ETag': obj.httpEtag || '',
+              'Access-Control-Allow-Origin': '*',
             },
           });
         }
