@@ -28,7 +28,7 @@
   "searchMinChars": 2,
 
   "imageQuality": { "480p": 75, "720p": 80, "1080p": 85 },
-  "videoQuality": { "crf": 23, "preset": "fast" },
+  "videoQuality": { "crf": 23, "preset": "veryfast", "maxHeight": 1080 },
 
   "cardShowTags": true,
   "cardShowStats": true,

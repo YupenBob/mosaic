@@ -15,6 +15,17 @@ const DIST = path.join(ROOT, 'dist');
 // Checksums live under dist/ so CI can cache them (override via CHECKSUMS_FILE env)
 const CHECKSUMS_FILE = process.env.CHECKSUMS_FILE || path.join(DIST, '.media-checksums.json');
 
+// Video settings from config (tunable in Admin -> Config):
+//   videoQuality.preset    – ffmpeg x264 preset (faster = quicker, larger)
+//   videoQuality.maxHeight – highest transcode tier (1080 default; 4K opt-in)
+let VIDEO_PRESET = 'fast';
+let VIDEO_MAX_HEIGHT = 1080;
+try {
+  const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf-8'));
+  VIDEO_PRESET = cfg.videoQuality?.preset || 'fast';
+  VIDEO_MAX_HEIGHT = cfg.videoQuality?.maxHeight || 1080;
+} catch {}
+
 // Load existing checksums
 let checksums = {};
 try { checksums = JSON.parse(fs.readFileSync(CHECKSUMS_FILE, 'utf-8')); } catch {}
@@ -148,7 +159,7 @@ async function compressVideo(file, postDir, slug) {
   }
 
   const srcHeight = getSourceHeight(srcPath);
-  const resList = ALL_RES.filter(r => r.height <= srcHeight);
+  const resList = ALL_RES.filter(r => r.height <= srcHeight && r.height <= VIDEO_MAX_HEIGHT);
   if (resList.length === 0) {
     console.log(`  ${file}: source too small (${srcHeight}px), copying as-is`);
     fs.copyFileSync(srcPath, path.join(outDir, file));
@@ -163,7 +174,7 @@ async function compressVideo(file, postDir, slug) {
       await new Promise((resolve, reject) => {
         const proc = spawn('ffmpeg', [
           '-i', srcPath, '-vf', `scale=-2:${res.height},fps=30`,
-          '-c:v', 'libx264', '-crf', '23', '-preset', 'fast',
+          '-c:v', 'libx264', '-crf', '23', '-preset', VIDEO_PRESET,
           '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', outPath
         ], { stdio: 'ignore' });
         proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
