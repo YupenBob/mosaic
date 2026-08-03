@@ -1,0 +1,85 @@
+# Mosaic 运维与性能
+
+## 构建性能
+
+### 缓存机制
+
+- 媒体 checksum 缓存：`dist/.media-checksums.json`，由 GitHub Actions `actions/cache` 存/取
+- v2 起缓存内包含**产物清单**（每视频档位、封面/照片宽高比），因此缓存命中时 `compress` 秒级跳过，`generate` 仍能正确输出 HLS 与封面
+- 缓存命中（内容未变）构建约 **3 分钟**；媒体变更时视转码量 10–20 分钟
+
+### 何时会全量重建
+
+- checksum 文件版本升级（如 v1→v2 的首次引导）
+- 新增/修改/删除媒体文件
+- 缓存被 GitHub 清理（7 天无访问或超 10GB）
+
+### 加速建议
+
+- 视频转码档位受 `videoQuality.maxHeight` 控制：默认 1080p，调低（720p）可显著缩短转码
+- `videoQuality.preset` 调快（如 `ultrafast`）进一步减少耗时，体积略增
+- 视频上传并发已为 4；如需可调整 `scripts/upload.js` / `worker/scripts/upload-videos.mjs`
+
+## 媒体分发
+
+### 直连 vs 代理
+
+- 图片/封面：`<img>` 不需要 CORS，直连 `mosaic-media.xsanye.cn`
+- HLS：hls.js 跨域 XHR 需要 CORS。当前策略为 R2 对象 `Cache-Control: no-store` + 桶级 CORS，保证每次响应都带 CORS 头（牺牲边缘缓存换确定性）
+- 若已配置媒体域 **Transform Rule**（强制 `Access-Control-Allow-Origin: *`），可把 CI 环境变量 `VIDEO_CACHE_CONTROL` 设为 `public, max-age=31536000`，恢复视频边缘缓存、进一步降低延迟
+
+### CORS 排查
+
+- 浏览器控制台出现 CORS 报错：检查桶级 CORS（`worker/r2-cors.json`）与 Transform Rule
+- 确认请求带 `Origin`（浏览器自动带）；无 Origin 的请求不返回 CORS 头属正常
+
+## Worker 运维
+
+### 部署与 Secrets
+
+```bash
+cd worker
+npx wrangler deploy
+npx wrangler secret list            # 查看已配置
+npx wrangler secret put <NAME>      # 设置：ADMIN_PASSWORD/JWT_SECRET/GITHUB_TOKEN/CF_ACCOUNT_ID/R2_ACCESS_KEY/R2_SECRET_KEY/PROXY_SECRET
+```
+
+### 健康端点与日志
+
+- `/api/health`、`/api/health/github`、`/api/health/r2`
+- 实时日志：`npx wrangler tail`
+
+### 统计（Durable Object）
+
+- 视图/点赞/停留时长由 `StatsDurableObject` 串行写入，单实例保证不丢更新
+- 首次访问自动从 R2 `site-data/stats.json` 迁移历史；此后 DO 为主、stats.json 备份
+- 若需重置统计：清空 DO 存储需谨慎，备份 stats.json 后可重建
+
+### 上传
+
+- 预签名直传：浏览器 → R2，单文件最大 5GB，1 小时有效期
+- Worker 直传兜底：≤100MB（平台请求体上限）
+- `PROXY_SECRET` 缺失时，Worker 回退使用 `CF-Connecting-IP`（本地开发场景）
+
+## 生产巡检
+
+- `health-check.yml` 每 6 小时运行 `check-site.mjs`，失败即 GitHub 告警
+- 可手动触发：GitHub → Actions → Production Health Check → Run workflow
+
+## 常见问题
+
+| 现象 | 排查 |
+| --- | --- |
+| 登录 503 | `JWT_SECRET` 或 `ADMIN_PASSWORD` 未配置（fail-closed） |
+| 登录 429 | 触发限流，等待 5 分钟 |
+| 视频无法播放 | 媒体域 CORS / Transform Rule；`PROXY_SECRET` 一致性 |
+| 构建慢 | 检查缓存是否命中（见上）；媒体变更属正常 |
+| 上传失败 | 大文件走预签名（>100MB 直传会 413）；确认 Worker R2 凭证 |
+| 统计不涨 | 浏览器是否带 `Origin`（正常请求都带）；DO 冷启动迁移日志 |
+
+## 升级与回滚
+
+- 代码：`git pull` → 推 `main` 触发构建；回滚用 `git revert`
+- Worker：`npx wrangler rollback`
+- Pages：Dashboard → Deployments → 选择历史版本
+- 详见 [migration.md](migration.md)
