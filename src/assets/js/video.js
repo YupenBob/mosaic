@@ -111,12 +111,25 @@ class VideoPlayer {
       // Pre-set sources so quality menu shows immediately
       this.sources = { '360p': hlsSource.src, '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
       this.currentRes = 'auto'; // Default to ABR
+      // ABR start estimate: match the stored preference so playback starts at
+      // the right tier instead of ramping up from the lowest one.
+      var storedPref = (function() { try { return localStorage.getItem('mosaic_video_quality'); } catch { return null; } })();
+      var defaultEstimate = 2500000;
+      if (storedPref === '1080p') defaultEstimate = 6000000;
+      else if (storedPref === '720p') defaultEstimate = 3000000;
+      else if (storedPref === '480p') defaultEstimate = 1500000;
+      else if (storedPref === '360p') defaultEstimate = 800000;
       try {
         this.hls = new window.Hls({
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
+          maxBufferLength: 60,
+          maxMaxBufferLength: 300,
+          backBufferLength: 30,
           startLevel: -1,
           enableWorker: true,
+          startFragPrefetch: true,
+          capLevelToPlayerSize: true,
+          abrEwmaDefaultEstimate: defaultEstimate,
+          fragLoadingMaxRetry: 6,
         });
         vlog('info', 'HLS init: loading ' + hlsSource.src);
         this.hls.loadSource(hlsSource.src);
@@ -136,6 +149,18 @@ class VideoPlayer {
             self.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
           }
           if (self.qualityMenu) { self.qualityMenu.innerHTML = ''; self.buildQualityMenu(); }
+          // Apply a stored manual preference so playback starts at that tier
+          if (storedPref && ['360p','480p','720p','1080p','4K'].indexOf(storedPref) >= 0) {
+            var want = parseInt(storedPref) || 0;
+            var sidx = (self.hls.levels || []).findIndex(function(l) { return l.height === want; });
+            if (sidx >= 0) {
+              self.currentRes = storedPref;
+              self.hls.loadLevel = sidx;
+              self.hls.nextLevel = sidx;
+              vlog('info', 'Stored quality applied: ' + storedPref + ' (level ' + sidx + ')');
+              self.updateQualityActive();
+            }
+          }
         });
         // Quality switch completion event
         this.hls.on('hlsLevelSwitched', function(event, data) {
@@ -148,7 +173,8 @@ class VideoPlayer {
             vlog('info', 'Level switched to ' + label + ' (h='+h+')');
             if (!self.isAuto()) { self.currentRes = label; }
             self.updateQualityActive();
-            self.showSwitchToast('Switched to ' + label);
+            // Only toast on manual switches; automatic ABR changes stay quiet
+            if (!self.isAuto()) self.showSwitchToast('Switched to ' + label);
           }
         });
         this.hls.on('hlsError', function(event, data) {
@@ -317,7 +343,7 @@ class VideoPlayer {
     const targetH = parseInt(this.currentRes);
     if (isNaN(targetH)) return;
     const idx = (this.hls.levels||[]).findIndex(function(l){return l.height === targetH || l.height >= targetH;});
-    if (idx >= 0) { this.hls.loadLevel = idx; this.hls.nextLevel = idx; this.hls.autoLevelCapping = idx; }
+    if (idx >= 0) { this.hls.loadLevel = idx; this.hls.nextLevel = idx; }
   }
 
   showSwitchToast(msg) {
@@ -355,7 +381,6 @@ class VideoPlayer {
         this.hls.loadLevel = -1;
         this.hls.nextLevel = -1;
         this.hls.autoLevelCapping = -1;
-        this._switching = false;
       } else {
         const targetH = parseInt(res);
         const levels = this.hls.levels || [];
@@ -366,9 +391,7 @@ class VideoPlayer {
         if (idx >= 0) {
           this.hls.loadLevel = idx;
           this.hls.nextLevel = idx;
-          this.hls.autoLevelCapping = idx;
-          // Force-disable ABR to prevent auto-switching away from manual selection
-          if (this.hls.autoLevelEnabled !== false) { this.hls.autoLevelEnabled = false; this.hls.autoLevelEnabled = true; this.hls.autoLevelEnabled = false; }
+          // Setting loadLevel/nextLevel locks the tier (ABR disabled in hls.js)
           vlog('info', 'loadLevel=' + idx + ', ABR disabled');
         }
       }
