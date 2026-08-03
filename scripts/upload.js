@@ -42,13 +42,6 @@ try {
       total += fs.readdirSync(photosDir).length;
     }
 
-    // Upload videos
-    const videosDir = path.join(mediaDir, 'videos');
-    if (fs.existsSync(videosDir)) {
-      runUpload(`${slug}/videos`, `rclone copy "${videosDir}" "r2:mosaic-media/processed/${slug}/videos/" --transfers 4 --retries 3 --metadata-set ":http:cache-control=no-store"`);
-      total += fs.readdirSync(videosDir).length;
-    }
-
     // Upload covers
     const coverFiles = fs.readdirSync(mediaDir).filter(f => f.startsWith('cover-'));
     if (coverFiles.length) {
