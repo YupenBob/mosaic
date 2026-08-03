@@ -40,6 +40,20 @@
 
 .header-logo-icon {
   flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.header-logo:hover .header-logo-icon {
+  transform: scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-logo-icon {
+    transition: none;
+  }
+  .header-logo:hover .header-logo-icon {
+    transform: none;
+  }
 }
 
 .header-nav {
@@ -84,6 +98,13 @@
 
 .footer a:hover {
   color: var(--color-accent);
+}
+
+.footer-tagline {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--space-1);
+  letter-spacing: 0.02em;
 }
 
 /* Card Grid — masonry via CSS columns */

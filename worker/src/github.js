@@ -204,6 +204,7 @@ export async function getLatestRun(c) {
   const data = await resp.json();
   const run = data.workflow_runs?.[0];
   if (!run) return null;
+  const repo = c.env.GITHUB_REPO;
   const result = {
     id: run.id,
     runNumber: run.run_number,
@@ -212,28 +213,48 @@ export async function getLatestRun(c) {
     displayTitle: run.display_title,
     headBranch: run.head_branch,
     headSha: run.head_sha?.slice(0, 7),
+    headShaFull: run.head_sha || '',
     commitMessage: run.head_commit?.message?.split('\n')[0] || '',
     htmlUrl: run.html_url,
+    commitUrl: run.head_sha ? `https://github.com/${repo}/commit/${run.head_sha}` : '',
+    repo: `https://github.com/${repo}`,
     createdAt: run.created_at,
     updatedAt: run.updated_at,
     event: run.event,
   };
 
-  // Fetch job steps for in-progress builds
-  if (run.status === 'in_progress') {
+  // Fetch job steps for running or terminal builds (full pipeline timeline)
+  if (run.status === 'in_progress' || run.conclusion === 'success' || run.conclusion === 'failure') {
     try {
       const jobsResp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs/${run.id}/jobs`, { headers: headers(c) });
       if (jobsResp.ok) {
         const jobsData = await jobsResp.json();
         const steps = [];
+        let jobUrl = '';
         for (const job of (jobsData.jobs || [])) {
+          if (!jobUrl && job.html_url) jobUrl = job.html_url;
           for (const step of (job.steps || [])) {
-            if (step.status === 'completed') continue; // skip finished steps
-            steps.push({ name: step.name, status: step.status, number: step.number });
+            steps.push({
+              name: step.name,
+              status: step.status,
+              conclusion: step.conclusion || '',
+              number: step.number,
+              startedAt: step.started_at || '',
+              completedAt: step.completed_at || '',
+            });
           }
         }
         result.steps = steps;
-        result.totalSteps = Math.max(...(jobsData.jobs || []).flatMap(j => (j.steps || []).map(s => s.number)), 0);
+        result.totalSteps = steps.length;
+        result.jobUrl = jobUrl;
+        const failed = steps.find((s) => s.conclusion === 'failure');
+        if (failed) {
+          result.failedStep = {
+            name: failed.name,
+            number: failed.number,
+            logUrl: jobUrl ? `${jobUrl}#step:${failed.number}:1` : '',
+          };
+        }
       }
     } catch {}
   }
@@ -245,6 +266,7 @@ export async function getRunHistory(c) {
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=10`, { headers: headers(c) });
   if (!resp.ok) return [];
   const data = await resp.json();
+  const repo = c.env.GITHUB_REPO;
   return (data.workflow_runs || []).map(run => ({
     id: run.id,
     runNumber: run.run_number,
@@ -253,8 +275,11 @@ export async function getRunHistory(c) {
     displayTitle: run.display_title,
     headBranch: run.head_branch,
     headSha: run.head_sha?.slice(0, 7),
+    headShaFull: run.head_sha || '',
     commitMessage: run.head_commit?.message?.split('\n')[0] || '',
     htmlUrl: run.html_url,
+    commitUrl: run.head_sha ? `https://github.com/${repo}/commit/${run.head_sha}` : '',
+    repo: `https://github.com/${repo}`,
     createdAt: run.created_at,
     updatedAt: run.updated_at,
     event: run.event,
@@ -347,6 +372,46 @@ export async function renameTag(c, oldName, newName, message) {
   }
   bustCache();
   return renamed;
+}
+
+/**
+ * Remove a category from every post that uses it (posts themselves are kept).
+ * Returns the number of posts that were rewritten.
+ */
+export async function removeCategory(c, name, message) {
+  const posts = await listPosts(c);
+  let affected = 0;
+  for (const p of posts) {
+    if ((p.category || '') !== name) continue;
+    const file = await fetchRawFile(c, `content/posts/${p.slug}/index.md`);
+    if (!file) continue;
+    const next = file.content.replace(/^category:.*$/m, '');
+    if (next === file.content) continue;
+    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Remove category ${name}`)) affected++;
+  }
+  bustCache();
+  return affected;
+}
+
+/**
+ * Remove a tag from every post that uses it (posts themselves are kept).
+ * Returns the number of posts that were rewritten.
+ */
+export async function removeTag(c, name, message) {
+  const posts = await listPosts(c);
+  let affected = 0;
+  for (const p of posts) {
+    const tags = (p.tags || []).map(String);
+    if (!tags.includes(name)) continue;
+    const file = await fetchRawFile(c, `content/posts/${p.slug}/index.md`);
+    if (!file) continue;
+    const newTags = tags.filter((tag) => tag !== name);
+    const next = file.content.replace(/^tags:.*$/m, newTags.length ? `tags: [${newTags.join(', ')}]` : '');
+    if (next === file.content) continue;
+    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Remove tag ${name}`)) affected++;
+  }
+  bustCache();
+  return affected;
 }
 
 // ====== UTF-8 safe base64 ======

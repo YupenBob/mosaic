@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { loginHandler, authMiddleware, clientIp } from './auth.js';
-import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty, renameCategory, renameTag } from './github.js';
+import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty, renameCategory, renameTag, removeCategory, removeTag } from './github.js';
 import { generatePresignedUrl, uploadComplete, listMedia, serveMediaFile, uploadDirect, deleteMediaFile } from './r2.js';
 import { StatsDurableObject } from './stats-do.js';
 
@@ -158,6 +158,32 @@ app.get('/api/stats/traffic', async (c) => {
   } catch { return c.json({ total: 0, totalLikes: 0, posts: 0, byDay: [], byCategory: [], byTag: [], top5: [] }); }
 });
 
+// Bulk per-post stats for the admin posts list (60s worker-memory cache).
+// Registered before /api/stats/:slug so the static path wins.
+let _postStatsCache = null;
+let _postStatsAt = 0;
+app.get('/api/stats/posts', async (c) => {
+  if (_postStatsCache && Date.now() - _postStatsAt < 60000) return c.json(_postStatsCache);
+  try {
+    const posts = await listPosts(c);
+    const arr = await Promise.all(posts.slice(0, 500).map(async (p) => {
+      try {
+        const resp = await statsFetch(c, '/stats', p.slug, { method: 'POST', body: '{}' });
+        const d = await resp.json();
+        return { slug: p.slug, views: d.views || 0, likes: d.likes || 0 };
+      } catch {
+        return { slug: p.slug, views: 0, likes: 0 };
+      }
+    }));
+    const statsMap = Object.fromEntries(arr.map((s) => [s.slug, { views: s.views, likes: s.likes }]));
+    _postStatsCache = { stats: statsMap, updatedAt: new Date().toISOString() };
+    _postStatsAt = Date.now();
+    return c.json(_postStatsCache);
+  } catch (e) {
+    return c.json({ stats: {} });
+  }
+});
+
 // Live stats for a single post — public
 app.get('/api/stats/:slug', async (c) => {
   const slug = c.req.param('slug');
@@ -201,7 +227,14 @@ app.get('/api/dirty', async (c) => {
 app.get('/api/posts', async (c) => {
   try {
     const posts = await listPosts(c);
-    return c.json({ posts, total: posts.length });
+    const limit = Math.min(Math.max(parseInt(c.req.query('limit')) || 0, 0), 500);
+    const cursor = c.req.query('cursor') || '';
+    if (!limit) return c.json({ posts, total: posts.length });
+    const start = cursor ? posts.findIndex((p) => p.slug === cursor) + 1 : 0;
+    if (start < 0) return c.json({ posts: [], total: posts.length, nextCursor: null });
+    const page = posts.slice(start, start + limit);
+    const nextCursor = start + limit < posts.length ? posts[Math.min(start + limit, posts.length - 1)].slug : null;
+    return c.json({ posts: page, total: posts.length, nextCursor });
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 
@@ -282,9 +315,12 @@ app.get('/api/build/history', async (c) => {
     });
     if (!resp.ok) return c.json({ runs: [] });
     const data = await resp.json();
+    const repo = c.env.GITHUB_REPO;
     return c.json({ runs: (data.workflow_runs || []).map(r => ({
       id: r.id, runNumber: r.run_number, status: r.status, conclusion: r.conclusion,
-      displayTitle: r.display_title, headBranch: r.head_branch, headSha: r.head_sha?.slice(0, 7),
+      displayTitle: r.display_title, headBranch: r.head_branch,
+      headSha: r.head_sha?.slice(0, 7), headShaFull: r.head_sha || '',
+      commitUrl: r.head_sha ? `https://github.com/${repo}/commit/${r.head_sha}` : '',
       commitMessage: r.head_commit?.message?.split('\n')[0] || '', htmlUrl: r.html_url,
       createdAt: r.created_at, updatedAt: r.updated_at, event: r.event,
     })) });
@@ -297,6 +333,16 @@ app.get('/api/build/status', async (c) => {
     if (!run) return c.json({ status: 'unknown' });
     return c.json(run);
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
+});
+
+// Live build progress reported by the pipeline (R2 site-data/build-progress.json)
+app.get('/api/build/progress', async (c) => {
+  try {
+    const obj = await c.env.MEDIA.get('site-data/build-progress.json');
+    if (!obj) return c.json({ stage: '', updatedAt: null });
+    const data = JSON.parse(await obj.text());
+    return c.json(data);
+  } catch (e) { return c.json({ error: e.message, code: 'R2_ERROR' }, 502); }
 });
 
 // Config
@@ -395,6 +441,28 @@ app.put('/api/taxonomy/tag', async (c) => {
     const renamed = await renameTag(c, oldName, newName, message);
     defer(c, () => markDirty(c.env));
     return c.json({ ok: true, renamed });
+  } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
+});
+
+// Delete category — remove it from every post that uses it
+app.delete('/api/taxonomy/category', async (c) => {
+  try {
+    const { name, message } = await c.req.json().catch(() => ({}));
+    if (!name) return c.json({ error: 'name required', code: 'INVALID_PARAMS' }, 400);
+    const affected = await removeCategory(c, name, message);
+    defer(c, () => markDirty(c.env));
+    return c.json({ ok: true, affected });
+  } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
+});
+
+// Delete tag — remove it from every post that uses it
+app.delete('/api/taxonomy/tag', async (c) => {
+  try {
+    const { name, message } = await c.req.json().catch(() => ({}));
+    if (!name) return c.json({ error: 'name required', code: 'INVALID_PARAMS' }, 400);
+    const affected = await removeTag(c, name, message);
+    defer(c, () => markDirty(c.env));
+    return c.json({ ok: true, affected });
   } catch (e) { return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502); }
 });
 

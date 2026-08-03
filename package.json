@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "compress": "node scripts/compress.js",
-    "build": "node scripts/generate.js",
+    "build": "node scripts/generate.js && node scripts/generate-brand-assets.js",
     "serve": "npx serve dist"
   },
   "devDependencies": {

@@ -30,6 +30,35 @@ try {
 let checksums = {};
 try { checksums = JSON.parse(fs.readFileSync(CHECKSUMS_FILE, 'utf-8')); } catch {}
 
+// ── Build progress reporting ────────────────────────────────
+// Writes dist/build-progress.json which the pipeline's background reporter
+// uploads to R2 every few seconds, so the admin can show which media file is
+// currently being processed ("具体转到哪里了").
+const PROGRESS_FILE = path.join(DIST, 'build-progress.json');
+const progress = { total: 0, done: 0 };
+let _progressState = { stage: 'media', current: '准备中', done: 0, total: 0, updatedAt: new Date().toISOString() };
+let _lastWrite = 0;
+
+function writeProgress() {
+  _progressState.updatedAt = new Date().toISOString();
+  try {
+    fs.mkdirSync(path.dirname(PROGRESS_FILE), { recursive: true });
+    fs.writeFileSync(PROGRESS_FILE, JSON.stringify(_progressState));
+  } catch {}
+}
+
+function tick(current) {
+  progress.done++;
+  _progressState = { ..._progressState, current, done: progress.done, total: progress.total };
+  // Throttle writes to ~every 2s; flush the latest state on exit.
+  if (Date.now() - _lastWrite > 2000) {
+    _lastWrite = Date.now();
+    writeProgress();
+  }
+}
+
+process.on('exit', () => { try { writeProgress(); } catch {} });
+
 function md5(filePath) {
   return crypto.createHash('md5').update(fs.readFileSync(filePath)).digest('hex');
 }
@@ -64,7 +93,7 @@ async function compressPhotos(postDir, slug) {
     // fresh checkout must regenerate, otherwise generate.js loses the media)
     const photoReady = ['-10p.webp', '-480p.webp', '-720p.webp', '-1080p.webp', '-meta.json']
       .map((s) => path.join(outDir, base + s)).every((p) => fs.existsSync(p));
-    if (!changed(src) && photoReady) { console.log(`  SKIP ${f} (unchanged)`); continue; }
+    if (!changed(src) && photoReady) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
     // Source changed: remove stale outputs so they are regenerated (and re-uploaded)
     for (const out of [`${base}-10p.webp`, `${base}-480p.webp`, `${base}-720p.webp`, `${base}-1080p.webp`, `${base}-meta.json`]) {
       fs.rmSync(path.join(outDir, out), { force: true });
@@ -82,6 +111,7 @@ async function compressPhotos(postDir, slug) {
     }
     // Save meta
     fs.writeFileSync(path.join(outDir, `${base}-meta.json`), JSON.stringify({ aspect, width: meta.width, height: meta.height }));
+    tick(`${slug}/${f}`);
   }
 }
 
@@ -239,7 +269,7 @@ async function compressMusic(postDir, slug) {
     const src = path.join(musicDir, f);
     const musicReady = [`${base}-128k.mp3`, `${base}-320k.mp3`]
       .map((n) => path.join(outDir, n)).every((p) => fs.existsSync(p));
-    if (!changed(src) && musicReady) { console.log(`  SKIP music ${f} (unchanged)`); continue; }
+    if (!changed(src) && musicReady) { console.log(`  SKIP music ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
     // Source changed: remove stale outputs for this track
     for (const stale of fs.readdirSync(outDir)) {
       if (stale.startsWith(base + '-')) fs.rmSync(path.join(outDir, stale), { force: true });
@@ -255,10 +285,30 @@ async function compressMusic(postDir, slug) {
         console.log(`  ${f} -> ${label}`);
       } catch (e) { console.error(`  MUSIC FAIL ${f} ${label}: ${e.message}`); }
     }
+    tick(`${slug}/${f}`);
   }
 }
 
 // ── Main ──
+// Count media files first so the progress bar has a total
+for (const slug of POSTS) {
+  const postDir = path.join(CONTENT, slug);
+  const photosDir = path.join(postDir, 'photos');
+  if (fs.existsSync(photosDir)) {
+    progress.total += fs.readdirSync(photosDir).filter(f => /\.(jpg|jpeg|png|webp|tiff)$/i.test(f)).length;
+  }
+  const videosDir = path.join(postDir, 'videos');
+  if (fs.existsSync(videosDir)) {
+    progress.total += fs.readdirSync(videosDir).filter(f => /\.(mp4|mov|avi|mkv|webm)$/i.test(f)).length;
+  }
+  const musicDir = path.join(postDir, 'music');
+  if (fs.existsSync(musicDir)) {
+    progress.total += fs.readdirSync(musicDir).filter(f => /\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)).length;
+  }
+}
+_progressState = { stage: 'media', current: '准备中', done: 0, total: progress.total };
+writeProgress();
+
 console.log(`Processing ${POSTS.length} posts...`);
 for (const slug of POSTS) {
   const postDir = path.join(CONTENT, slug);
@@ -272,8 +322,9 @@ for (const slug of POSTS) {
         const src = path.join(videosDir, f);
         const base = path.parse(f).name.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
         const masterPath = path.join(DIST, 'posts', slug, 'media', 'videos', `${base}-master.m3u8`);
-        if (!changed(src) && fs.existsSync(masterPath)) { console.log(`  SKIP ${f} (unchanged)`); continue; }
+        if (!changed(src) && fs.existsSync(masterPath)) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/videos/${f}`); continue; }
         await compressVideo(f, postDir, slug);
+        tick(`${slug}/videos/${f}`);
       }
     }
   }
@@ -281,4 +332,6 @@ for (const slug of POSTS) {
 }
 // Save checksums for next build
 fs.writeFileSync(CHECKSUMS_FILE, JSON.stringify(checksums, null, 2));
+_progressState = { stage: 'media-done', current: '全部媒体处理完成', done: progress.done, total: progress.total };
+writeProgress();
 console.log(`Compression complete. Checksums saved (${Object.keys(checksums).length} entries)`);

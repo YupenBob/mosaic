@@ -1,6 +1,6 @@
 {
   "name": "mosaic-cloud-admin",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Mosaic Cloud Admin — browser-based content management",
   "type": "module",
   "scripts": {

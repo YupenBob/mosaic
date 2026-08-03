@@ -198,6 +198,15 @@ Worker 内存缓存 Github API 响应：
 - 缓存清理：`DELETE /api/processed-cache` 清空 processed/
 - 成功后显示绿色确认消息，2 秒自动消失
 
+### 5.9 v0.9 体验与视觉优化（2026-08）
+- **结构**：`admin.js` 拆分为 ES 模块（`js/admin.js` 入口 + `i18n/theme/state/ui/upload` + 每页一个模块），仍为零构建 Vanilla JS。
+- **设计系统**：`css/admin.css` 重写，含语义色令牌、三态主题（auto/light/dark，`localStorage.mosaic_admin_theme`）、分层阴影、统一圆角/动效，支持 `prefers-reduced-motion`。
+- **信息架构**：新增 56px 顶栏（全局搜索、主题/语言切换、构建状态点、一键构建、访问站点）；侧边栏分组（内容/站点/数据），**回收站入口**上线，Deploy 页保留为隐藏重定向。
+- **交互**：命令面板（Ctrl/Cmd+K）、快捷键（`n` 新建、`Ctrl+Enter` 保存）、编辑器自动保存草稿（`localStorage.mosaic_draft_*`）+ 离开拦截、Markdown 预览（自托管 `marked.min.js` + `purify.min.js`）、封面选择弹窗、上传并发 2 + 重试/取消/缩略图、危险操作输入确认、删除分类/标签的 Modal 化。
+- **性能**：Chart.js 改为仪表盘内懒加载；文章列表超 100 篇分块渲染；图标按钮全部带 aria-label。
+- **构建页**：新增概览卡（近 10 次成功率 / 平均时长 / 当前分支）；pipeline 进度条按步骤真实耗时加权（后端返回每步 `startedAt/completedAt`），显示百分比与预计剩余时间（ETA），可展开 22 步明细（每步状态+耗时）；失败时高亮失败步骤并提供「查看日志」跳转；构建结束 Toast + 标题通知；轮询按阶段调速（queued 10s / running 5s）并显示「上次更新」；触发按钮构建中禁用；历史 SHA 可点击跳 commit，支持「在 GitHub 查看全部」。
+- **新增 Worker 端点**：`DELETE /api/taxonomy/category|tag`（从所有文章中移除，返回 affected 数）；`GET /api/stats/posts`（批量文章统计，60s 缓存）；`GET /api/posts?limit&cursor`（分页参数，向后兼容）。前端对未部署端点自动降级（隐藏删除入口）。
+
 ---
 
 ## 6. 前台功能

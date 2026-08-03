@@ -71,6 +71,23 @@ jobs:
           find content/posts -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.tiff' -o -iname '*.tif' \) -exec sh -c 'exiftool -all= -overwrite_original "$1" 2>/dev/null || echo "skip(not-stripped): $1"' _ {} \;
           echo "EXIF strip complete (skips above are non-fatal)"
 
+      # 鈹€鈹€ Build progress reporter: upload dist/build-progress.json to R2 every 5s
+      # so the admin panel can show which media file is being processed.
+      - name: Start build progress reporter
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
+          mkdir -p dist
+          node scripts/build-progress.mjs media
+          (while true; do
+            rclone copyto dist/build-progress.json r2:${R2_BUCKET}/site-data/build-progress.json --low-level-retries 1 2>/dev/null || true
+            sleep 5
+          done) &
+          echo $! > dist/build-progress.pid
+
       - name: Compress media
         env:
           NODE_ENV: production
@@ -82,11 +99,17 @@ jobs:
           path: dist/.media-checksums.json
           key: media-checksums-${{ github.sha }}
 
+      - name: Progress — generate site
+        run: node scripts/build-progress.mjs generate || true
+
       # ── 3. Generate site ──
       - name: Generate site
         env:
           NODE_ENV: production
         run: node scripts/generate.js
+
+      - name: Progress — tests
+        run: node scripts/build-progress.mjs test || true
 
       # ── 3b. Tests ──
       - name: Run tests
@@ -94,6 +117,9 @@ jobs:
           cd worker && npm ci && cd ..
           node --check scripts/compress.js scripts/generate.js scripts/upload.js
           node tests/worker-smoke.mjs
+
+      - name: Progress — upload
+        run: node scripts/build-progress.mjs upload || true
 
       # ── 4. Upload processed to R2 ──
       - name: Upload to R2
@@ -142,6 +168,9 @@ jobs:
             --checksum --transfers 4
           echo "Originals synced back (EXIF stripped)"
 
+      - name: Progress — deploy
+        run: node scripts/build-progress.mjs deploy || true
+
       # ── 5. Strip media from dist (served from R2) ──
       - name: Strip media from dist
         run: |
@@ -163,3 +192,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist/ --project-name mosaic --branch main --commit-dirty=true
+
+      - name: Finish build progress
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          node scripts/build-progress.mjs done || true
+          if [ -f dist/build-progress.pid ]; then kill $(cat dist/build-progress.pid) 2>/dev/null || true; fi
+          if [ -n "$R2_ACCESS_KEY" ]; then rclone copyto dist/build-progress.json r2:${R2_BUCKET}/site-data/build-progress.json --low-level-retries 1 2>/dev/null || true; fi

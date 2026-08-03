@@ -48,6 +48,13 @@ async function apiFetch(path, options = {}) {
     throw new Error(body.error || `HTTP ${resp.status}`);
   }
 
+  // Surface dirty state from the response header so the banner updates instantly
+  const dirtyHeader = resp.headers.get('X-Dirty');
+  if (dirtyHeader && typeof window !== 'undefined') {
+    const [count, last] = dirtyHeader.split('|');
+    window.dispatchEvent(new CustomEvent('mosaic:dirty', { detail: { count: parseInt(count) || 0, last } }));
+  }
+
   return resp.json();
 }
 
@@ -61,8 +68,14 @@ export const auth = {
 };
 
 // ── Posts ──────────────────────────────────
+function qs(params = {}) {
+  const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '');
+  if (!entries.length) return '';
+  return '?' + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+}
+
 export const posts = {
-  list: () => apiFetch('/posts'),
+  list: (params) => apiFetch('/posts' + qs(params)),
 
   get: (slug) => apiFetch(`/posts/${slug}`),
 
@@ -112,12 +125,15 @@ export const build = {
   history: () => apiFetch('/build/history'),
 
   trigger: () => apiFetch('/build', { method: 'POST' }),
+
+  progress: () => apiFetch('/build/progress').catch(() => null),
 };
 
 // ── Stats ──────────────────────────────────
 export const stats = {
   dashboard: () => apiFetch('/stats'),
   traffic: () => apiFetch('/stats/traffic'),
+  posts: () => apiFetch('/stats/posts').catch(() => ({ stats: {} })),
 };
 
 // ── Config ─────────────────────────────────
@@ -134,6 +150,10 @@ export const taxonomy = {
     apiFetch('/taxonomy/category', { method: 'PUT', body: JSON.stringify({ oldName, newName }) }),
   renameTag: (oldName, newName) =>
     apiFetch('/taxonomy/tag', { method: 'PUT', body: JSON.stringify({ oldName, newName }) }),
+  removeCategory: (name) =>
+    apiFetch('/taxonomy/category', { method: 'DELETE', body: JSON.stringify({ name }) }),
+  removeTag: (name) =>
+    apiFetch('/taxonomy/tag', { method: 'DELETE', body: JSON.stringify({ name }) }),
 };
 
 // ── Trash ──────────────────────────────────
