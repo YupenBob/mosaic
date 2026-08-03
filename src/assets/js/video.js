@@ -121,7 +121,7 @@ class VideoPlayer {
       else if (storedPref === '360p') defaultEstimate = 800000;
       try {
         this.hls = new window.Hls({
-          maxBufferLength: 60,
+          maxBufferLength: 90,
           maxMaxBufferLength: 300,
           backBufferLength: 30,
           startLevel: -1,
@@ -130,6 +130,9 @@ class VideoPlayer {
           capLevelToPlayerSize: true,
           abrEwmaDefaultEstimate: defaultEstimate,
           fragLoadingMaxRetry: 6,
+          fragLoadingTimeOut: 60000,
+          manifestLoadingTimeOut: 60000,
+          levelLoadingTimeOut: 60000,
         });
         vlog('info', 'HLS init: loading ' + hlsSource.src);
         this.hls.loadSource(hlsSource.src);
@@ -162,6 +165,11 @@ class VideoPlayer {
               vlog('info', 'Stored quality applied: ' + storedPref + ' (level ' + sidx + ')');
               self.updateQualityActive();
             }
+          } else {
+            // No stored preference: start at a mid tier so the first frames
+            // arrive quickly instead of probing up from the lowest level.
+            var mid = Math.min(2, (self.hls.levels || []).length - 1);
+            if (mid >= 0) self.hls.startLevel = mid;
           }
         });
         // Quality switch completion event
@@ -181,7 +189,14 @@ class VideoPlayer {
         });
         this.hls.on('hlsError', function(event, data) {
           vlog('error', 'HLS error: ' + data.type + ' - ' + (data.details||''));
-          if (data.fatal) { vlog('error', 'HLS FATAL — playback may stop'); }
+          if (data.fatal) {
+            vlog('error', 'HLS FATAL ' + data.type + ' — attempting recovery');
+            try {
+              if (data.type === 'networkError') { self.hls.startLoad(); }
+              else if (data.type === 'mediaError') { self.hls.recoverMediaError(); }
+              else { self.hls.destroy(); }
+            } catch (e) { vlog('error', 'HLS recovery failed: ' + e.message); }
+          }
         });
       } catch(e) { console.error('HLS init failed:', e); this.isHLS = false; }
     }
