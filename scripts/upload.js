@@ -4,6 +4,8 @@
  * Default size+mtime comparison: unchanged files are skipped, changed files
  * overwrite (re-uploads propagate). Avoids --checksum, whose S3 checksum
  * headers Cloudflare R2 rejects with HTTP 501.
+ * Videos carry Cache-Control: no-store so the edge never serves stale cached
+ * responses lacking CORS headers (hls.js fetches cross-origin via XHR).
  */
 import fs from 'fs';
 import path from 'path';
@@ -43,7 +45,7 @@ try {
     // Upload videos
     const videosDir = path.join(mediaDir, 'videos');
     if (fs.existsSync(videosDir)) {
-      runUpload(`${slug}/videos`, `rclone copy "${videosDir}" "r2:mosaic-media/processed/${slug}/videos/" --transfers 4 --retries 3`);
+      runUpload(`${slug}/videos`, `rclone copy "${videosDir}" "r2:mosaic-media/processed/${slug}/videos/" --transfers 4 --retries 3 --header-upload "Cache-Control: no-store"`);
       total += fs.readdirSync(videosDir).length;
     }
 

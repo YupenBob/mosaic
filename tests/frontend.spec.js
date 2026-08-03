@@ -85,7 +85,8 @@ test('mobile viewport: video post loads with HLS source', async ({ page, browser
   const hlsSource = await page.locator('source[type="application/x-mpegURL"]').first().getAttribute('src');
   expect(hlsSource).toBeTruthy();
   const hlsUrl = hlsSource.startsWith('http') ? hlsSource : new URL(hlsSource, SITE).href;
-  const playlistResp = await page.request.get(hlsUrl, { timeout: 20000 });
+  // Direct R2 responses only include ACAO for CORS requests (with Origin)
+  const playlistResp = await page.request.get(hlsUrl, { timeout: 20000, headers: { Origin: SITE } });
   expect(playlistResp.status()).toBe(200);
   expect(playlistResp.headers()['access-control-allow-origin']).toBe('*');
   await page.waitForTimeout(3000);

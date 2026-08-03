@@ -28,10 +28,6 @@ const oUrl = (slug, folder, filename) => {
   if (R2_PUBLIC) return `${R2_PUBLIC}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(filename)}`;
   return `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
 };
-// Video URLs go through the Pages Functions -> Worker proxy so responses
-// always carry CORS headers (hls.js fetches manifests/segments via XHR).
-// R2's own edge responses intermittently omit CORS on cached range responses.
-const vUrl = (slug, filename) => `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`;
 const SITE = { ...config, language: config.language || 'zh-CN' };
 
 // Load i18n
@@ -97,12 +93,12 @@ for (const dir of postDirs) {
         hasHLS = fs.existsSync(masterM3U8);
         for (const res of ['4K','1080p','720p','480p','360p','240p']) {
           const mp4 = path.join(outDir, `${base}-${res}.mp4`);
-          if (fs.existsSync(mp4)) sources[res] = vUrl(slug, base + '-' + res + '.mp4');
+          if (fs.existsSync(mp4)) sources[res] = pUrl(slug, 'videos', base + '-' + res + '.mp4');
         }
       }
 
       if (hasHLS) {
-        videos.push({ base, poster, hls: vUrl(slug, base + '-master.m3u8'), ...(Object.keys(sources).length ? { sources } : {}) });
+        videos.push({ base, poster, hls: pUrl(slug, 'videos', base + '-master.m3u8'), ...(Object.keys(sources).length ? { sources } : {}) });
       } else if (Object.keys(sources).length) {
         videos.push({ base, poster, sources });
       } else {
