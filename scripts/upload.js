@@ -43,7 +43,7 @@ try {
     // Upload videos
     const videosDir = path.join(mediaDir, 'videos');
     if (fs.existsSync(videosDir)) {
-      runUpload(`${slug}/videos`, `rclone copy "${videosDir}" "r2:mosaic-media/processed/${slug}/videos/" --transfers 2 --retries 3`);
+      runUpload(`${slug}/videos`, `rclone copy "${videosDir}" "r2:mosaic-media/processed/${slug}/videos/" --transfers 4 --retries 3`);
       total += fs.readdirSync(videosDir).length;
     }
 
@@ -57,7 +57,7 @@ try {
     // Upload music
     const musicDir = path.join(mediaDir, 'music');
     if (fs.existsSync(musicDir)) {
-      runUpload(`${slug}/music`, `rclone copy "${musicDir}" "r2:mosaic-media/processed/${slug}/music/" --transfers 2 --retries 3`);
+      runUpload(`${slug}/music`, `rclone copy "${musicDir}" "r2:mosaic-media/processed/${slug}/music/" --transfers 4 --retries 3`);
       total += fs.readdirSync(musicDir).length;
     }
   }
