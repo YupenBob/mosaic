@@ -28,6 +28,10 @@ function envOrDev(key) {
 }
 
 const bucket = process.env.R2_BUCKET || 'mosaic-media';
+// Default no-store guarantees correct CORS on direct responses. Once a
+// Cloudflare Transform Rule forces ACAO on the media host, set this env to
+// "public, max-age=31536000" to restore edge caching (fast playback).
+const cacheControl = process.env.VIDEO_CACHE_CONTROL || 'no-store';
 const accessKey = envOrDev('R2_ACCESS_KEY');
 const secretKey = envOrDev('R2_SECRET_KEY');
 const accountId = envOrDev('CF_ACCOUNT_ID');
@@ -67,7 +71,7 @@ for (const slug of fs.readdirSync(postsDir)) {
         Bucket: bucket,
         Key: key,
         Body: fs.createReadStream(filePath),
-        CacheControl: 'no-store',
+        CacheControl: cacheControl,
         ContentType: CONTENT_TYPE[ext] || 'application/octet-stream',
       }));
       total++;

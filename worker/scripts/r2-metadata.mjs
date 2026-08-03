@@ -17,6 +17,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const devVars = fs.readFileSync(path.join(__dirname, '..', '.dev.vars'), 'utf8');
 const get = (k) => (devVars.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1]?.trim();
 const dryRun = process.argv.includes('--dry-run');
+const cacheArg = process.argv.find((a) => a.startsWith('--cache-control='));
+const TARGET_CACHE = cacheArg ? cacheArg.split('=')[1] : (process.env.VIDEO_CACHE_CONTROL || 'no-store');
 const encPath = (key) => key.split('/').map(encodeURIComponent).join('/');
 
 const client = new S3Client({
@@ -48,11 +50,11 @@ const TEST = 'processed/codex-meta-test/videos/probe.ts';
 await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: TEST, Body: 'probe' }));
 await client.send(new CopyObjectCommand({
   Bucket: BUCKET, Key: TEST, CopySource: `${encodeURIComponent(BUCKET)}/${encPath(TEST)}`,
-  MetadataDirective: 'REPLACE', CacheControl: 'no-store',
+  MetadataDirective: 'REPLACE', CacheControl: TARGET_CACHE,
 }));
 const h = await head(TEST);
 await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: TEST }));
-if (h?.CacheControl !== 'no-store') {
+if (h?.CacheControl !== TARGET_CACHE) {
   console.error('CopyObject metadata replace FAILED:', h?.CacheControl);
   process.exit(1);
 }
@@ -64,12 +66,12 @@ console.log(`found ${keys.length} video objects`);
 let changed = 0, failed = 0;
 for (const key of keys) {
   const meta = await head(key);
-  if (meta?.CacheControl === 'no-store') continue;
+  if (meta?.CacheControl === TARGET_CACHE) continue;
   if (dryRun) { console.log('  would update', key); changed++; continue; }
   try {
     await client.send(new CopyObjectCommand({
       Bucket: BUCKET, Key: key, CopySource: `${encodeURIComponent(BUCKET)}/${encPath(key)}`,
-      MetadataDirective: 'REPLACE', CacheControl: 'no-store',
+      MetadataDirective: 'REPLACE', CacheControl: TARGET_CACHE,
     }));
     changed++;
   } catch (e) { failed++; console.error('  FAIL', key, e.message); }
