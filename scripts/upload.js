@@ -1,8 +1,9 @@
 /**
  * Upload processed media from dist/ to R2 processed/
  * Uses rclone (configured by pipeline step).
- * --checksum: unchanged files are skipped by hash, changed files overwrite
- * (re-uploads of the same filename propagate instead of being ignored).
+ * Default size+mtime comparison: unchanged files are skipped, changed files
+ * overwrite (re-uploads propagate). Avoids --checksum, whose S3 checksum
+ * headers Cloudflare R2 rejects with HTTP 501.
  */
 import fs from 'fs';
 import path from 'path';
@@ -35,28 +36,28 @@ try {
     // Upload photos
     const photosDir = path.join(mediaDir, 'photos');
     if (fs.existsSync(photosDir)) {
-      runUpload(`${slug}/photos`, `rclone copy "${photosDir}" "r2:mosaic-media/processed/${slug}/photos/" --transfers 4 --checksum --retries 3`);
+      runUpload(`${slug}/photos`, `rclone copy "${photosDir}" "r2:mosaic-media/processed/${slug}/photos/" --transfers 4 --retries 3`);
       total += fs.readdirSync(photosDir).length;
     }
 
     // Upload videos
     const videosDir = path.join(mediaDir, 'videos');
     if (fs.existsSync(videosDir)) {
-      runUpload(`${slug}/videos`, `rclone copy "${videosDir}" "r2:mosaic-media/processed/${slug}/videos/" --transfers 2 --checksum --retries 3`);
+      runUpload(`${slug}/videos`, `rclone copy "${videosDir}" "r2:mosaic-media/processed/${slug}/videos/" --transfers 2 --retries 3`);
       total += fs.readdirSync(videosDir).length;
     }
 
     // Upload covers
     const coverFiles = fs.readdirSync(mediaDir).filter(f => f.startsWith('cover-'));
     if (coverFiles.length) {
-      runUpload(`${slug}/covers`, `rclone copy "${mediaDir}" "r2:mosaic-media/processed/${slug}/covers/" --include "cover-*" --transfers 4 --checksum --retries 3`);
+      runUpload(`${slug}/covers`, `rclone copy "${mediaDir}" "r2:mosaic-media/processed/${slug}/covers/" --include "cover-*" --transfers 4 --retries 3`);
       total += coverFiles.length;
     }
 
     // Upload music
     const musicDir = path.join(mediaDir, 'music');
     if (fs.existsSync(musicDir)) {
-      runUpload(`${slug}/music`, `rclone copy "${musicDir}" "r2:mosaic-media/processed/${slug}/music/" --transfers 2 --checksum --retries 3`);
+      runUpload(`${slug}/music`, `rclone copy "${musicDir}" "r2:mosaic-media/processed/${slug}/music/" --transfers 2 --retries 3`);
       total += fs.readdirSync(musicDir).length;
     }
   }
@@ -65,7 +66,7 @@ try {
   // post list from R2 (one GET) instead of N+1 GitHub contents calls.
   const dataDir = path.join(DIST, 'data');
   if (fs.existsSync(dataDir)) {
-    runUpload('site-data', `rclone copy "${dataDir}" "r2:mosaic-media/site-data/" --transfers 4 --checksum --retries 3`);
+    runUpload('site-data', `rclone copy "${dataDir}" "r2:mosaic-media/site-data/" --transfers 4 --retries 3`);
     total += fs.readdirSync(dataDir).length;
   }
   console.log(`Upload complete: ${total} files`);
