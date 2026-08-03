@@ -111,6 +111,7 @@ npx wrangler secret put GITHUB_TOKEN       # 上面创建的 GitHub token
 npx wrangler secret put CF_ACCOUNT_ID      # Cloudflare Account ID
 npx wrangler secret put R2_ACCESS_KEY      # R2 S3 Access Key
 npx wrangler secret put R2_SECRET_KEY      # R2 S3 Secret Key
+npx wrangler secret put PROXY_SECRET       # Pages→Worker IP 透传签名（见下方步骤）
 ```
 
 ### 4.3 部署
@@ -122,6 +123,8 @@ npx wrangler deploy
 部署后 Worker URL 类似：`https://mosaic-api.你的用户名.workers.dev`
 
 验证：打开 `https://mosaic-api.你的用户名.workers.dev/api/health`，应返回 `{"status":"ok",...}`
+
+> 说明：媒体上传走预签名直传，Worker 需要 `CF_ACCOUNT_ID` + `R2_ACCESS_KEY` + `R2_SECRET_KEY` 生成直传 URL（上述 Secrets 已覆盖）。
 
 ---
 
@@ -165,6 +168,26 @@ npx wrangler pages deploy ./
 
 部署后管理面板 URL：`https://mosaic-admin.pages.dev`
 
+### 6.1 配置 Pages PROXY_SECRET
+
+为前台与管理面板两个 Pages 项目设置与 Worker 相同的 `PROXY_SECRET`，让 Functions 代理能把真实访客 IP 透传给 Worker：
+
+```bash
+echo "$PROXY_SECRET" | npx wrangler pages secret put PROXY_SECRET --project-name mosaic
+echo "$PROXY_SECRET" | npx wrangler pages secret put PROXY_SECRET --project-name mosaic-admin
+```
+
+### 6.2 媒体域 CORS（推荐）
+
+媒体由 R2 直连提供。为保证 HLS 跨域播放稳定并允许边缘缓存，推荐在 Cloudflare 面板给媒体域加一条**响应头 Transform Rule**：
+
+1. Dashboard → 选择媒体所在域名（如 `xsanye.cn`）→ Rules → Transform Rules → 修改响应头 → 创建规则
+2. 匹配：主机名等于媒体域（如 `mosaic-media.xsanye.cn`）
+3. 操作：设置静态值 `Access-Control-Allow-Origin` = `*`
+4. 部署
+
+配置后可将 CI 环境变量 `VIDEO_CACHE_CONTROL` 设为 `public, max-age=31536000` 以恢复视频边缘缓存（详见 [operations.md](operations.md)）。
+
 ---
 
 ## 第七步：配置 GitHub Actions
@@ -207,7 +230,9 @@ Push a test commit or use the admin panel:
 5. Upload media using the drag-and-drop zone at the bottom of the editor
 6. Go to **Build** and click "Build & Deploy"
 
-The build runs on GitHub Actions and takes 5–15 minutes depending on media volume. Check progress on the Build page or at `https://github.com/YupenBob/mosaic/actions`.
+构建在 GitHub Actions 上运行：**缓存命中（内容未变）约 3 分钟**；新增/修改媒体时视转码量 10–20 分钟。构建中心会显示步骤级进度与预计剩余时间，也可在 `https://github.com/YupenBob/mosaic/actions` 查看。
+
+仓库另有 `health-check.yml`：每 6 小时对线上域名执行一次 `tests/check-site.mjs` 巡检，失败会触发 GitHub 告警。
 
 ---
 
@@ -268,7 +293,10 @@ mosaic/
 │   ├── layouts/         # EJS 模板
 │   └── data/            # 翻译文件
 ├── worker/              # Cloudflare Worker API
+│   └── scripts/         #   元数据迁移 / SDK 视频上传器
 ├── cloud-admin/         # 云端管理面板 SPA
-├── admin/               # 本地管理面板（开发用）
-└── mosaic.config.json   # 站点配置
+├── functions/           # 前台 Pages Functions 代理
+├── tests/               # E2E / 冒烟测试
+├── mosaic.config.json   # 站点配置
+└── docs/                # 文档
 ```

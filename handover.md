@@ -284,6 +284,8 @@ Worker 内存缓存 Github API 响应：
 | `CF_ACCOUNT_ID` | Cloudflare 账户 ID | Worker Secrets |
 | `CLOUDFLARE_API_TOKEN` | CF API 令牌 | GitHub Secrets |
 | `PROXY_SECRET` | Pages Functions → Worker 的 IP 透传签名（Worker Secret + 两个 Pages 项目 Secret） | 部署时设置 |
+| `DEV_MODE` | 本地开发：未配置 ADMIN_PASSWORD 时显式允许无鉴权 | Worker（可选） |
+| `VIDEO_CACHE_CONTROL` | 视频上传器缓存头（默认 no-store；配 CORS Transform Rule 后改 max-age 恢复边缘缓存） | CI（可选） |
 
 ---
 
@@ -312,6 +314,8 @@ npx wrangler pages deploy . --project-name mosaic-admin --branch main
 6. **媒体走 pipeline，不手动上传**：所有压缩/转码在 GitHub Actions 完成
 7. **Stats Durable Object**：视图/点赞/停留计数单实例串行化写入，杜绝并发丢失；DO 存储为主，R2 stats.json 备份并迁移历史
 8. **代理 IP 透传**：Pages Functions 转发真实访客 IP（`X-Real-IP`）并用 `PROXY_SECRET` 签名，Worker 校验后才信任——修复视图去重与登录限流
+9. **媒体缓存与 CORS**：视频对象默认 `Cache-Control: no-store` 换取 CORS 确定性；配置媒体域 Transform Rule 后可改回 `public, max-age` 恢复边缘缓存
+10. **增量构建**：checksum 缓存 + 产物清单（v2）——内容未变时压缩秒级跳过，generate 仍按清单输出 HLS/封面
 
 ---
 

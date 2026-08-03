@@ -1,149 +1,76 @@
-# Migrating from Mosaic v0.7 to v0.8
+# Mosaic 版本升级与迁移指南
 
-## Overview
+本文面向**已在使用旧版本的用户**，说明如何升级到当前版本（v1.0）。全新部署请直接看 [SETUP.md](SETUP.md)。
 
-Mosaic v0.8 introduces a cloud-native architecture. The main changes are:
-- Media files move from Git to Cloudflare R2
-- Build happens in GitHub Actions instead of locally
-- Admin panel becomes cloud-hosted (no more local Express server)
-- New music/media type support
+## v0.8 → v1.0 概览
 
-## Migration Steps
+主要变化：
 
-### 1. Run the migration scanner
+- 管理后台重构为 ES Module 零构建 SPA（v0.9），本地 Express 后台（`admin/`）已移除
+- 统计改为 Durable Object（视图/点赞/停留时长），历史 `site-data/stats.json` 自动迁移
+- 媒体上传改为预签名直传（浏览器 → R2），Worker 直传仅作 ≤100MB 兜底
+- 构建引入媒体 checksum 缓存 + 产物清单：内容未变时压缩秒级跳过
+- 新增：构建进度上报、批量文章统计、分类/标签删除、文章分页、回收站、生产健康检查
+- 新增环境变量：`PROXY_SECRET`（IP 透传）、`DEV_MODE`（本地开发）、`VIDEO_CACHE_CONTROL`（CI 缓存头）
 
-```bash
-node scripts/migrate-v0.8.js
-```
+## 升级步骤
 
-This will:
-- Inventory all your media files (photos, videos, covers)
-- Show total size and count per post
-- Update `mosaic.config.json` with new v0.8 fields
-- Set up `themes/default/` directory
-
-### 2. Set up Cloudflare R2
-
-1. Create a Cloudflare account at https://dash.cloudflare.com
-2. Navigate to R2 → Create bucket
-3. Name: `mosaic-media`
-4. Create an API token with R2 Read/Write access
-5. Note your Account ID, Access Key, Secret Key
-6. Set a custom domain (e.g., `media.yourdomain.com`) for public access
-
-### 3. Upload media to R2
+### 1. 拉取最新代码
 
 ```bash
-# Install rclone: https://rclone.org/install/
-# Configure rclone with your R2 credentials (see rclone.conf.example)
-
-# Upload all media files
-rclone copy content/posts/ r2:mosaic-media/originals/ \
-  --include "photos/**" \
-  --include "videos/**" \
-  --include "music/**" \
-  --include "cover.*" \
-  --transfers 4 \
-  --verbose
-
-# Verify the upload
-rclone check content/posts/ r2:mosaic-media/originals/ \
-  --include "photos/**" --include "videos/**" --include "cover.*"
-```
-
-### 4. Clean local media (optional)
-
-Once you've verified the R2 upload, you can remove local media files:
-
-```bash
-node scripts/migrate-v0.8.js --clean-media
-```
-
-This deletes photos/, videos/, and cover files from content/, keeping only index.md.
-
-### 5. Configure GitHub Secrets
-
-Add these to your repository (Settings → Secrets → Actions):
-
-| Secret | Value |
-|--------|-------|
-| `R2_ACCESS_KEY` | Your R2 access key |
-| `R2_SECRET_KEY` | Your R2 secret key |
-| `R2_ENDPOINT` | `https://{account_id}.r2.cloudflarestorage.com` |
-| `R2_PUBLIC_URL` | `https://media.yourdomain.com` |
-| `CLOUDFLARE_API_TOKEN` | CF API token with Pages edit |
-| `CLOUDFLARE_ACCOUNT_ID` | Your CF account ID |
-| `ADMIN_PASSWORD_HASH` | SHA-256 hash of your admin password |
-
-### 6. Update GitHub Actions
-
-Replace `.github/workflows/deploy.yml` with the new `.github/workflows/build.yml`.
-
-### 7. Deploy the Worker
-
-```bash
-cd worker
+git pull origin main
 npm install
-wrangler deploy
 ```
 
-Set Worker secrets:
+`mosaic.config.json` 无需手工迁移：缺少的键由代码默认值兜底，Admin 后台保存配置为深合并，不会丢字段。
+
+### 2. 配置 Secrets
+
+按 [SETUP.md](SETUP.md) 第 4.2 / 6.1 节设置：
+
+- Worker Secrets：`ADMIN_PASSWORD`、`JWT_SECRET`、`GITHUB_TOKEN`、`CF_ACCOUNT_ID`、`R2_ACCESS_KEY`、`R2_SECRET_KEY`、`PROXY_SECRET`
+- 两个 Pages 项目 Secret：`PROXY_SECRET`（与 Worker 一致）
+- GitHub Actions Secrets：`R2_ACCESS_KEY`、`R2_SECRET_KEY`、`R2_ENDPOINT`、`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`
+
+### 3. 部署
+
 ```bash
-wrangler secret put JWT_SECRET
-wrangler secret put ADMIN_PASSWORD_HASH
-wrangler secret put GITHUB_TOKEN
+cd worker && npx wrangler deploy
+cd .. && npx wrangler pages deploy cloud-admin --project-name mosaic-admin
 ```
 
-### 8. Deploy Cloud Admin
+### 4. 媒体清单缓存首次引导
 
-```bash
-cd cloud-admin
-wrangler pages deploy ./
-```
+压缩脚本的 checksum 文件已升级到 v2（新增产物清单）。首次构建会自动触发一次全量重建并写入清单，之后增量生效——首次构建会比平时慢，属预期。
 
-Update `API_BASE` in `cloud-admin/index.html` to point to your Worker URL.
+### 5. 统计迁移
 
-### 9. Test the build
+旧统计在 R2 `site-data/stats.json`。首次访问统计接口时，Durable Object 会自动读取并迁移该文件，无需手工操作；此后以 DO 存储为主、stats.json 仅作备份。
 
-Push a change to `main` branch. GitHub Actions will:
-1. Sync media from R2
-2. Process images/videos/music
-3. Generate the static site
-4. Deploy to Cloudflare Pages
+### 6. 移除本地后台
 
-Or trigger a build from Cloud Admin → Build → Build & Deploy.
+`admin/`（本地 Express 后台）已从仓库移除，请改用云后台 `cloud-admin`（部署于 `mosaic-admin.xsanye.cn`）。
 
-### 10. Verify
+### 7. 媒体域 CORS（推荐）
 
-- [ ] Site loads at your Pages URL
-- [ ] Images display correctly (R2 URLs in src)
-- [ ] Videos play (HLS streaming)
-- [ ] Music player works
-- [ ] Search works
-- [ ] RSS feed is accessible
-- [ ] Cloud Admin login works
-- [ ] Upload via Cloud Admin works
+按 [SETUP.md](SETUP.md) 6.2 节添加 Transform Rule，以保证 HLS 跨域播放稳定；配置后可把 `VIDEO_CACHE_CONTROL` 设为 `public, max-age=31536000` 恢复视频边缘缓存。
 
-## Backward Compatibility
+## 验证清单
 
-v0.8 build scripts are backward-compatible with v0.7 project structure:
-- If R2 is not configured, media files are read from local paths
-- New config fields have sensible defaults
-- You can gradually migrate — start with R2, then add cloud features
+- [ ] `/api/health` 返回 ok
+- [ ] Admin 登录成功，仪表盘显示正确文章/分类/标签统计
+- [ ] 上传一张图片 + 一个视频，构建后前台正常展示（HLS 可播放）
+- [ ] 页面浏览量在重复访问后递增（DO 统计生效）
+- [ ] `node tests/check-site.mjs` 通过
 
-## Troubleshooting
+## 回滚
 
-### Media not showing
-- Check `R2_PUBLIC_URL` is correct
-- Verify media was uploaded to `processed/{slug}/` in R2
-- Check CORS settings on R2 custom domain
+- 代码回滚：`git revert <commit>` 后推送到 `main` 触发重建
+- Worker：`npx wrangler rollback`
+- Pages：Cloudflare Dashboard → Pages → Deployments 选择历史版本
 
-### Build fails
-- Check GitHub Actions logs for rclone errors
-- Verify R2 credentials are correct
-- Ensure FFmpeg is available in the Action runner
+## 常见问题
 
-### Cloud Admin can't connect
-- Verify Worker is deployed and running
-- Check `API_BASE` URL in Cloud Admin
-- Ensure CORS is configured on the Worker
+- **构建比预期慢**：媒体变更或首次 v2 引导属正常；内容未变仍慢请检查 checksum 缓存是否恢复（见 [operations.md](operations.md)）
+- **视频无法播放**：确认媒体域 CORS（桶级或 Transform Rule）与 `PROXY_SECRET` 配置一致
+- **登录 503**：`JWT_SECRET` 未配置，Worker fail-closed（见 [operations.md](operations.md)）

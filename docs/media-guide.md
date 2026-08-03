@@ -1,95 +1,75 @@
-# Mosaic Media Guide
+# Mosaic 媒体指南
 
-## Overview
+## 概览
 
-Mosaic v0.8 separates media storage from content. Media files (images, videos, audio) are stored in Cloudflare R2 and referenced from your Markdown posts.
+Mosaic 把媒体与内容分离：Markdown 文本进 Git，二进制媒体进 Cloudflare R2。媒体**永远不手动本地传输**——完整链路是：Admin 上传 → R2 `originals/` → GitHub Actions 压缩 → R2 `processed/` → 前台展示。
 
-## Directory Structure
+## 媒体如何进入平台
+
+1. 在 Admin 编辑器打开文章，把文件拖入上传区
+2. 浏览器向 Worker 请求预签名 URL（`POST /api/upload/presign`），随后**直连 R2** 上传（单文件最大 5GB），完成后调 `POST /api/upload/complete` 标记待构建
+3. 在构建中心点击"构建并部署"，管线从 `originals/` 拉取并压缩
+
+> 禁止用 Playwright / curl / 脚本手动上传到 R2 绕过管线；管线故障应从根源修复。
+
+## 目录结构
 
 ```
 content/posts/{slug}/
-├── index.md          # Required: Markdown content with YAML frontmatter
-├── cover.jpg         # Optional: Cover image (or cover.png, cover.webp)
-├── photos/           # Optional: Gallery images
-│   ├── img-001.jpg
-│   └── img-002.webp
-├── videos/           # Optional: Video files
-│   └── video-001.mp4
-└── music/            # Optional: Audio files
-    └── track-01.flac
+├── index.md          # 必填
+├── cover.jpg         # 可选封面
+├── photos/           # 可选：画廊图片
+├── videos/           # 可选：视频
+└── music/            # 可选：音频（见 music-guide.md）
 ```
 
-## Images
+## 图片
 
-### Supported Formats
-- JPEG (.jpg, .jpeg)
-- PNG (.png)
-- WebP (.webp)
-- TIFF (.tiff)
+### 支持格式
 
-### Processing
-Images are automatically compressed to WebP at three resolutions:
-- **480p** (854px wide) — Small screens and thumbnails
-- **720p** (1280px wide) — Medium screens
-- **1080p** (1920px wide) — Large screens and fullscreen viewer
+JPEG（`.jpg`/`.jpeg`）、PNG（`.png`）、WebP（`.webp`）、TIFF（`.tiff`）。
 
-The `srcset` attribute is used for responsive loading.
+### 处理
 
-### Gallery Modes
-- **Grid mode** (default): CSS masonry grid, 2-4 columns depending on viewport
-- **Single mode**: Large stacked images when ≤ N photos (configurable via `gallerySingleThreshold`)
+- 自动转 WebP 三档：**480p / 720p / 1080p**（宽），另生成 150px **LQIP** 占位图（`*-10p.webp`）
+- 管线自动**剥离原图 EXIF**（含 GPS），隐私默认受保护
+- `srcset` 按视口加载对应档位
 
-### Fullscreen Viewer
-Click any gallery image to enter fullscreen:
-- Left/Right arrows or keyboard ← → to navigate
-- Bottom filmstrip for quick navigation
-- Quality selector (low/high/original)
-- Pinch-to-zoom and double-tap zoom
-- Scroll to zoom
+### 画廊
 
-## Videos
+- 网格（masonry）与单列大图（≤ `gallerySingleThreshold` 张时）两种模式
+- 全屏查看器：左右键 / 滚轮缩放 / 捏合 / 底部胶片导航
+- 清晰度切换：`1`=480p、`2`=720p、`3`=1080p、`4`=原图；切换时保留缩放状态
 
-### Supported Formats
-- MP4 (.mp4) — Recommended
-- MOV (.mov)
-- AVI (.avi)
-- MKV (.mkv)
-- WebM (.webm)
+## 视频
 
-### Processing
-Videos are transcoded by FFmpeg:
-- Multi-resolution MP4 (480p, 720p, 1080p, 4K if source allows)
-- HLS streaming segments (.m3u8 + .ts)
-- Poster frame extracted at 1 second
+### 支持格式
 
-### Video Player
-Custom controls include:
-- Play/pause
-- Progress bar with seek preview
-- Volume control
-- Playback speed (0.5x - 2x)
-- Quality switching
-- Picture-in-Picture
-- Fullscreen
-- Keyboard shortcuts: Space, ← → (seek), ↑ ↓ (volume), F (fullscreen), M (mute)
+MP4（推荐）、MOV、AVI、MKV、WebM。
 
-### Playlist Mode
-Set `video_mode: playlist` in frontmatter to show a playlist bar below the video. Click to switch between videos.
+### 处理
 
-## Cover Images
+- FFmpeg 转码 HLS（m3u8 + ts 分片）与多分辨率 MP4：**240p–1080p**（默认顶格 1080p；在 Admin 配置或 `videoQuality.maxHeight` 中可开启 4K）
+- 低分辨率源（如 240p 素材）自动走最低档，不会强转更高清晰度
+- 自动提取 1 秒处海报帧（`*-poster.jpg`）
 
-### Auto-Detection
-1. Explicit cover: `cover: cover.jpg` or `cover: video:0` or `cover: photo:0`
-2. Auto-detect: Video poster frame → First photo → None
+### 播放器
 
-### Aspect Ratio
-Covers respect the original image aspect ratio (with configurable min/max via `coverAspectMin` and `coverAspectMax`).
+- HLS 自适应码率（ABR），质量菜单支持 **Auto / 手动选档**，切换无缝
+- 倍速、音量、PiP、全屏、播放列表（`video_mode: playlist`）
+- 快捷键：空格=播放/暂停、`←/→`=±5s、`↑/↓`=音量、`f`=全屏、`n`=下一个
+- 网络波动自动重试与致命错误自动恢复
 
-## Best Practices
+## 封面
 
-- Use `.jpg` for photos (smaller file size)
-- Use `.mp4` for videos (best browser support)
-- Use `.flac` for music (best quality — auto-converted to MP3)
-- Keep photos under 4000px wide for faster processing
-- Keep videos under 4K / 30fps for reasonable transcode times
-- Name files without spaces (use hyphens or underscores)
+1. 显式指定：`cover: cover.jpg`（或 `cover.png`/`cover.webp`）
+2. 自动检测：视频海报帧 → 首张照片
+
+封面尊重原图宽高比（`coverAspectMin/Max` 约束），卡片展示时超过 1.5 会统一裁切为 1.5。
+
+## 最佳实践
+
+- 图片用 JPEG、视频用 MP4、音频用 FLAC/MP3
+- 文件名避免空格与特殊字符（压缩产物按净化后的 base 命名）
+- 图片宽度控制在 4000px 内、视频 4K/30fps 内，以缩短管线转码时间
+- 已有内容更新：同名重传即可，管线按 checksum 增量处理

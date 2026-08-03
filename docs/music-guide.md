@@ -1,105 +1,55 @@
-# Mosaic Music Guide
+# Mosaic 音乐指南
 
-## Overview
+## 概览
 
-Mosaic v0.8 adds first-class music support. You can include audio files alongside your photos and videos, with automatic metadata extraction, transcoding, and a built-in web player.
+Mosaic 提供一等公民的音乐支持：把音频放进文章的 `music/` 目录，管线自动转码，前台渲染曲目列表与全局 mini 播放器。
 
-## Quick Start
-
-Create a post with a `music/` directory:
+## 快速开始
 
 ```
 content/posts/my-mix/
 ├── index.md
-├── cover.jpg
-├── photos/               # optional
-├── videos/               # optional
+├── cover.jpg              # 可选：作为曲目封面
 └── music/
     ├── track-01.flac
     ├── track-02.wav
     └── track-03.mp3
 ```
 
-Set the layout to prioritize music:
+文章 frontmatter 无需额外配置，音频自动出现在正文后的"音乐"区块。
 
-```yaml
----
-title: "My Mix"
-date: 2026-06-01
-category: music
-tags: [ambient, electronic]
-description: "A curated collection"
-layout: music-first
----
-```
+## 支持格式
 
-## Supported Formats
+| 格式 | 扩展名 | 说明 |
+| --- | --- | --- |
+| FLAC / WAV | `.flac` / `.wav` | 无损，转码为 MP3 |
+| MP3 | `.mp3` | 直接使用 |
+| M4A / AAC | `.m4a` / `.aac` | 转码为 MP3 |
+| OGG | `.ogg` | 转码为 MP3 |
 
-| Format | Extension | Lossless | Notes |
-|--------|-----------|----------|-------|
-| FLAC | `.flac` | Yes | Transcodes to MP3 |
-| WAV | `.wav` | Yes | Transcodes to MP3 |
-| AIFF | `.aiff` | Yes | Transcodes to MP3 |
-| MP3 | `.mp3` | No | 320k copy + 128k version |
-| M4A | `.m4a` | No | 320k copy + 128k version |
-| OGG | `.ogg` | No | 320k copy + 128k version |
+## 音频处理
 
-## Audio Processing
+管线对每个音频文件转码两个码率：
 
-The build pipeline automatically:
-1. Extracts audio metadata (title, artist, album, genre, cover art) via ffprobe
-2. Transcodes lossless files to MP3 at two quality levels:
-   - **320kbps** — High quality
-   - **128kbps** — Data-saving
-3. Extracts embedded album artwork
-4. Generates waveform visualization data
-5. Outputs `music-meta.json` for the frontend player
+- **320kbps** — 高音质
+- **128kbps** — 省流量
 
-## Frontmatter Options
+产物存于 `processed/{slug}/music/`，页面引用压缩版、缺失时回退原始文件。
 
-```yaml
-layout: music-first    # Shows music player prominently at the top
-music_mode: playlist   # 'stacked' (default) or 'playlist' (single player + list)
-```
+## 播放器功能
 
-## Music Player Features
+- 播放/暂停、上一首/下一首
+- 三种循环模式：列表循环 / 单曲循环 / 随机
+- 音量记忆、播放进度记忆（刷新后恢复）
+- Media Session（锁屏/系统媒体控制）
+- 底部 mini 播放器，跨页面保持播放状态
 
-The built-in player supports:
-- Play/pause, skip, previous track
-- Three loop modes: repeat all, repeat one, shuffle
-- Waveform visualization with click-to-seek
-- Volume control with memory
-- Playback position memory (resumes where you left off)
-- Media Session API for lock screen controls
-- Background playback (persists across page navigation)
-- Keyboard shortcuts: Space (play/pause), ← → (seek), ↑ ↓ (volume)
+> 波形可视化（waveform）为路线图功能，暂未上线。
 
-## Embedding in Posts
+## 嵌入文章
 
-Music tracks appear as a tracklist section in your post. Each track shows:
-- Track number
-- Cover art (if available)
-- Title and artist
-- Duration
+曲目以列表形式渲染在文章"音乐"区块，每项显示标题与作者（作者取站点 `author.name`，曲目名默认取文件名）。点击即播放。
 
-Click any track to start playback. The mini-player appears at the bottom of the screen.
+## 配置
 
-## Configuration
-
-In `mosaic.config.json`:
-
-```json
-{
-  "enableMusicProcessing": true,
-  "musicQuality": {
-    "mp3_320k": { "bitrate": "320k" },
-    "mp3_128k": { "bitrate": "128k" }
-  },
-  "components": {
-    "music": {
-      "enabled": true,
-      "defaultQuality": "320k"
-    }
-  }
-}
-```
+音乐默认启用，无需额外配置。若需改变转码档位或未来新增波形数据，改动发生在管线 `compress.js` 内。
