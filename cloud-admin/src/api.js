@@ -89,16 +89,20 @@ export const media = {
 
 // ── Upload (direct to Worker → R2) ─
 export const upload = {
-  /** Direct upload via Worker (primary) */
+  /** Direct upload via Worker (fallback, <=100MB) */
   directUrl: (slug, filename) =>
     `${API_BASE}/upload/direct/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`,
 
-  /** Presigned URL for large files (fallback) */
+  /** Presigned direct-to-R2 URL (primary path — single hop, >100MB capable) */
   presign: (slug, filename, contentType) =>
     apiFetch('/upload/presign', {
       method: 'POST',
       body: JSON.stringify({ slug, filename, contentType: contentType || 'application/octet-stream' }),
     }),
+
+  /** Confirm a presigned upload landed in R2 (marks the site dirty) */
+  complete: (slug, filename) =>
+    apiFetch(`/upload/complete/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`, { method: 'POST' }),
 };
 
 // ── Build ──────────────────────────────────

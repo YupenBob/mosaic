@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { loginHandler, authMiddleware, clientIp } from './auth.js';
 import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty, renameCategory, renameTag } from './github.js';
-import { generatePresignedUrl, listMedia, serveMediaFile, uploadDirect, deleteMediaFile } from './r2.js';
+import { generatePresignedUrl, uploadComplete, listMedia, serveMediaFile, uploadDirect, deleteMediaFile } from './r2.js';
 import { StatsDurableObject } from './stats-do.js';
 
 const app = new Hono();
@@ -259,6 +259,7 @@ app.delete('/api/posts/:slug', async (c) => {
 
 // Upload
 app.post('/api/upload/presign', generatePresignedUrl);
+app.post('/api/upload/complete/:slug/:filename', uploadComplete);
 
 // Build
 app.post('/api/build', async (c) => {

@@ -1285,32 +1285,10 @@ async function handleUploadFiles(files) {
     progressEl.appendChild(itemEl);
 
     try {
-      const url = upload.directUrl(slug, file.name);
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        const fillEl = itemEl.querySelector('.upload-item-fill');
-        const statusEl = itemEl.querySelector('.upload-item-status');
-        const metaEl = itemEl.querySelector('.upload-item-meta');
-        xhr.upload.addEventListener('progress', e => {
-          if (e.lengthComputable) {
-            const pct = Math.round(e.loaded / e.total * 100);
-            if (fillEl) fillEl.style.width = pct + '%';
-            if (statusEl) statusEl.textContent = pct + '%';
-            if (metaEl && pct >= 100) metaEl.innerHTML = '<span>Processing on server...</span>';
-          }
-        });
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error('HTTP ' + xhr.status));
-        });
-        xhr.addEventListener('error', () => reject(new Error('Network error')));
-        xhr.timeout = 300000; // 5 min timeout for large files
-        xhr.upload.onprogress = xhr.upload.onprogress;
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-        xhr.send(file);
-      });
+      // Prefer presigned direct-to-R2 (single hop, >100MB capable); fall back
+      // to the Worker-mediated direct upload when presign is unavailable.
+      const ok = await uploadFilePresigned(slug, file, itemEl);
+      if (!ok) await uploadFileDirect(slug, file, token, itemEl);
       done++;
       itemEl.classList.add('upload-done');
       itemEl.querySelector('.upload-item-status').innerHTML = '<i class="ri-check-line" style="color:#2ecc71"></i>';
@@ -1326,6 +1304,61 @@ async function handleUploadFiles(files) {
     checkDirty();
     loadExistingMedia(slug);
   }
+}
+
+function progressUI(itemEl, pct, doneText) {
+  const fillEl = itemEl.querySelector('.upload-item-fill');
+  const statusEl = itemEl.querySelector('.upload-item-status');
+  const metaEl = itemEl.querySelector('.upload-item-meta');
+  if (fillEl) fillEl.style.width = pct + '%';
+  if (statusEl) statusEl.textContent = pct + '%';
+  if (metaEl && pct >= 100 && doneText) metaEl.innerHTML = '<span>' + doneText + '</span>';
+}
+
+async function uploadFilePresigned(slug, file, itemEl) {
+  let presigned;
+  try { presigned = await upload.presign(slug, file.name, file.type || 'application/octet-stream'); }
+  catch (e) { console.warn('presign failed, fallback to direct upload:', e); return false; }
+  try {
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', presigned.url);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.timeout = 600000; // 10 min for large files
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) progressUI(itemEl, Math.round(e.loaded / e.total * 100), 'Uploading to R2...');
+      });
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error('HTTP ' + xhr.status));
+      });
+      xhr.addEventListener('error', () => reject(new Error('Network error')));
+      xhr.send(file);
+    });
+  } catch (e) { console.warn('presigned PUT failed, fallback to direct upload:', e); return false; }
+  try { await upload.complete(slug, file.name); }
+  catch (e) { console.warn('upload complete failed (object uploaded, dirty not marked):', e); }
+  return true;
+}
+
+async function uploadFileDirect(slug, file, token, itemEl) {
+  const url = upload.directUrl(slug, file.name);
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.timeout = 300000;
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) progressUI(itemEl, Math.round(e.loaded / e.total * 100), 'Processing on server...');
+    });
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error('HTTP ' + xhr.status));
+    });
+    xhr.addEventListener('error', () => reject(new Error('Network error')));
+    xhr.send(file);
+  });
 }
 
 function setupUploadZone() {

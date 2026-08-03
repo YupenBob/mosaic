@@ -16,6 +16,7 @@ const media = {
     if (!store.has(key)) return null;
     return { text: async () => store.get(key), httpMetadata: { contentType: 'application/json' }, httpEtag: 'etag1' };
   },
+  head: async (key) => (store.has(key) ? { size: store.get(key).length || 1 } : null),
   put: async (key, value) => { store.set(key, typeof value === 'string' ? value : String(value)); },
   delete: async (key) => { store.delete(key); },
   list: async ({ prefix = '' } = {}) => {
@@ -81,6 +82,9 @@ function env(overrides = {}) {
     DEV_MODE: 'false',
     R2_PUBLIC_URL: '',
     R2_BUCKET: 'mosaic-media',
+    R2_ACCESS_KEY: 'test-access-key',
+    R2_SECRET_KEY: 'test-secret-key',
+    CF_ACCOUNT_ID: 'test-account',
     STATS,
     ...overrides,
   };
@@ -217,6 +221,29 @@ await record('upload auth/size-limit/site-data namespace', async () => {
   assert.ok(store.has('site-data/favicon.svg'));
 });
 
+// ── 9b. Presigned direct upload flow ──
+await record('presign URL + complete (direct-to-R2 flow)', async () => {
+  const pr = await call('/api/upload/presign', {
+    method: 'POST', token: TOKEN,
+    body: { slug: 'a', filename: 'clip.mp4', contentType: 'video/mp4' },
+  });
+  assert.equal(pr.status, 200);
+  const p = await pr.json();
+  assert.ok(p.url.includes('X-Amz-Signature'), 'presigned URL carries SigV4 signature');
+  assert.equal(p.key, 'originals/a/videos/clip.mp4');
+  assert.equal(p.folder, 'videos');
+  // Complete for a missing object -> 404
+  const missing = await call('/api/upload/complete/a/missing.mp4', { method: 'POST', token: TOKEN });
+  assert.equal(missing.status, 404);
+  // Upload object (simulated) then complete -> 200 + dirty marked
+  await media.put('originals/a/videos/clip.mp4', 'x');
+  const done = await call('/api/upload/complete/a/clip.mp4', { method: 'POST', token: TOKEN });
+  assert.equal(done.status, 200);
+  assert.equal((await done.json()).size, 1);
+  const dirty = await (await call('/api/dirty', { token: TOKEN })).json();
+  assert.ok((dirty.count || 0) >= 1, 'dirty marked after complete');
+});
+
 // ── 10. Login rate limiting ──
 await record('login rate limit (429 after 5 failures)', async () => {
   const h = { 'CF-Connecting-IP': '10.0.0.9' };
@@ -231,4 +258,4 @@ await record('login rate limit (429 after 5 failures)', async () => {
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 12) process.exit(1);
+if (passed < 13) process.exit(1);
