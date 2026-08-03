@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { execSync, spawn } from 'child_process';
+import { execSync, execFile, spawn } from 'child_process';
 import sharp from 'sharp';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +29,10 @@ try {
 // Load existing checksums
 let checksums = {};
 try { checksums = JSON.parse(fs.readFileSync(CHECKSUMS_FILE, 'utf-8')); } catch {}
+// v2 checksums add a media manifest (per-video tiers, cover aspect) so
+// generate.js can emit HLS/multi-res URLs even on cache-hit (skip) builds.
+const CHECKSUMS_VERSION = '2';
+const forceReprocess = checksums.__version__ !== CHECKSUMS_VERSION;
 
 // ── Build progress reporting ────────────────────────────────
 // Writes dist/build-progress.json which the pipeline's background reporter
@@ -44,13 +48,38 @@ function writeProgress() {
   try {
     fs.mkdirSync(path.dirname(PROGRESS_FILE), { recursive: true });
     fs.writeFileSync(PROGRESS_FILE, JSON.stringify(_progressState));
+    uploadProgress();
   } catch {}
+}
+
+let _lastUpload = 0;
+let _uploading = false;
+// Upload progress straight from this process (a background loop started from a
+// separate workflow step gets killed by the Actions runner, so we upload here).
+function uploadProgress() {
+  if (!process.env.R2_ACCESS_KEY || !process.env.R2_BUCKET || _uploading) return;
+  if (Date.now() - _lastUpload < 5000) return;
+  _lastUpload = Date.now();
+  _uploading = true;
+  execFile('rclone', ['copyto', PROGRESS_FILE, `r2:${process.env.R2_BUCKET}/site-data/build-progress.json`, '--low-level-retries', '1'], { timeout: 15000 }, () => {
+    _uploading = false;
+  });
 }
 
 function tick(current) {
   progress.done++;
   _progressState = { ..._progressState, current, done: progress.done, total: progress.total };
   // Throttle writes to ~every 2s; flush the latest state on exit.
+  if (Date.now() - _lastWrite > 2000) {
+    _lastWrite = Date.now();
+    writeProgress();
+  }
+}
+
+// Report the file being processed BEFORE it starts (long transcodes would
+// otherwise show "准备中" for minutes).
+function reportCurrent(current) {
+  _progressState = { ..._progressState, current };
   if (Date.now() - _lastWrite > 2000) {
     _lastWrite = Date.now();
     writeProgress();
@@ -89,11 +118,8 @@ async function compressPhotos(postDir, slug) {
     if (!/\.(jpg|jpeg|png|webp|tiff)$/i.test(f)) continue;
     const base = path.parse(f).name;
     const src = path.join(photosDir, f);
-    // Incremental skip only when outputs are already on disk (cache restore +
-    // fresh checkout must regenerate, otherwise generate.js loses the media)
-    const photoReady = ['-10p.webp', '-480p.webp', '-720p.webp', '-1080p.webp', '-meta.json']
-      .map((s) => path.join(outDir, base + s)).every((p) => fs.existsSync(p));
-    if (!changed(src) && photoReady) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
+    if (!forceReprocess && !changed(src)) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
+    reportCurrent(`${slug}/${f}`);
     // Source changed: remove stale outputs so they are regenerated (and re-uploaded)
     for (const out of [`${base}-10p.webp`, `${base}-480p.webp`, `${base}-720p.webp`, `${base}-1080p.webp`, `${base}-meta.json`]) {
       fs.rmSync(path.join(outDir, out), { force: true });
@@ -111,6 +137,7 @@ async function compressPhotos(postDir, slug) {
     }
     // Save meta
     fs.writeFileSync(path.join(outDir, `${base}-meta.json`), JSON.stringify({ aspect, width: meta.width, height: meta.height }));
+    checksums[`__photo-meta__/${slug}/${base}`] = String(aspect);
     tick(`${slug}/${f}`);
   }
 }
@@ -138,9 +165,7 @@ async function compressCover(postDir, slug) {
   const coverHash = md5(coverFile);
   const outDir = path.join(DIST, 'posts', slug, 'media');
   fs.mkdirSync(outDir, { recursive: true });
-  const coverReady = ['cover-10p.webp', 'cover-480p.webp', 'cover-720p.webp', 'cover-1080p.webp', 'cover-meta.json']
-    .map((n) => path.join(outDir, n)).every((p) => fs.existsSync(p));
-  if (checksums[coverKey] === coverHash && coverReady) { console.log(`  SKIP cover (unchanged)`); return; }
+  if (!forceReprocess && checksums[coverKey] === coverHash) { console.log(`  SKIP cover (unchanged)`); return; }
   checksums[coverKey] = coverHash;
   for (const out of ['cover-10p.webp', 'cover-480p.webp', 'cover-720p.webp', 'cover-1080p.webp', 'cover-meta.json']) {
     fs.rmSync(path.join(outDir, out), { force: true });
@@ -156,6 +181,7 @@ async function compressCover(postDir, slug) {
       .webp({ quality: QUALITY[w] || 80 }).toFile(path.join(outDir, `cover-${w}p.webp`));
   }
   fs.writeFileSync(path.join(outDir, 'cover-meta.json'), JSON.stringify({ aspect, width: meta.width, height: meta.height }));
+  checksums[`__cover-meta__/${slug}`] = String(aspect);
 }
 
 // ── Video compression ──
@@ -193,6 +219,7 @@ async function compressVideo(file, postDir, slug) {
   if (resList.length === 0) {
     console.log(`  ${file}: source too small (${srcHeight}px), copying as-is`);
     fs.copyFileSync(srcPath, path.join(outDir, file));
+    checksums[`__video__/${slug}/${baseName}`] = JSON.stringify({ tiers: [], height: srcHeight });
     return;
   }
 
@@ -254,6 +281,7 @@ async function compressVideo(file, postDir, slug) {
     }
     fs.writeFileSync(path.join(outDir, `${baseName}-master.m3u8`), master);
   }
+  checksums[`__video__/${slug}/${baseName}`] = JSON.stringify({ tiers: successRes, height: srcHeight });
 }
 
 // ── Music compression: 128k/320k MP3 ──
@@ -267,9 +295,8 @@ async function compressMusic(postDir, slug) {
     if (!/\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)) continue;
     const base = path.parse(f).name;
     const src = path.join(musicDir, f);
-    const musicReady = [`${base}-128k.mp3`, `${base}-320k.mp3`]
-      .map((n) => path.join(outDir, n)).every((p) => fs.existsSync(p));
-    if (!changed(src) && musicReady) { console.log(`  SKIP music ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
+    if (!forceReprocess && !changed(src)) { console.log(`  SKIP music ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
+    reportCurrent(`${slug}/${f}`);
     // Source changed: remove stale outputs for this track
     for (const stale of fs.readdirSync(outDir)) {
       if (stale.startsWith(base + '-')) fs.rmSync(path.join(outDir, stale), { force: true });
@@ -320,9 +347,8 @@ for (const slug of POSTS) {
     for (const f of fs.readdirSync(videosDir)) {
       if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) {
         const src = path.join(videosDir, f);
-        const base = path.parse(f).name.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
-        const masterPath = path.join(DIST, 'posts', slug, 'media', 'videos', `${base}-master.m3u8`);
-        if (!changed(src) && fs.existsSync(masterPath)) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/videos/${f}`); continue; }
+        if (!forceReprocess && !changed(src)) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/videos/${f}`); continue; }
+        reportCurrent(`${slug}/videos/${f}`);
         await compressVideo(f, postDir, slug);
         tick(`${slug}/videos/${f}`);
       }
@@ -331,6 +357,7 @@ for (const slug of POSTS) {
   await compressMusic(postDir, slug);
 }
 // Save checksums for next build
+checksums.__version__ = CHECKSUMS_VERSION;
 fs.writeFileSync(CHECKSUMS_FILE, JSON.stringify(checksums, null, 2));
 _progressState = { stage: 'media-done', current: '全部媒体处理完成', done: progress.done, total: progress.total };
 writeProgress();

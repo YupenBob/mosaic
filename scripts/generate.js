@@ -15,6 +15,12 @@ const CONTENT = path.join(ROOT, 'content', 'posts');
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');
 
+// Media manifest written by compress.js (and restored via the CI checksum
+// cache): lets cache-hit builds emit HLS/multi-res URLs without local outputs.
+const mediaChecksums = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(DIST, '.media-checksums.json'), 'utf-8')); } catch { return {}; }
+})();
+
 // Load config
 const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf-8'));
 
@@ -84,16 +90,27 @@ for (const dir of postDirs) {
       const base = rawBase.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
       const poster = pUrl(slug, 'videos', base + '-poster.jpg');
 
-      // Check for compressed versions in dist/
+      // Compressed tier list: prefer the compress manifest (works on cache-hit
+      // builds where dist/ has no media outputs), fall back to scanning dist/.
       const sources = {};
       let hasHLS = false;
-      const outDir = path.join(DIST, 'posts', slug, 'media', 'videos');
-      if (fs.existsSync(outDir)) {
-        const masterM3U8 = path.join(outDir, `${base}-master.m3u8`);
-        hasHLS = fs.existsSync(masterM3U8);
-        for (const res of ['4K','1080p','720p','480p','360p','240p']) {
-          const mp4 = path.join(outDir, `${base}-${res}.mp4`);
-          if (fs.existsSync(mp4)) sources[res] = pUrl(slug, 'videos', base + '-' + res + '.mp4');
+      const manifestRaw = mediaChecksums[`__video__/${slug}/${base}`];
+      let manifest = null;
+      try { manifest = manifestRaw ? JSON.parse(manifestRaw) : null; } catch {}
+      if (manifest) {
+        hasHLS = (manifest.tiers || []).length > 0;
+        for (const res of manifest.tiers || []) {
+          sources[res] = pUrl(slug, 'videos', base + '-' + res + '.mp4');
+        }
+      } else {
+        const outDir = path.join(DIST, 'posts', slug, 'media', 'videos');
+        if (fs.existsSync(outDir)) {
+          const masterM3U8 = path.join(outDir, `${base}-master.m3u8`);
+          hasHLS = fs.existsSync(masterM3U8);
+          for (const res of ['4K','1080p','720p','480p','360p','240p']) {
+            const mp4 = path.join(outDir, `${base}-${res}.mp4`);
+            if (fs.existsSync(mp4)) sources[res] = pUrl(slug, 'videos', base + '-' + res + '.mp4');
+          }
         }
       }
 
@@ -154,12 +171,19 @@ for (const dir of postDirs) {
       try {
         const meta = JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'photos', `${photos[0].base}-meta.json`), 'utf-8'));
         coverAspect = meta.aspect || 1.5;
-      } catch {}
+      } catch {
+        const a = parseFloat(mediaChecksums[`__photo-meta__/${slug}/${photos[0].base}`]);
+        if (Number.isFinite(a)) coverAspect = a;
+      }
     }
   }
   // Check if compressed cover exists (manual cover, not auto-detected from media)
   if (cover && !cover.startsWith('http') && !cover.startsWith('/')) {
-    const coverMeta = (() => { try { return JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'cover-meta.json'), 'utf-8')); } catch { return null; } })();
+    const coverMeta = (() => {
+      try { return JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'cover-meta.json'), 'utf-8')); } catch {}
+      const a = parseFloat(mediaChecksums[`__cover-meta__/${slug}`]);
+      return Number.isFinite(a) ? { aspect: a } : null;
+    })();
     if (coverMeta) {
       coverAspect = coverMeta.aspect || 1.778;
       cover = pUrl(slug, 'covers', 'cover-10p.webp');
