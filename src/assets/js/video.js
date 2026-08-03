@@ -134,6 +134,8 @@ class VideoPlayer {
         vlog('info', 'HLS init: loading ' + hlsSource.src);
         this.hls.loadSource(hlsSource.src);
         this.hls.attachMedia(this.video);
+        // Expose the Hls instance on the element (debugging/tests)
+        this.video._hls = this.hls;
         var self = this;
         this.hls.on('hlsManifestParsed', function() {
           vlog('info', 'HLS manifest loaded: ' + (self.hls.levels||[]).length + ' levels, ' + ((self.hls.levels||[]).map(function(l){ return l.height + 'p'; }).join(', ')));
