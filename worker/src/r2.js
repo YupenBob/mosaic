@@ -11,6 +11,7 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { verifyToken } from './auth.js';
+import { adjustUsage } from './usage.js';
 import { markDirty } from './github.js';
 
 // Workers platform request-body limit (~100MB). Larger files must use the
@@ -65,6 +66,8 @@ export async function uploadDirect(c) {
   const key = mediaKey(slug, filename);
 
   await c.env.MEDIA.put(key, c.req.raw.body, { httpMetadata: { contentType } });
+  const obj = await c.env.MEDIA.head(key).catch(() => null);
+  await adjustUsage(c.env, obj?.size ?? length, 1);
   return c.json({ ok: true, key, filename, folder: isSiteData ? 'site-data' : folder });
 }
 
@@ -78,6 +81,7 @@ export async function uploadComplete(c) {
     const obj = await c.env.MEDIA.head(key);
     if (!obj) return c.json({ error: 'Object not found', code: 'NOT_FOUND' }, 404);
     await markDirty(c.env);
+    await adjustUsage(c.env, obj.size || 0, 1);
     return c.json({ ok: true, key, size: obj.size });
   } catch (e) { return c.json({ error: e.message, code: 'R2_ERROR' }, 500); }
 }
@@ -88,6 +92,7 @@ export async function deleteMediaFile(c) {
   const filename = c.req.param('file');
   if (!slug || !filename) return c.json({ error: 'slug and file required', code: 'INVALID_PARAMS' }, 400);
   let deleted = 0;
+  let deletedSize = 0;
   for (const prefix of ['originals', 'processed']) {
     let cursor;
     do {
@@ -96,6 +101,7 @@ export async function deleteMediaFile(c) {
       const list = await c.env.MEDIA.list(opts);
       for (const obj of (list.objects || [])) {
         if (obj.key.split('/').pop() === filename) {
+          deletedSize += obj.size || 0;
           await c.env.MEDIA.delete(obj.key);
           deleted++;
         }
@@ -103,6 +109,7 @@ export async function deleteMediaFile(c) {
       cursor = list.truncated ? list.cursor : null;
     } while (cursor);
   }
+  await adjustUsage(c.env, -deletedSize, -deleted);
   return c.json({ ok: true, deleted });
 }
 

@@ -10,12 +10,7 @@
 */
 @font-face {
   font-family: "remixicon";
-  src: url('remixicon.eot?t=1734404658139'); /* IE9*/
-  src: url('remixicon.eot?t=1734404658139#iefix') format('embedded-opentype'), /* IE6-IE8 */
-  url("remixicon.woff2?t=1734404658139") format("woff2"),
-  url("remixicon.woff?t=1734404658139") format("woff"),
-  url('remixicon.ttf?t=1734404658139') format('truetype'), /* chrome, firefox, opera, Safari, Android, iOS 4.2+*/
-  url('remixicon.svg?t=1734404658139#remixicon') format('svg'); /* iOS 4.1- */
+  src: url("remixicon.woff2?t=1734404658139") format("woff2");
   font-display: swap;
 }
 
@@ -3101,4 +3096,3 @@
 .ri-no-credit-card-line:before { content: "\f5f0"; }
 .ri-service-bell-fill:before { content: "\f5f1"; }
 .ri-service-bell-line:before { content: "\f5f2"; }
-

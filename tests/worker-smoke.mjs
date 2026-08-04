@@ -337,7 +337,30 @@ await record('CORS allowlist (admin allowed, others blocked, public open)', asyn
   assert.equal(pub.headers.get('access-control-allow-origin'), '*');
 });
 
+// ── 13. Usage snapshot ──
+await record('usage snapshot (disk rebuilds, uploads/deletes adjust)', async () => {
+  // First disk read lists the bucket and persists the snapshot baseline.
+  const disk = await (await call('/api/disk', { token: TOKEN })).json();
+  assert.ok(disk.size >= 1 && disk.objects >= 1, 'disk lists bucket');
+  assert.ok(store.has('site-data/media-usage.json'), 'snapshot persisted by disk read');
+  const base = JSON.parse(store.get('site-data/media-usage.json'));
+
+  // Upload a new object via the presigned-complete path → snapshot grows.
+  await media.put('originals/a/photos/new.jpg', 'yy');
+  const done = await call('/api/upload/complete/a/new.jpg', { method: 'POST', token: TOKEN });
+  assert.equal(done.status, 200);
+  const afterUpload = JSON.parse(store.get('site-data/media-usage.json'));
+  assert.equal(afterUpload.objects, base.objects + 1, 'object count increased after upload');
+  assert.ok(afterUpload.size >= base.size, 'size increased after upload');
+
+  // deleteMediaFile → snapshot shrinks.
+  await call('/api/media/a/new.jpg', { method: 'DELETE', token: TOKEN });
+  const afterDelete = JSON.parse(store.get('site-data/media-usage.json'));
+  assert.ok(afterDelete.objects <= afterUpload.objects, 'object count decreased after delete');
+  assert.ok(afterDelete.size <= afterUpload.size, 'size decreased after delete');
+});
+
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 18) process.exit(1);
+if (passed < 19) process.exit(1);

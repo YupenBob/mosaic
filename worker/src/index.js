@@ -8,6 +8,7 @@ import { loginHandler, authMiddleware, clientIp } from './auth.js';
 import { listPosts, getPost, createOrUpdatePost, deletePost, dispatchBuild, getLatestRun, getConfig, updateConfig, markDirty, clearDirty, isDirty, renameCategory, renameTag, removeCategory, removeTag } from './github.js';
 import { generatePresignedUrl, uploadComplete, listMedia, serveMediaFile, uploadDirect, deleteMediaFile } from './r2.js';
 import { StatsDurableObject } from './stats-do.js';
+import { readUsageSnapshot, writeUsageSnapshot, invalidateUsageSnapshot } from './usage.js';
 
 const app = new Hono();
 // Run a fire-and-forget task; executionCtx only exists in Workers runtimes.
@@ -86,10 +87,21 @@ async function bucketUsage(env) {
 }
 
 let _diskCache = null, _diskAt = 0;
+const DISK_CACHE_TTL_MS = 5 * 60 * 1000;
+const USAGE_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 async function getDiskUsage(env) {
-  if (_diskCache && Date.now() - _diskAt < 60000) return _diskCache;
+  if (_diskCache && Date.now() - _diskAt < DISK_CACHE_TTL_MS) return _diskCache;
+  const snap = await readUsageSnapshot(env);
+  if (snap && Date.now() - (snap.updatedAt || 0) < USAGE_SNAPSHOT_MAX_AGE_MS) {
+    _diskCache = { size: snap.size, objects: snap.objects };
+    _diskAt = Date.now();
+    return _diskCache;
+  }
   _diskCache = await bucketUsage(env);
   _diskAt = Date.now();
+  // Persist the fresh totals so subsequent reads are cheap.
+  await writeUsageSnapshot(env, _diskCache.size, _diskCache.objects);
   return _diskCache;
 }
 
@@ -110,11 +122,13 @@ async function scanOrphans(env, valid, mode) {
     } while (cursor);
     return { orphans, freed, deleted };
   }));
-  return parts.reduce((acc, p) => ({
+  const total = parts.reduce((acc, p) => ({
     orphans: acc.orphans.concat(p.orphans),
     freed: acc.freed + p.freed,
     deleted: acc.deleted + p.deleted,
   }), { orphans: [], freed: 0, deleted: 0 });
+  if (mode === 'delete' && total.deleted > 0) await invalidateUsageSnapshot(env);
+  return total;
 }
 
 // Track view — public (dedup by IP: 10min cooldown)
@@ -305,6 +319,7 @@ app.delete('/api/posts/:slug', async (c) => {
       } while (cursor);
     }
     if (r2Count > 0) result.r2Deleted = r2Count;
+    if (r2Count > 0) await invalidateUsageSnapshot(c.env);
 
     defer(c, () => markDirty(c.env));
     return c.json(result);
@@ -535,6 +550,7 @@ app.delete('/api/processed-cache', async (c) => {
       }
       cursor = list.truncated ? list.cursor : null;
     } while (cursor);
+    if (deleted > 0) await invalidateUsageSnapshot(c.env);
     return c.json({ deleted, freed, freedMB: (freed / 1048576).toFixed(1) });
   } catch (e) { return c.json({ error: e.message, code: 'R2_ERROR' }, 502); }
 });
