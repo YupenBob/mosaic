@@ -307,6 +307,23 @@ export async function getLatestRun(c) {
   return result;
 }
 
+// Cancel the latest running workflow run (requires a token with actions:write).
+export async function cancelRun(c) {
+  const run = await getLatestRun(c);
+  if (!run) return { ok: false, error: 'No build found', status: 404 };
+  if (run.status !== 'in_progress' && run.status !== 'queued') {
+    return { ok: false, error: 'Build is not running', status: 409 };
+  }
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs/${run.id}/cancel`, {
+    method: 'POST',
+    headers: headers(c),
+  });
+  if (resp.ok || resp.status === 202) return { ok: true, runNumber: run.runNumber };
+  if (resp.status === 403) return { ok: false, error: 'Token lacks actions:write permission', status: 403 };
+  if (resp.status === 409) return { ok: false, error: 'Build already completed or cancelling', status: 409 };
+  return { ok: false, error: `GitHub API ${resp.status}`, status: resp.status };
+}
+
 export async function getRunHistory(c) {
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=10`, {
     headers: headers(c),

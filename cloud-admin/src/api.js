@@ -126,6 +126,9 @@ export const build = {
   /** Report build completion: {success: true} clears the dirty flag, false re-marks it. */
   done: (body = {}) => apiFetch('/build/done', { method: 'POST', body: JSON.stringify(body) }),
 
+  /** Cancel the currently running build. */
+  cancel: () => apiFetch('/build/cancel', { method: 'POST' }),
+
   history: () => apiFetch('/build/history'),
 
   trigger: () => apiFetch('/build', { method: 'POST' }),

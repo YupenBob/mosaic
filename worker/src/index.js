@@ -21,6 +21,7 @@ import {
   renameTag,
   removeCategory,
   removeTag,
+  cancelRun,
 } from './github.js';
 import {
   generatePresignedUrl,
@@ -482,6 +483,20 @@ app.post('/api/build/done', async (c) => {
     return c.json({ ok: true, dirty: false });
   } catch (e) {
     return c.json({ error: e.message, code: 'BUILD_DONE_ERROR' }, 502);
+  }
+});
+
+// Cancel the latest running build (GitHub Actions run).
+app.post('/api/build/cancel', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization') || '';
+    const auth = await verifyToken(c, authHeader.replace('Bearer ', ''));
+    if (!auth.ok) return c.json({ error: 'Unauthorized', code: 'AUTH_REQUIRED' }, auth.status || 401);
+    const result = await cancelRun(c);
+    if (!result.ok) return c.json({ error: result.error, code: 'CANCEL_FAILED' }, result.status || 400);
+    return c.json({ ok: true, runNumber: result.runNumber });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'CANCEL_ERROR' }, 502);
   }
 });
 

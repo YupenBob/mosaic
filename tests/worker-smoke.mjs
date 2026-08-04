@@ -70,6 +70,30 @@ const gh = new Map([
 const ghFetch = async (url, opts = {}) => {
   const prefix = 'https://api.github.com/repos/test/repo/contents/';
   const href = String(url);
+  if (href.includes('/actions/workflows/pipeline.yml/runs')) {
+    return new Response(
+      JSON.stringify({
+        workflow_runs: [
+          {
+            id: 123,
+            run_number: 7,
+            status: 'in_progress',
+            conclusion: null,
+            display_title: 'smoke',
+            head_branch: 'main',
+            head_sha: 'abc1234',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            event: 'workflow_dispatch',
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+  if (href.includes('/actions/runs/') && href.endsWith('/cancel')) {
+    return new Response(null, { status: 202 });
+  }
   if (!href.startsWith(prefix)) return new Response(JSON.stringify({}), { status: 404 });
   const key = decodeURIComponent(href.slice(prefix.length)).replace(/\/+$/, '');
   if (key === 'content/posts') {
@@ -446,7 +470,16 @@ await record('build done hook (auth, clear on success, re-mark on failure)', asy
   assert.ok(reMarked.count >= 1, 'dirty re-marked after failed build');
 });
 
+// ── 15. Build cancel ──
+await record('build cancel (auth required, cancels running run)', async () => {
+  const unauth = await call('/api/build/cancel', { method: 'POST' });
+  assert.equal(unauth.status, 401);
+  const r = await call('/api/build/cancel', { method: 'POST', token: TOKEN });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).runNumber, 7);
+});
+
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 20) process.exit(1);
+if (passed < 21) process.exit(1);

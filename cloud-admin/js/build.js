@@ -4,7 +4,7 @@
  */
 import { build } from '../src/api.js';
 import { t } from './i18n.js';
-import { escHtml, formatTime, fmtDuration, getStatusDef, statusBadge, toast, copyText } from './ui.js';
+import { escHtml, formatTime, fmtDuration, getStatusDef, statusBadge, toast, copyText, modalConfirm } from './ui.js';
 
 // Chinese labels for the known pipeline steps (GitHub returns English names)
 const STEP_LABELS_ZH = {
@@ -509,6 +509,11 @@ function renderStatusCard(run) {
         ${statusBadge(def)}
         ${dur ? `<span class="build-duration" id="build-duration" data-start="${run.createdAt}" data-status="${run.status}">${durLabel} ${dur}</span>` : ''}
         <span class="build-duration" id="build-updated" style="margin-left:auto"></span>
+        ${
+          run.status === 'in_progress' || run.status === 'queued'
+            ? `<button class="btn btn-danger btn-sm" data-build-cancel onclick="window.doCancelBuild()" title="${t('build.cancel')}" aria-label="${t('build.cancel')}"><i class="ri-stop-line"></i> ${t('build.cancel')}</button>`
+            : ''
+        }
       </div>
 
       ${renderPipeline(run)}
@@ -545,6 +550,17 @@ function renderStatusCard(run) {
     </div>
   `;
 }
+
+window.doCancelBuild = () => {
+  modalConfirm(t('build.cancelConfirmTitle'), t('build.cancelConfirmBody'), async () => {
+    try {
+      const r = await build.cancel();
+      toast(t('build.cancelSent', { n: r.runNumber || '' }), 'info', 6000);
+    } catch (err) {
+      toast(t('build.cancelFailed') + ': ' + err.message, 'error', 8000);
+    }
+  });
+};
 
 function renderRunHistory(runs) {
   return `
