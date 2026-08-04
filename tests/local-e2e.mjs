@@ -6,6 +6,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
+import net from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -15,16 +16,26 @@ const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
-const PORT = 3000;
 const HOST = '127.0.0.1';
 const SERVE_MAIN = require.resolve('serve/build/main.js');
 
-function waitForServer() {
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.on('error', reject);
+    probe.listen(0, HOST, () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+function waitForServer(port) {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + 20000;
     const ping = () => {
       http
-        .get(`http://${HOST}:${PORT}/index.html`, (r) => {
+        .get(`http://${HOST}:${port}/index.html`, (r) => {
           r.resume();
           resolve();
         })
@@ -43,15 +54,16 @@ async function main() {
     process.exit(1);
   }
 
-  const server = spawn(process.execPath, [SERVE_MAIN, 'dist', '-l', `tcp://${HOST}:${PORT}`, '--no-clipboard'], {
+  const port = await getFreePort();
+  const server = spawn(process.execPath, [SERVE_MAIN, 'dist', '-l', `tcp://${HOST}:${port}`, '--no-clipboard'], {
     cwd: ROOT,
     stdio: ['ignore', 'ignore', 'inherit'],
   });
   server.on('error', (e) => console.error('static server error:', e.message));
 
   try {
-    await waitForServer();
-    console.log(`Serving ${DIST} at http://${HOST}:${PORT}`);
+    await waitForServer(port);
+    console.log(`Serving ${DIST} at http://${HOST}:${port}`);
 
     const cmd = [
       'npx playwright test tests/frontend.spec.js',
@@ -62,7 +74,7 @@ async function main() {
       cwd: ROOT,
       stdio: 'inherit',
       shell: true,
-      env: { ...process.env, SITE: `http://${HOST}:${PORT}`, ADMIN: 'skip' },
+      env: { ...process.env, SITE: `http://${HOST}:${port}`, ADMIN: 'skip' },
       timeout: 10 * 60 * 1000,
     });
     process.exit(result.status ?? 1);
