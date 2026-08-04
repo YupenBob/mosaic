@@ -94,7 +94,7 @@ export function handleUploadFiles(files) {
     setState(item, 'uploading', '0%');
     try {
       const ok = await uploadFilePresigned(item);
-      if (!ok) await uploadFileDirect(item);
+      if (!ok && item.status !== 'cancelled') await uploadFileDirect(item);
       if (item.status === 'cancelled') return;
       item.status = 'done';
       item.done = true;
@@ -189,7 +189,7 @@ async function runSingle(item) {
   setState(item, 'uploading', '0%');
   try {
     const ok = await uploadFilePresigned(item);
-    if (!ok) await uploadFileDirect(item);
+    if (!ok && item.status !== 'cancelled') await uploadFileDirect(item);
     if (item.status === 'cancelled') return;
     item.status = 'done';
     item.done = true;
@@ -205,42 +205,53 @@ async function runSingle(item) {
   }
 }
 
-function uploadFilePresigned(item) {
-  return async () => {
-    let presigned;
-    try {
-      presigned = await upload.presign(item.slug, item.file.name, item.file.type || 'application/octet-stream');
-    } catch {
-      return false;
-    }
-    const xhr = new XMLHttpRequest();
-    item.controller = xhr;
-    xhr.open('PUT', presigned.url);
-    xhr.setRequestHeader('Content-Type', item.file.type || 'application/octet-stream');
-    xhr.timeout = 600000;
-    return new Promise((resolve) => {
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable && item.status !== 'cancelled') progressUI(item, Math.round((e.loaded / e.total) * 100));
-      });
-      xhr.addEventListener('load', () => {
-        item.controller = null;
-        if (xhr.status >= 200 && xhr.status < 300) {
-          upload.complete(item.slug, item.file.name).catch(() => {});
-          resolve(true);
-        } else {
-          resolve(false); // fall back to direct
-        }
-      });
-      xhr.addEventListener('error', () => {
-        item.controller = null;
-        resolve(false);
-      });
-      xhr.addEventListener('abort', () => {
-        item.controller = null;
-      });
-      xhr.send(item.file);
+async function uploadFilePresigned(item) {
+  let presigned;
+  try {
+    presigned = await upload.presign(item.slug, item.file.name, item.file.type || 'application/octet-stream');
+  } catch {
+    return false;
+  }
+  const xhr = new XMLHttpRequest();
+  item.controller = xhr;
+  xhr.open('PUT', presigned.url);
+  xhr.setRequestHeader('Content-Type', item.file.type || 'application/octet-stream');
+  xhr.timeout = 600000;
+  return new Promise((resolve) => {
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && item.status !== 'cancelled') progressUI(item, Math.round((e.loaded / e.total) * 100));
     });
-  };
+    xhr.addEventListener('load', () => {
+      item.controller = null;
+      if (item.status === 'cancelled') {
+        resolve(false);
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        // Confirm the object landed + mark the site dirty. If confirmation
+        // fails the upload is NOT silently swallowed — fall back to direct.
+        upload
+          .complete(item.slug, item.file.name)
+          .then(() => resolve(true))
+          .catch(() => resolve(false));
+      } else {
+        resolve(false); // fall back to direct
+      }
+    });
+    xhr.addEventListener('error', () => {
+      item.controller = null;
+      resolve(false);
+    });
+    xhr.addEventListener('timeout', () => {
+      item.controller = null;
+      resolve(false);
+    });
+    xhr.addEventListener('abort', () => {
+      item.controller = null;
+      resolve(false);
+    });
+    xhr.send(item.file);
+  });
 }
 
 function uploadFileDirect(item) {
@@ -258,6 +269,7 @@ function uploadFileDirect(item) {
     xhr.addEventListener('load', () => {
       item.controller = null;
       if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else if (xhr.status === 413) reject(new Error('文件超过 100MB 且预签名上传失败，无法兜底'));
       else reject(new Error('HTTP ' + xhr.status));
     });
     xhr.addEventListener('error', () => {
