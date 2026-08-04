@@ -6,17 +6,23 @@
   "scripts": {
     "compress": "node scripts/compress.js",
     "build": "node scripts/generate.js && node scripts/generate-brand-assets.js",
-    "serve": "npx serve dist"
+    "serve": "npx serve dist",
+    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs && node tests/worker-smoke.mjs && node tests/build-smoke.mjs",
+    "validate": "node scripts/validate-config.mjs",
+    "minify": "node scripts/minify.mjs",
+    "test:e2e:local": "node tests/local-e2e.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "ejs": "^3.1.10",
+    "esbuild": "^0.28.1",
     "fs-extra": "^11.3.0",
     "glob": "^11.0.1",
     "gray-matter": "^4.0.3",
     "html-minifier-terser": "^7.2.0",
     "marked": "^15.0.7",
     "playwright": "^1.60.0",
+    "serve": "^14.2.6",
     "sharp": "^0.33.5"
   }
 }

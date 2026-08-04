@@ -98,6 +98,17 @@ async function main() {
     }
     await page.close();
 
+    // ── 4b. Feed + Sitemap ──
+    console.log('\nFeed & Sitemap');
+    for (const f of ['feed.xml', 'sitemap.xml']) {
+      try {
+        const resp = await fetch(`${SITE}/${f}`, { signal: AbortSignal.timeout(15000) });
+        check(`${f} loads`, resp.ok, `${resp.status}`);
+      } catch (e) {
+        check(`${f} loads`, false, e.message);
+      }
+    }
+
     // ── 5. Admin loads ──
     if (ADMIN) {
       console.log('\nAdmin Panel');

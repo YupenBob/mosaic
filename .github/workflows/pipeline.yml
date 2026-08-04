@@ -118,11 +118,24 @@ jobs:
         run: node scripts/build-progress.mjs test || true
 
       # ── 3b. Tests ──
-      - name: Run tests
+      - name: Install worker deps
+        run: cd worker && npm ci && cd ..
+
+      - name: Run checks (syntax + smoke)
+        run: npm run check
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Frontend E2E (local static preview)
         run: |
-          cd worker && npm ci && cd ..
-          node --check scripts/compress.js scripts/generate.js scripts/upload.js
-          node tests/worker-smoke.mjs
+          npx serve dist -l 3000 >/dev/null 2>&1 &
+          SERVER_PID=$!
+          sleep 3
+          SITE=http://127.0.0.1:3000 ADMIN=skip npx playwright test tests/frontend.spec.js --grep-invert "Worker health|mobile viewport|admin login" --reporter=list
+          EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          exit $EXIT
 
       - name: Progress — upload
         env:
