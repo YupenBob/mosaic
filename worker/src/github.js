@@ -18,7 +18,10 @@ let _configCache = null;
 let _configTime = 0;
 const CACHE_MS = { posts: 60000, config: 120000 };
 
-export function bustCache() { _postsCache = null; _configCache = null; }
+export function bustCache() {
+  _postsCache = null;
+  _configCache = null;
+}
 
 // ====== Dirty State (R2 + memory) ======
 const DIRTY_KEY = 'site-data/dirty.json';
@@ -35,14 +38,20 @@ export async function isDirty(env) {
 
 export async function markDirty(env) {
   const now = new Date().toISOString();
-  if (_dirtyState) { _dirtyState.count++; _dirtyState.last = now; }
-  else _dirtyState = { count: 1, last: now };
-  try { await env.MEDIA.put(DIRTY_KEY, JSON.stringify(_dirtyState), { httpMetadata: { contentType: 'application/json' } }); } catch {}
+  if (_dirtyState) {
+    _dirtyState.count++;
+    _dirtyState.last = now;
+  } else _dirtyState = { count: 1, last: now };
+  try {
+    await env.MEDIA.put(DIRTY_KEY, JSON.stringify(_dirtyState), { httpMetadata: { contentType: 'application/json' } });
+  } catch {}
 }
 
 export async function clearDirty(env) {
   _dirtyState = null;
-  try { await env.MEDIA.delete(DIRTY_KEY); } catch {}
+  try {
+    await env.MEDIA.delete(DIRTY_KEY);
+  } catch {}
 }
 
 // ====== Contents API ======
@@ -50,17 +59,32 @@ export async function clearDirty(env) {
 async function listPostsUncached(c) {
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts`, { headers: headers(c) });
   if (!resp.ok) throw new Error(`GitHub listPosts: ${resp.status}`);
-  const dirs = (await resp.json()).filter(f => f.type === 'dir');
-  return Promise.all(dirs.map(async d => {
-    try {
-      const mdResp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts/${d.name}/index.md`, { headers: headers(c) });
-      if (!mdResp.ok) return { slug: d.name, title: d.name };
-      const md = await mdResp.json();
-      const content = decodeBase64(md.content);
-      const fm = parseFrontMatter(content);
-      return { slug: d.name, title: fm.title || d.name, category: fm.category, tags: fm.tags || [], date: fm.date, description: fm.description, cover: fm.cover || '' };
-    } catch { return { slug: d.name, title: d.name, cover: '' }; }
-  }));
+  const dirs = (await resp.json()).filter((f) => f.type === 'dir');
+  return Promise.all(
+    dirs.map(async (d) => {
+      try {
+        const mdResp = await fetch(
+          `${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts/${d.name}/index.md`,
+          { headers: headers(c) },
+        );
+        if (!mdResp.ok) return { slug: d.name, title: d.name };
+        const md = await mdResp.json();
+        const content = decodeBase64(md.content);
+        const fm = parseFrontMatter(content);
+        return {
+          slug: d.name,
+          title: fm.title || d.name,
+          category: fm.category,
+          tags: fm.tags || [],
+          date: fm.date,
+          description: fm.description,
+          cover: fm.cover || '',
+        };
+      } catch {
+        return { slug: d.name, title: d.name, cover: '' };
+      }
+    }),
+  );
 }
 
 async function listPostsFromR2(c) {
@@ -78,7 +102,9 @@ async function listPostsFromR2(c) {
       description: p.description,
       cover: p.cover || '',
     }));
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export async function listPosts(c) {
@@ -97,7 +123,9 @@ export async function listPosts(c) {
 }
 
 export async function getPost(c, slug) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts/${slug}/index.md`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts/${slug}/index.md`, {
+    headers: headers(c),
+  });
   if (!resp.ok) return null;
   const md = await resp.json();
   const content = decodeBase64(md.content);
@@ -109,7 +137,7 @@ export async function getPost(c, slug) {
 export async function createOrUpdatePost(c, slug, frontMatter, body, message) {
   const existing = await getPost(c, slug);
   const yaml = Object.entries(frontMatter)
-    .map(([k, v]) => Array.isArray(v) ? `${k}: [${v.join(', ')}]` : `${k}: ${v}`)
+    .map(([k, v]) => (Array.isArray(v) ? `${k}: [${v.join(', ')}]` : `${k}: ${v}`))
     .join('\n');
   const content = `---\n${yaml}\n---\n\n${body || ''}`;
   const endpoint = `${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/content/posts/${slug}/index.md`;
@@ -130,7 +158,7 @@ async function deleteDir(c, dirPath, message) {
   if (!resp.ok) return 0;
   const items = await resp.json();
   let count = 0;
-  for (const item of (Array.isArray(items) ? items : [items])) {
+  for (const item of Array.isArray(items) ? items : [items]) {
     if (item.type === 'dir') {
       count += await deleteDir(c, item.path, message);
     } else {
@@ -162,7 +190,7 @@ export async function dispatchBuild(c) {
       method: 'POST',
       headers: { ...headers(c), 'Content-Type': 'application/json' },
       body: JSON.stringify({ ref: 'main' }),
-    }
+    },
   );
   if (dispatchResp.ok || dispatchResp.status === 204) {
     return { method: 'workflow_dispatch', status: dispatchResp.status };
@@ -175,7 +203,9 @@ export async function dispatchBuild(c) {
     const content = `${ts}\n`;
     let sha = '';
     try {
-      const existing = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${path}`, { headers: headers(c) });
+      const existing = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${path}`, {
+        headers: headers(c),
+      });
       if (existing.ok) {
         const f = await existing.json();
         sha = f.sha;
@@ -199,7 +229,9 @@ export async function dispatchBuild(c) {
 }
 
 export async function getLatestRun(c) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=1`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=1`, {
+    headers: headers(c),
+  });
   if (!resp.ok) return null;
   const data = await resp.json();
   const run = data.workflow_runs?.[0];
@@ -226,14 +258,16 @@ export async function getLatestRun(c) {
   // Fetch job steps for running or terminal builds (full pipeline timeline)
   if (run.status === 'in_progress' || run.conclusion === 'success' || run.conclusion === 'failure') {
     try {
-      const jobsResp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs/${run.id}/jobs`, { headers: headers(c) });
+      const jobsResp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs/${run.id}/jobs`, {
+        headers: headers(c),
+      });
       if (jobsResp.ok) {
         const jobsData = await jobsResp.json();
         const steps = [];
         let jobUrl = '';
-        for (const job of (jobsData.jobs || [])) {
+        for (const job of jobsData.jobs || []) {
           if (!jobUrl && job.html_url) jobUrl = job.html_url;
-          for (const step of (job.steps || [])) {
+          for (const step of job.steps || []) {
             steps.push({
               name: step.name,
               status: step.status,
@@ -263,11 +297,13 @@ export async function getLatestRun(c) {
 }
 
 export async function getRunHistory(c) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=10`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=10`, {
+    headers: headers(c),
+  });
   if (!resp.ok) return [];
   const data = await resp.json();
   const repo = c.env.GITHUB_REPO;
-  return (data.workflow_runs || []).map(run => ({
+  return (data.workflow_runs || []).map((run) => ({
     id: run.id,
     runNumber: run.run_number,
     status: run.status,
@@ -290,7 +326,9 @@ export async function getRunHistory(c) {
 
 export async function getConfig(c) {
   if (_configCache && Date.now() - _configTime < CACHE_MS.config) return _configCache;
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, { headers: headers(c) });
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, {
+    headers: headers(c),
+  });
   if (!resp.ok) return {};
   const file = await resp.json();
   const fresh = JSON.parse(decodeBase64(file.content));
@@ -310,7 +348,9 @@ function deepMerge(base, patch) {
 }
 
 export async function updateConfig(c, config, message) {
-  const existing = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, { headers: headers(c) });
+  const existing = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, {
+    headers: headers(c),
+  });
   if (!existing.ok) throw new Error('Config not found');
   const file = await existing.json();
   const current = JSON.parse(decodeBase64(file.content));
@@ -319,7 +359,11 @@ export async function updateConfig(c, config, message) {
   const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/mosaic.config.json`, {
     method: 'PUT',
     headers: { ...headers(c), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: message || 'Update config', content: encodeBase64(JSON.stringify(merged, null, 2)), sha: file.sha }),
+    body: JSON.stringify({
+      message: message || 'Update config',
+      content: encodeBase64(JSON.stringify(merged, null, 2)),
+      sha: file.sha,
+    }),
   });
   if (!resp.ok) throw new Error(`updateConfig: ${resp.status}`);
   bustCache();
@@ -351,7 +395,16 @@ export async function renameCategory(c, oldName, newName, message) {
     if (!file) continue;
     const next = file.content.replace(/^category:.*$/m, `category: ${newName}`);
     if (next === file.content) continue;
-    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Rename category ${oldName} to ${newName}`)) renamed++;
+    if (
+      await putRawFile(
+        c,
+        `content/posts/${p.slug}/index.md`,
+        next,
+        file.sha,
+        message || `Rename category ${oldName} to ${newName}`,
+      )
+    )
+      renamed++;
   }
   bustCache();
   return renamed;
@@ -361,14 +414,23 @@ export async function renameTag(c, oldName, newName, message) {
   const posts = await listPosts(c);
   let renamed = 0;
   for (const p of posts) {
-    const tags = (p.tags || []).map(t => String(t));
+    const tags = (p.tags || []).map((t) => String(t));
     if (!tags.includes(oldName)) continue;
     const file = await fetchRawFile(c, `content/posts/${p.slug}/index.md`);
     if (!file) continue;
-    const newTags = tags.map(t => t === oldName ? newName : t);
+    const newTags = tags.map((t) => (t === oldName ? newName : t));
     const next = file.content.replace(/^tags:.*$/m, `tags: [${newTags.join(', ')}]`);
     if (next === file.content) continue;
-    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Rename tag ${oldName} to ${newName}`)) renamed++;
+    if (
+      await putRawFile(
+        c,
+        `content/posts/${p.slug}/index.md`,
+        next,
+        file.sha,
+        message || `Rename tag ${oldName} to ${newName}`,
+      )
+    )
+      renamed++;
   }
   bustCache();
   return renamed;
@@ -387,7 +449,8 @@ export async function removeCategory(c, name, message) {
     if (!file) continue;
     const next = file.content.replace(/^category:.*$/m, '');
     if (next === file.content) continue;
-    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Remove category ${name}`)) affected++;
+    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Remove category ${name}`))
+      affected++;
   }
   bustCache();
   return affected;
@@ -408,7 +471,8 @@ export async function removeTag(c, name, message) {
     const newTags = tags.filter((tag) => tag !== name);
     const next = file.content.replace(/^tags:.*$/m, newTags.length ? `tags: [${newTags.join(', ')}]` : '');
     if (next === file.content) continue;
-    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Remove tag ${name}`)) affected++;
+    if (await putRawFile(c, `content/posts/${p.slug}/index.md`, next, file.sha, message || `Remove tag ${name}`))
+      affected++;
   }
   bustCache();
   return affected;
@@ -418,7 +482,7 @@ export async function removeTag(c, name, message) {
 
 function decodeBase64(base64) {
   const binary = atob(base64);
-  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
 
@@ -437,12 +501,16 @@ function parseFrontMatter(content) {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) return {};
   const fm = {};
-  match[1].split('\n').forEach(line => {
+  match[1].split('\n').forEach((line) => {
     const m = line.match(/^(\w[\w_-]*):\s*(.*)$/);
     if (!m) return;
     let val = m[2].trim();
     if (val.startsWith('[') && val.endsWith(']')) {
-      val = val.slice(1, -1).split(',').map(s => s.trim().replace(/^"(.*)"$/, '$1')).filter(Boolean);
+      val = val
+        .slice(1, -1)
+        .split(',')
+        .map((s) => s.trim().replace(/^"(.*)"$/, '$1'))
+        .filter(Boolean);
     }
     fm[m[1]] = val;
   });

@@ -28,7 +28,9 @@ try {
 
 // Load existing checksums
 let checksums = {};
-try { checksums = JSON.parse(fs.readFileSync(CHECKSUMS_FILE, 'utf-8')); } catch {}
+try {
+  checksums = JSON.parse(fs.readFileSync(CHECKSUMS_FILE, 'utf-8'));
+} catch {}
 // v2 checksums add a media manifest (per-video tiers, cover aspect) so
 // generate.js can emit HLS/multi-res URLs even on cache-hit (skip) builds.
 const CHECKSUMS_VERSION = '2';
@@ -61,9 +63,14 @@ function uploadProgress() {
   if (Date.now() - _lastUpload < 5000) return;
   _lastUpload = Date.now();
   _uploading = true;
-  execFile('rclone', ['copyto', PROGRESS_FILE, `r2:${process.env.R2_BUCKET}/site-data/build-progress.json`, '--low-level-retries', '1'], { timeout: 15000 }, () => {
-    _uploading = false;
-  });
+  execFile(
+    'rclone',
+    ['copyto', PROGRESS_FILE, `r2:${process.env.R2_BUCKET}/site-data/build-progress.json`, '--low-level-retries', '1'],
+    { timeout: 15000 },
+    () => {
+      _uploading = false;
+    },
+  );
 }
 
 function tick(current) {
@@ -86,7 +93,11 @@ function reportCurrent(current) {
   }
 }
 
-process.on('exit', () => { try { writeProgress(); } catch {} });
+process.on('exit', () => {
+  try {
+    writeProgress();
+  } catch {}
+});
 
 function md5(filePath) {
   return crypto.createHash('md5').update(fs.readFileSync(filePath)).digest('hex');
@@ -100,7 +111,7 @@ function changed(filePath) {
   return true;
 }
 
-const POSTS = fs.readdirSync(CONTENT).filter(d => fs.statSync(path.join(CONTENT, d)).isDirectory());
+const POSTS = fs.readdirSync(CONTENT).filter((d) => fs.statSync(path.join(CONTENT, d)).isDirectory());
 
 // ── Image compression ──
 const QUALITY = { 1080: 85, 720: 80, 480: 75 };
@@ -118,10 +129,20 @@ async function compressPhotos(postDir, slug) {
     if (!/\.(jpg|jpeg|png|webp|tiff)$/i.test(f)) continue;
     const base = path.parse(f).name;
     const src = path.join(photosDir, f);
-    if (!forceReprocess && !changed(src)) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
+    if (!forceReprocess && !changed(src)) {
+      console.log(`  SKIP ${f} (unchanged)`);
+      tick(`${slug}/${f}`);
+      continue;
+    }
     reportCurrent(`${slug}/${f}`);
     // Source changed: remove stale outputs so they are regenerated (and re-uploaded)
-    for (const out of [`${base}-10p.webp`, `${base}-480p.webp`, `${base}-720p.webp`, `${base}-1080p.webp`, `${base}-meta.json`]) {
+    for (const out of [
+      `${base}-10p.webp`,
+      `${base}-480p.webp`,
+      `${base}-720p.webp`,
+      `${base}-1080p.webp`,
+      `${base}-meta.json`,
+    ]) {
       fs.rmSync(path.join(outDir, out), { force: true });
     }
     const img = sharp(src);
@@ -129,14 +150,24 @@ async function compressPhotos(postDir, slug) {
     const aspect = meta.width / (meta.height || 1);
 
     // LQIP: 10px thumbnail for instant placeholder
-    await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(path.join(outDir, `${base}-10p.webp`));
+    await img
+      .clone()
+      .resize({ width: THUMB_W, withoutEnlargement: true })
+      .webp({ quality: 30 })
+      .toFile(path.join(outDir, `${base}-10p.webp`));
 
     for (const w of SIZES) {
-      await img.clone().resize({ width: w, withoutEnlargement: true })
-        .webp({ quality: QUALITY[w] || 80 }).toFile(path.join(outDir, `${base}-${w}p.webp`));
+      await img
+        .clone()
+        .resize({ width: w, withoutEnlargement: true })
+        .webp({ quality: QUALITY[w] || 80 })
+        .toFile(path.join(outDir, `${base}-${w}p.webp`));
     }
     // Save meta
-    fs.writeFileSync(path.join(outDir, `${base}-meta.json`), JSON.stringify({ aspect, width: meta.width, height: meta.height }));
+    fs.writeFileSync(
+      path.join(outDir, `${base}-meta.json`),
+      JSON.stringify({ aspect, width: meta.width, height: meta.height }),
+    );
     checksums[`__photo-meta__/${slug}/${base}`] = String(aspect);
     tick(`${slug}/${f}`);
   }
@@ -149,13 +180,19 @@ async function compressCover(postDir, slug) {
   let coverFile = null;
   for (const c of covers) {
     const p = path.join(postDir, c);
-    if (fs.existsSync(p)) { coverFile = p; break; }
+    if (fs.existsSync(p)) {
+      coverFile = p;
+      break;
+    }
   }
   if (!coverFile) {
     // Try first photo as cover
     const photosDir = path.join(postDir, 'photos');
     if (fs.existsSync(photosDir)) {
-      const files = fs.readdirSync(photosDir).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f)).sort();
+      const files = fs
+        .readdirSync(photosDir)
+        .filter((f) => /\.(jpg|jpeg|png|webp)$/i.test(f))
+        .sort();
       if (files.length) coverFile = path.join(photosDir, files[0]);
     }
   }
@@ -165,7 +202,10 @@ async function compressCover(postDir, slug) {
   const coverHash = md5(coverFile);
   const outDir = path.join(DIST, 'posts', slug, 'media');
   fs.mkdirSync(outDir, { recursive: true });
-  if (!forceReprocess && checksums[coverKey] === coverHash) { console.log(`  SKIP cover (unchanged)`); return; }
+  if (!forceReprocess && checksums[coverKey] === coverHash) {
+    console.log(`  SKIP cover (unchanged)`);
+    return;
+  }
   checksums[coverKey] = coverHash;
   for (const out of ['cover-10p.webp', 'cover-480p.webp', 'cover-720p.webp', 'cover-1080p.webp', 'cover-meta.json']) {
     fs.rmSync(path.join(outDir, out), { force: true });
@@ -175,22 +215,37 @@ async function compressCover(postDir, slug) {
   const aspect = meta.width / (meta.height || 1);
 
   // LQIP
-  await img.clone().resize({ width: THUMB_W, withoutEnlargement: true }).webp({ quality: 30 }).toFile(path.join(outDir, 'cover-10p.webp'));
+  await img
+    .clone()
+    .resize({ width: THUMB_W, withoutEnlargement: true })
+    .webp({ quality: 30 })
+    .toFile(path.join(outDir, 'cover-10p.webp'));
   for (const w of SIZES) {
-    await img.clone().resize({ width: w, withoutEnlargement: true })
-      .webp({ quality: QUALITY[w] || 80 }).toFile(path.join(outDir, `cover-${w}p.webp`));
+    await img
+      .clone()
+      .resize({ width: w, withoutEnlargement: true })
+      .webp({ quality: QUALITY[w] || 80 })
+      .toFile(path.join(outDir, `cover-${w}p.webp`));
   }
-  fs.writeFileSync(path.join(outDir, 'cover-meta.json'), JSON.stringify({ aspect, width: meta.width, height: meta.height }));
+  fs.writeFileSync(
+    path.join(outDir, 'cover-meta.json'),
+    JSON.stringify({ aspect, width: meta.width, height: meta.height }),
+  );
   checksums[`__cover-meta__/${slug}`] = String(aspect);
 }
 
 // ── Video compression ──
 function getSourceHeight(srcPath) {
   try {
-    const out = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 "${srcPath}"`, { encoding: 'utf-8', timeout: 10000 });
+    const out = execSync(
+      `ffprobe -v error -select_streams v:0 -show_entries stream=height -of default=noprint_wrappers=1:nokey=1 "${srcPath}"`,
+      { encoding: 'utf-8', timeout: 10000 },
+    );
     const h = parseInt(out.trim());
     return h > 0 ? h : 2160;
-  } catch { return 2160; }
+  } catch {
+    return 2160;
+  }
 }
 
 const ALL_RES = [
@@ -203,7 +258,11 @@ const ALL_RES = [
 ];
 
 async function compressVideo(file, postDir, slug) {
-  const baseName = path.parse(file).name.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
+  const baseName =
+    path
+      .parse(file)
+      .name.replace(/[^a-zA-Z0-9_-]/g, '')
+      .slice(0, 60) || 'video';
   const srcPath = path.join(postDir, 'videos', file);
   const outDir = path.join(DIST, 'posts', slug, 'media', 'videos');
   fs.mkdirSync(outDir, { recursive: true });
@@ -215,7 +274,7 @@ async function compressVideo(file, postDir, slug) {
   }
 
   const srcHeight = getSourceHeight(srcPath);
-  const resList = ALL_RES.filter(r => r.height <= srcHeight && r.height <= VIDEO_MAX_HEIGHT);
+  const resList = ALL_RES.filter((r) => r.height <= srcHeight && r.height <= VIDEO_MAX_HEIGHT);
   if (resList.length === 0) {
     console.log(`  ${file}: source too small (${srcHeight}px), copying as-is`);
     fs.copyFileSync(srcPath, path.join(outDir, file));
@@ -229,17 +288,38 @@ async function compressVideo(file, postDir, slug) {
     const outPath = path.join(outDir, `${baseName}-${res.name}.mp4`);
     try {
       await new Promise((resolve, reject) => {
-        const proc = spawn('ffmpeg', [
-          '-i', srcPath, '-vf', `scale=-2:${res.height},fps=30`,
-          '-c:v', 'libx264', '-crf', '23', '-preset', VIDEO_PRESET,
-          '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', outPath
-        ], { stdio: 'ignore' });
-        proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+        const proc = spawn(
+          'ffmpeg',
+          [
+            '-i',
+            srcPath,
+            '-vf',
+            `scale=-2:${res.height},fps=30`,
+            '-c:v',
+            'libx264',
+            '-crf',
+            '23',
+            '-preset',
+            VIDEO_PRESET,
+            '-c:a',
+            'aac',
+            '-b:a',
+            '128k',
+            '-movflags',
+            '+faststart',
+            '-y',
+            outPath,
+          ],
+          { stdio: 'ignore' },
+        );
+        proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
         proc.on('error', reject);
       });
       successRes.push(res.name);
       console.log(`  ${file} → ${res.name}`);
-    } catch (e) { console.error(`  FAIL ${res.name}: ${e.message}`); }
+    } catch (e) {
+      console.error(`  FAIL ${res.name}: ${e.message}`);
+    }
   }
 
   // HLS segment for each existing MP4
@@ -250,23 +330,43 @@ async function compressVideo(file, postDir, slug) {
       const plPath = path.join(outDir, `${baseName}-${res.name}.m3u8`);
       const segPattern = path.join(outDir, `${baseName}-${res.name}-%03d.ts`);
       await new Promise((resolve, reject) => {
-        const proc = spawn('ffmpeg', [
-          '-i', mp4Path, '-c', 'copy', '-hls_time', '6', '-hls_list_size', '0',
-          '-hls_segment_filename', segPattern, plPath, '-y'
-        ], { stdio: 'ignore' });
-        proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+        const proc = spawn(
+          'ffmpeg',
+          [
+            '-i',
+            mp4Path,
+            '-c',
+            'copy',
+            '-hls_time',
+            '6',
+            '-hls_list_size',
+            '0',
+            '-hls_segment_filename',
+            segPattern,
+            plPath,
+            '-y',
+          ],
+          { stdio: 'ignore' },
+        );
+        proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
         proc.on('error', reject);
       });
       if (!successRes.includes(res.name)) successRes.push(res.name);
-    } catch (e) { console.error(`  HLS FAIL ${res.name}: ${e.message}`); }
+    } catch (e) {
+      console.error(`  HLS FAIL ${res.name}: ${e.message}`);
+    }
   }
 
   // Generate poster
   try {
     const posterPath = path.join(outDir, `${baseName}-poster.jpg`);
     await new Promise((resolve, reject) => {
-      const proc = spawn('ffmpeg', ['-i', srcPath, '-ss', '00:00:01', '-vframes', '1', '-vf', 'scale=-2:720', '-y', posterPath], { stdio: 'ignore' });
-      proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+      const proc = spawn(
+        'ffmpeg',
+        ['-i', srcPath, '-ss', '00:00:01', '-vframes', '1', '-vf', 'scale=-2:720', '-y', posterPath],
+        { stdio: 'ignore' },
+      );
+      proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
       proc.on('error', reject);
     });
   } catch {}
@@ -295,22 +395,33 @@ async function compressMusic(postDir, slug) {
     if (!/\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)) continue;
     const base = path.parse(f).name;
     const src = path.join(musicDir, f);
-    if (!forceReprocess && !changed(src)) { console.log(`  SKIP music ${f} (unchanged)`); tick(`${slug}/${f}`); continue; }
+    if (!forceReprocess && !changed(src)) {
+      console.log(`  SKIP music ${f} (unchanged)`);
+      tick(`${slug}/${f}`);
+      continue;
+    }
     reportCurrent(`${slug}/${f}`);
     // Source changed: remove stale outputs for this track
     for (const stale of fs.readdirSync(outDir)) {
       if (stale.startsWith(base + '-')) fs.rmSync(path.join(outDir, stale), { force: true });
     }
-    for (const [label, bitrate] of [['128k', '128k'], ['320k', '320k']]) {
+    for (const [label, bitrate] of [
+      ['128k', '128k'],
+      ['320k', '320k'],
+    ]) {
       const outPath = path.join(outDir, `${base}-${label}.mp3`);
       try {
         await new Promise((resolve, reject) => {
-          const proc = spawn('ffmpeg', ['-i', src, '-vn', '-c:a', 'libmp3lame', '-b:a', bitrate, '-y', outPath], { stdio: 'ignore' });
-          proc.on('close', (code) => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+          const proc = spawn('ffmpeg', ['-i', src, '-vn', '-c:a', 'libmp3lame', '-b:a', bitrate, '-y', outPath], {
+            stdio: 'ignore',
+          });
+          proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
           proc.on('error', reject);
         });
         console.log(`  ${f} -> ${label}`);
-      } catch (e) { console.error(`  MUSIC FAIL ${f} ${label}: ${e.message}`); }
+      } catch (e) {
+        console.error(`  MUSIC FAIL ${f} ${label}: ${e.message}`);
+      }
     }
     tick(`${slug}/${f}`);
   }
@@ -322,15 +433,15 @@ for (const slug of POSTS) {
   const postDir = path.join(CONTENT, slug);
   const photosDir = path.join(postDir, 'photos');
   if (fs.existsSync(photosDir)) {
-    progress.total += fs.readdirSync(photosDir).filter(f => /\.(jpg|jpeg|png|webp|tiff)$/i.test(f)).length;
+    progress.total += fs.readdirSync(photosDir).filter((f) => /\.(jpg|jpeg|png|webp|tiff)$/i.test(f)).length;
   }
   const videosDir = path.join(postDir, 'videos');
   if (fs.existsSync(videosDir)) {
-    progress.total += fs.readdirSync(videosDir).filter(f => /\.(mp4|mov|avi|mkv|webm)$/i.test(f)).length;
+    progress.total += fs.readdirSync(videosDir).filter((f) => /\.(mp4|mov|avi|mkv|webm)$/i.test(f)).length;
   }
   const musicDir = path.join(postDir, 'music');
   if (fs.existsSync(musicDir)) {
-    progress.total += fs.readdirSync(musicDir).filter(f => /\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)).length;
+    progress.total += fs.readdirSync(musicDir).filter((f) => /\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(f)).length;
   }
 }
 _progressState = { stage: 'media', current: '准备中', done: 0, total: progress.total };
@@ -347,7 +458,11 @@ for (const slug of POSTS) {
     for (const f of fs.readdirSync(videosDir)) {
       if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) {
         const src = path.join(videosDir, f);
-        if (!forceReprocess && !changed(src)) { console.log(`  SKIP ${f} (unchanged)`); tick(`${slug}/videos/${f}`); continue; }
+        if (!forceReprocess && !changed(src)) {
+          console.log(`  SKIP ${f} (unchanged)`);
+          tick(`${slug}/videos/${f}`);
+          continue;
+        }
         reportCurrent(`${slug}/videos/${f}`);
         await compressVideo(f, postDir, slug);
         tick(`${slug}/videos/${f}`);

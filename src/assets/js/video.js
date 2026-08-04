@@ -2,7 +2,7 @@
  * Custom video player with full control UI.
  * Controls: play/pause, progress bar, time, speed, quality, next, fullscreen.
  */
-import { $, $$ } from './utils.js';
+import { $$ } from './utils.js';
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const RES_ORDER = ['1080p', '720p', '480p', '360p'];
@@ -11,7 +11,7 @@ let allPlayers = [];
 let _logLevel = 'info'; // debug | info | warn | error
 
 function vlog(level, msg) {
-  const order = { debug:0, info:1, warn:2, error:3 };
+  const order = { debug: 0, info: 1, warn: 2, error: 3 };
   if ((order[level] || 0) >= (order[_logLevel] || 0)) {
     console.log('[Video ' + level.toUpperCase() + '] ' + msg);
   }
@@ -60,7 +60,9 @@ function initPlaylistMode(wrap) {
 
   function showVideo(idx) {
     if (currentPlayer) currentPlayer.video.pause();
-    containers.forEach((c, i) => { c.style.display = i === idx ? '' : 'none'; });
+    containers.forEach((c, i) => {
+      c.style.display = i === idx ? '' : 'none';
+    });
     items.forEach((it, i) => it.classList.toggle('active', i === idx));
     currentIdx = idx;
     currentPlayer = new VideoPlayer(containers[idx], idx, total);
@@ -84,7 +86,9 @@ function initPlaylistMode(wrap) {
   wrap.addEventListener('video-ended', () => {
     const next = (currentIdx + 1) % total;
     showVideo(next);
-    setTimeout(() => { if (currentPlayer) currentPlayer.video.play()?.catch(() => {}); }, 300);
+    setTimeout(() => {
+      if (currentPlayer) currentPlayer.video.play()?.catch(() => {});
+    }, 300);
   });
 }
 
@@ -100,11 +104,15 @@ class VideoPlayer {
     // Parse sources (multi-res or single)
     this.sources = {};
     var sourceEls = container.querySelectorAll('source[data-res]');
-    sourceEls.forEach(function(s) { this.sources[s.dataset.res] = s.src; }.bind(this));
+    sourceEls.forEach(
+      function (s) {
+        this.sources[s.dataset.res] = s.src;
+      }.bind(this),
+    );
 
     // Check for HLS
     var hlsSource = container.querySelector('source[type="application/x-mpegURL"]');
-    this.isHLS = !!(hlsSource);
+    this.isHLS = !!hlsSource;
     this.hls = null;
 
     if (this.isHLS && hlsSource && typeof window.Hls !== 'undefined') {
@@ -113,7 +121,13 @@ class VideoPlayer {
       this.currentRes = 'auto'; // Default to ABR
       // ABR start estimate: match the stored preference so playback starts at
       // the right tier instead of ramping up from the lowest one.
-      var storedPref = (function() { try { return localStorage.getItem('mosaic_video_quality'); } catch { return null; } })();
+      var storedPref = (function () {
+        try {
+          return localStorage.getItem('mosaic_video_quality');
+        } catch {
+          return null;
+        }
+      })();
       var defaultEstimate = 2500000;
       if (storedPref === '1080p') defaultEstimate = 6000000;
       else if (storedPref === '720p') defaultEstimate = 3000000;
@@ -140,24 +154,41 @@ class VideoPlayer {
         // Expose the Hls instance on the element (debugging/tests)
         this.video._hls = this.hls;
         var self = this;
-        this.hls.on('hlsManifestParsed', function() {
-          vlog('info', 'HLS manifest loaded: ' + (self.hls.levels||[]).length + ' levels, ' + ((self.hls.levels||[]).map(function(l){ return l.height + 'p'; }).join(', ')));
+        this.hls.on('hlsManifestParsed', function () {
+          vlog(
+            'info',
+            'HLS manifest loaded: ' +
+              (self.hls.levels || []).length +
+              ' levels, ' +
+              (self.hls.levels || [])
+                .map(function (l) {
+                  return l.height + 'p';
+                })
+                .join(', '),
+          );
           self.sources = {};
           var levels = self.hls.levels || [];
-          levels.forEach(function(level) {
+          levels.forEach(function (level) {
             var h = level.height || 0;
-            if (h === 0) h = level.bitrate > 12000000 ? 2160 : level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
+            if (h === 0)
+              h =
+                level.bitrate > 12000000 ? 2160 : level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
             var label = h >= 2160 ? '4K' : h + 'p';
             self.sources[label] = hlsSource.src;
           });
           if (Object.keys(self.sources).length === 0) {
             self.sources = { '480p': hlsSource.src, '720p': hlsSource.src, '1080p': hlsSource.src };
           }
-          if (self.qualityMenu) { self.qualityMenu.innerHTML = ''; self.buildQualityMenu(); }
+          if (self.qualityMenu) {
+            self.qualityMenu.innerHTML = '';
+            self.buildQualityMenu();
+          }
           // Apply a stored manual preference so playback starts at that tier
-          if (storedPref && ['360p','480p','720p','1080p','4K'].indexOf(storedPref) >= 0) {
+          if (storedPref && ['360p', '480p', '720p', '1080p', '4K'].indexOf(storedPref) >= 0) {
             var want = parseInt(storedPref) || 0;
-            var sidx = (self.hls.levels || []).findIndex(function(l) { return l.height === want; });
+            var sidx = (self.hls.levels || []).findIndex(function (l) {
+              return l.height === want;
+            });
             if (sidx >= 0) {
               self.currentRes = storedPref;
               self.hls.loadLevel = sidx;
@@ -173,32 +204,43 @@ class VideoPlayer {
           }
         });
         // Quality switch completion event
-        this.hls.on('hlsLevelSwitched', function(event, data) {
+        this.hls.on('hlsLevelSwitched', function (event, data) {
           clearTimeout(self._switchFailTimer);
           self._switching = false;
           var level = self.hls.levels[data.level];
           if (level) {
             var h = level.height || 0;
             var label = h >= 2160 ? '4K' : h + 'p';
-            vlog('info', 'Level switched to ' + label + ' (h='+h+')');
-            if (!self.isAuto()) { self.currentRes = label; }
+            vlog('info', 'Level switched to ' + label + ' (h=' + h + ')');
+            if (!self.isAuto()) {
+              self.currentRes = label;
+            }
             self.updateQualityActive();
             // Only toast on manual switches; automatic ABR changes stay quiet
             if (!self.isAuto()) self.showSwitchToast('Switched to ' + label);
           }
         });
-        this.hls.on('hlsError', function(event, data) {
-          vlog('error', 'HLS error: ' + data.type + ' - ' + (data.details||''));
+        this.hls.on('hlsError', function (event, data) {
+          vlog('error', 'HLS error: ' + data.type + ' - ' + (data.details || ''));
           if (data.fatal) {
             vlog('error', 'HLS FATAL ' + data.type + ' — attempting recovery');
             try {
-              if (data.type === 'networkError') { self.hls.startLoad(); }
-              else if (data.type === 'mediaError') { self.hls.recoverMediaError(); }
-              else { self.hls.destroy(); }
-            } catch (e) { vlog('error', 'HLS recovery failed: ' + e.message); }
+              if (data.type === 'networkError') {
+                self.hls.startLoad();
+              } else if (data.type === 'mediaError') {
+                self.hls.recoverMediaError();
+              } else {
+                self.hls.destroy();
+              }
+            } catch (e) {
+              vlog('error', 'HLS recovery failed: ' + e.message);
+            }
           }
         });
-      } catch(e) { console.error('HLS init failed:', e); this.isHLS = false; }
+      } catch (e) {
+        console.error('HLS init failed:', e);
+        this.isHLS = false;
+      }
     }
 
     // Initialize sources for non-HLS or HLS fallback
@@ -206,7 +248,9 @@ class VideoPlayer {
       if (!sourceEls.length && this.video.src) this.sources.single = this.video.src;
       this.currentRes = this.detectResolution();
       if (sourceEls.length > 0 && this.sources[this.currentRes]) {
-        sourceEls.forEach(function(s) { s.remove(); });
+        sourceEls.forEach(function (s) {
+          s.remove();
+        });
         this.video.src = this.sources[this.currentRes];
       }
     }
@@ -238,7 +282,10 @@ class VideoPlayer {
       this.timeCur.addEventListener('click', () => {
         if (!isFinite(this.video.currentTime)) return;
         const ts = this.fmt(this.video.currentTime);
-        navigator.clipboard?.writeText(ts).then(() => this.showOverlay('复制成功 ' + ts)).catch(() => {});
+        navigator.clipboard
+          ?.writeText(ts)
+          .then(() => this.showOverlay('复制成功 ' + ts))
+          .catch(() => {});
       });
     }
     this.timeDur = container.querySelector('.vc-time-duration');
@@ -263,9 +310,12 @@ class VideoPlayer {
     if (this.qualityMenu) this.buildQualityMenu();
 
     // Pause RAF when tab hidden
-    var self = this;
-    document.addEventListener('visibilitychange', function() {
-      if (document.hidden && self._rafId) { cancelAnimationFrame(self._rafId); self._rafId = null; }
+    var me = this;
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && me._rafId) {
+        cancelAnimationFrame(me._rafId);
+        me._rafId = null;
+      }
     });
 
     // Events
@@ -279,7 +329,7 @@ class VideoPlayer {
     // Check stored preference first
     try {
       const stored = localStorage.getItem('mosaic_video_quality');
-      if (stored && ['360p','480p','720p','1080p'].includes(stored)) return stored;
+      if (stored && ['360p', '480p', '720p', '1080p'].includes(stored)) return stored;
     } catch {}
     const w = window.innerWidth;
     const dpr = window.devicePixelRatio || 1;
@@ -302,7 +352,9 @@ class VideoPlayer {
         this.speedBtn.innerHTML = s + 'x <i class="ri-arrow-down-s-line"></i>';
         this.speedMenu.classList.remove('open');
         this.updateSpeedMenuActive();
-        try { localStorage.setItem('mosaic_video_speed', s); } catch {}
+        try {
+          localStorage.setItem('mosaic_video_speed', s);
+        } catch {}
       });
       this.speedMenu.appendChild(btn);
     });
@@ -315,8 +367,13 @@ class VideoPlayer {
     // Auto option for HLS
     if (this.hls) {
       const abtn = document.createElement('button');
-      abtn.textContent = 'Auto'; abtn.dataset.res = 'auto';
-      abtn.addEventListener('click', (e) => { e.stopPropagation(); this.switchResolution('auto'); this.qualityMenu.classList.remove('open'); });
+      abtn.textContent = 'Auto';
+      abtn.dataset.res = 'auto';
+      abtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.switchResolution('auto');
+        this.qualityMenu.classList.remove('open');
+      });
       this.qualityMenu.appendChild(abtn);
     }
     Object.keys(this.sources).forEach((res) => {
@@ -348,19 +405,25 @@ class VideoPlayer {
       b.classList.toggle('active', b.dataset.res === this.currentRes);
     });
     if (this.qualityBtn) {
-      var label = (this.currentRes === 'auto' || !this.currentRes) ? 'Auto' : this.currentRes;
+      var label = this.currentRes === 'auto' || !this.currentRes ? 'Auto' : this.currentRes;
       this.qualityBtn.innerHTML = label + ' <i class="ri-arrow-down-s-line"></i>';
     }
   }
 
-
-  isAuto() { return this.currentRes === 'auto'; }
+  isAuto() {
+    return this.currentRes === 'auto';
+  }
 
   _relockQuality() {
     const targetH = parseInt(this.currentRes);
     if (isNaN(targetH)) return;
-    const idx = (this.hls.levels||[]).findIndex(function(l){return l.height === targetH || l.height >= targetH;});
-    if (idx >= 0) { this.hls.loadLevel = idx; this.hls.nextLevel = idx; }
+    const idx = (this.hls.levels || []).findIndex(function (l) {
+      return l.height === targetH || l.height >= targetH;
+    });
+    if (idx >= 0) {
+      this.hls.loadLevel = idx;
+      this.hls.nextLevel = idx;
+    }
   }
 
   showSwitchToast(msg) {
@@ -373,7 +436,9 @@ class VideoPlayer {
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+    this._toastTimer = setTimeout(function () {
+      el.classList.remove('show');
+    }, 2000);
   }
 
   switchResolution(res) {
@@ -389,7 +454,9 @@ class VideoPlayer {
 
     // Safety unlock after 3s
     var self = this;
-    this._unlockTimer = setTimeout(function() { self._switching = false; }, 3000);
+    this._unlockTimer = setTimeout(function () {
+      self._switching = false;
+    }, 3000);
 
     if (this.hls) {
       // Don't seek — hls.js handles level switch seamlessly with old buffer
@@ -401,9 +468,13 @@ class VideoPlayer {
       } else {
         const targetH = parseInt(res);
         const levels = this.hls.levels || [];
-        let idx = levels.findIndex(function(l) { return l.height === targetH; });
+        let idx = levels.findIndex(function (l) {
+          return l.height === targetH;
+        });
         if (idx < 0 && levels.length > 0) {
-          idx = levels.findIndex(function(l) { return l.height >= targetH; });
+          idx = levels.findIndex(function (l) {
+            return l.height >= targetH;
+          });
         }
         if (idx >= 0) {
           this.hls.loadLevel = idx;
@@ -413,19 +484,26 @@ class VideoPlayer {
         }
       }
     } else {
-      if (!this.sources[res]) { this._switching = false; return; }
+      if (!this.sources[res]) {
+        this._switching = false;
+        return;
+      }
       this.video.querySelectorAll('source').forEach((s) => s.remove());
       this.video.src = this.sources[res];
       this.video.load();
       const onReady = () => {
         this._switching = false;
-        try { this.video.currentTime = time; } catch {}
+        try {
+          this.video.currentTime = time;
+        } catch {}
         if (!this.video.paused) this.video.play()?.catch(() => {});
       };
       this.video.addEventListener('canplay', onReady, { once: true });
     }
     this.updateQualityActive();
-    try { localStorage.setItem('mosaic_video_quality', res); } catch {}
+    try {
+      localStorage.setItem('mosaic_video_quality', res);
+    } catch {}
   }
 
   bindEvents() {
@@ -434,29 +512,59 @@ class VideoPlayer {
     const self = this;
 
     // === Core playback events (merged) ===
-    if (this.bigPlay) { this.bigPlay.addEventListener('click', (e) => { e.stopPropagation(); this.togglePlay(); }); }
-    c.addEventListener('click', (e) => { if (!e.target.closest('.video-controls, .video-big-play')) this.togglePlay(); });
-    if (this.playBtn) { this.playBtn.addEventListener('click', (e) => { e.stopPropagation(); this.togglePlay(); }); }
+    if (this.bigPlay) {
+      this.bigPlay.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.togglePlay();
+      });
+    }
+    c.addEventListener('click', (e) => {
+      if (!e.target.closest('.video-controls, .video-big-play')) this.togglePlay();
+    });
+    if (this.playBtn) {
+      this.playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.togglePlay();
+      });
+    }
 
-    v.addEventListener('play', () => { c.classList.add('playing'); c.classList.remove('paused'); if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-pause-fill"></i>'; });
-    v.addEventListener('pause', () => { c.classList.add('paused'); c.classList.remove('playing'); if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-play-fill"></i>'; });
-    v.addEventListener('loadedmetadata', () => { if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration); });
+    v.addEventListener('play', () => {
+      c.classList.add('playing');
+      c.classList.remove('paused');
+      if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-pause-fill"></i>';
+    });
+    v.addEventListener('pause', () => {
+      c.classList.add('paused');
+      c.classList.remove('playing');
+      if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-play-fill"></i>';
+    });
+    v.addEventListener('loadedmetadata', () => {
+      if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration);
+    });
 
     // Merged timeupdate: progress + freeze detect + position save
     var _stuckCount = 0;
     v.addEventListener('timeupdate', () => {
       this.updateProgress();
       // Freeze detection
-      if (v.readyState < 3 && !v.paused) { _stuckCount++; if (_stuckCount >= 5) c.classList.add('buffering'); }
-      else { _stuckCount = 0; c.classList.remove('buffering'); }
+      if (v.readyState < 3 && !v.paused) {
+        _stuckCount++;
+        if (_stuckCount >= 5) c.classList.add('buffering');
+      } else {
+        _stuckCount = 0;
+        c.classList.remove('buffering');
+      }
       // Save position
-      try { if (v.currentTime > 1) localStorage.setItem('mosaic_video_pos_' + (v.src||'').slice(-40), v.currentTime); } catch {}
+      try {
+        if (v.currentTime > 1) localStorage.setItem('mosaic_video_pos_' + (v.src || '').slice(-40), v.currentTime);
+      } catch {}
     });
 
     // Merged waiting: spinner + adaptive downgrade
     var _waitingTimer = null;
     v.addEventListener('waiting', () => {
-      c.classList.add('buffering'); vlog('warn', 'Buffering...');
+      c.classList.add('buffering');
+      vlog('warn', 'Buffering...');
       // Adaptive downgrade for MP4 (not HLS — hls.js handles ABR)
       if (!this.isHLS && !this._switching) {
         _waitingTimer = setTimeout(() => {
@@ -468,18 +576,44 @@ class VideoPlayer {
         }, 3000);
       }
     });
-    v.addEventListener('canplay', () => { c.classList.remove('buffering'); });
-    v.addEventListener('playing', () => { c.classList.remove('buffering'); _waitingTimer && clearTimeout(_waitingTimer); });
-    v.addEventListener('ended', () => { c.dispatchEvent(new CustomEvent('video-ended', { bubbles: true })); });
+    v.addEventListener('canplay', () => {
+      c.classList.remove('buffering');
+    });
+    v.addEventListener('playing', () => {
+      c.classList.remove('buffering');
+      _waitingTimer && clearTimeout(_waitingTimer);
+    });
+    v.addEventListener('ended', () => {
+      c.dispatchEvent(new CustomEvent('video-ended', { bubbles: true }));
+    });
 
     // Volume
     v.addEventListener('volumechange', () => {
-      try { localStorage.setItem('mosaic_video_volume', v.volume); } catch {}
-      if (this.volumeBtn) this.volumeBtn.innerHTML = v.muted || v.volume === 0 ? '<i class="ri-volume-mute-line"></i>' : v.volume < 0.5 ? '<i class="ri-volume-down-line"></i>' : '<i class="ri-volume-up-line"></i>';
+      try {
+        localStorage.setItem('mosaic_video_volume', v.volume);
+      } catch {}
+      if (this.volumeBtn)
+        this.volumeBtn.innerHTML =
+          v.muted || v.volume === 0
+            ? '<i class="ri-volume-mute-line"></i>'
+            : v.volume < 0.5
+              ? '<i class="ri-volume-down-line"></i>'
+              : '<i class="ri-volume-up-line"></i>';
       if (this.volumeRange) this.volumeRange.value = Math.round(v.volume * 100);
     });
-    if (this.volumeBtn) { this.volumeBtn.addEventListener('click', (e) => { e.stopPropagation(); v.muted = !v.muted; }); }
-    if (this.volumeRange) { this.volumeRange.addEventListener('input', (e) => { e.stopPropagation(); v.volume = e.target.value / 100; v.muted = false; }); }
+    if (this.volumeBtn) {
+      this.volumeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        v.muted = !v.muted;
+      });
+    }
+    if (this.volumeRange) {
+      this.volumeRange.addEventListener('input', (e) => {
+        e.stopPropagation();
+        v.volume = e.target.value / 100;
+        v.muted = false;
+      });
+    }
 
     // === Progress bar (click, hover, drag) ===
     if (this.progressTrack) {
@@ -488,61 +622,114 @@ class VideoPlayer {
         const pct = (e.clientX - rect.left) / rect.width;
         if (!isFinite(v.duration)) return;
         v.currentTime = pct * v.duration;
-        if (this.progressFill) this.progressFill.style.width = (pct * 100) + '%';
-        if (this.progressThumb) this.progressThumb.style.left = (pct * 100) + '%';
+        if (this.progressFill) this.progressFill.style.width = pct * 100 + '%';
+        if (this.progressThumb) this.progressThumb.style.left = pct * 100 + '%';
         // Re-lock quality after click-seek
         if (self.hls && !self.isAuto()) self._relockQuality();
       });
       this.progressTrack.addEventListener('mousemove', (e) => {
         const rect = this.progressTrack.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
-        if (this.progressTooltip && isFinite(v.duration)) { this.progressTooltip.textContent = this.fmt(v.duration * pct); this.progressTooltip.style.left = (pct * 100) + '%'; this.progressTooltip.style.opacity = '1'; }
+        if (this.progressTooltip && isFinite(v.duration)) {
+          this.progressTooltip.textContent = this.fmt(v.duration * pct);
+          this.progressTooltip.style.left = pct * 100 + '%';
+          this.progressTooltip.style.opacity = '1';
+        }
       });
       this.progressTrack.addEventListener('mouseleave', () => {
         if (this.progressTooltip) this.progressTooltip.style.opacity = '0';
       });
       // Drag seek — supresses RAF smooth animation during drag
       var _drag = false;
-      this.progressTrack.addEventListener('mousedown', function(e) {
-        _drag = true; self._dragSeek = true;
+      this.progressTrack.addEventListener('mousedown', function (e) {
+        _drag = true;
+        self._dragSeek = true;
         var rect = self.progressTrack.getBoundingClientRect();
-        if (isFinite(self.video.duration)) { self.video.currentTime = ((e.clientX - rect.left) / rect.width) * self.video.duration; }
-        document.addEventListener('mousemove', onDrag); document.addEventListener('mouseup', onEnd);
+        if (isFinite(self.video.duration)) {
+          self.video.currentTime = ((e.clientX - rect.left) / rect.width) * self.video.duration;
+        }
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', onEnd);
       });
       function onDrag(e) {
         var rect = self.progressTrack.getBoundingClientRect();
         var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        if (isFinite(self.video.duration)) { self.video.currentTime = pct * self.video.duration; }
+        if (isFinite(self.video.duration)) {
+          self.video.currentTime = pct * self.video.duration;
+        }
         self.video.currentTime = pct * self.video.duration;
       }
-      function onEnd() { _drag = false; self._dragSeek = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', onEnd);
+      function onEnd() {
+        _drag = false;
+        self._dragSeek = false;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', onEnd);
         if (self.hls && !self.isAuto()) self._relockQuality();
       }
     }
 
     // === Menus, Fullscreen, PiP, Doubl-tap, Keyboard, Controls hide ===
-    if (this.speedBtn && this.speedMenu) { this.speedBtn.addEventListener('click', (e) => { e.stopPropagation(); this.toggleMenu(this.speedMenu); }); }
-    if (this.qualityBtn && this.qualityMenu) { this.qualityBtn.addEventListener('click', (e) => { e.stopPropagation(); this.toggleMenu(this.qualityMenu); }); }
-    if (this.fsBtn) { this.fsBtn.addEventListener('click', (e) => { e.stopPropagation(); document.fullscreenElement ? document.exitFullscreen() : c.requestFullscreen()?.catch(()=>{}); }); }
-    if (this.pipBtn && 'pictureInPictureEnabled' in document) { this.pipBtn.addEventListener('click', (e) => { e.stopPropagation(); document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture()?.catch(()=>{}); }); }
-    if (this.nextBtn && this.total > 1) { this.nextBtn.addEventListener('click', (e) => { e.stopPropagation(); this.switchToNextVideo(); }); }
+    if (this.speedBtn && this.speedMenu) {
+      this.speedBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleMenu(this.speedMenu);
+      });
+    }
+    if (this.qualityBtn && this.qualityMenu) {
+      this.qualityBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleMenu(this.qualityMenu);
+      });
+    }
+    if (this.fsBtn) {
+      this.fsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.fullscreenElement ? document.exitFullscreen() : c.requestFullscreen()?.catch(() => {});
+      });
+    }
+    if (this.pipBtn && 'pictureInPictureEnabled' in document) {
+      this.pipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.pictureInPictureElement
+          ? document.exitPictureInPicture()
+          : v.requestPictureInPicture()?.catch(() => {});
+      });
+    }
+    if (this.nextBtn && this.total > 1) {
+      this.nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.switchToNextVideo();
+      });
+    }
 
     // Mobile double-tap
     var _tap = null;
-    c.addEventListener('touchend', function(e) {
+    c.addEventListener('touchend', function (e) {
       if (e.target.closest('.video-controls')) return;
-      if (_tap) { clearTimeout(_tap); _tap = null;
+      if (_tap) {
+        clearTimeout(_tap);
+        _tap = null;
         var x = (e.changedTouches[0].clientX - c.getBoundingClientRect().left) / c.getBoundingClientRect().width;
         v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + (x < 0.5 ? -10 : 10)));
         self.showSwitchToast(x < 0.5 ? '-10s' : '+10s');
-      } else { _tap = setTimeout(function() { _tap = null; }, 300); }
+      } else {
+        _tap = setTimeout(function () {
+          _tap = null;
+        }, 300);
+      }
     });
 
     c.addEventListener('keydown', (e) => this.handleKeyboard(e));
 
     let _hideTimer;
-    c.addEventListener('mousemove', () => { this.showControls(); clearTimeout(_hideTimer); _hideTimer = setTimeout(() => this.hideControls(), 2500); });
-    c.addEventListener('mouseleave', () => { if (!v.paused) this.hideControls(); });
+    c.addEventListener('mousemove', () => {
+      this.showControls();
+      clearTimeout(_hideTimer);
+      _hideTimer = setTimeout(() => this.hideControls(), 2500);
+    });
+    c.addEventListener('mouseleave', () => {
+      if (!v.paused) this.hideControls();
+    });
   }
 
   togglePlay() {
@@ -569,7 +756,10 @@ class VideoPlayer {
         let _lastTime = v.currentTime;
         let _lastWall = performance.now();
         const step = () => {
-          if (self.video.paused || self._dragSeek) { self._rafId = null; return; }
+          if (self.video.paused || self._dragSeek) {
+            self._rafId = null;
+            return;
+          }
           // Sync anchor point every ~250ms from actual currentTime to avoid drift
           if (performance.now() - _lastWall > 250) {
             _lastTime = self.video.currentTime;
@@ -584,7 +774,10 @@ class VideoPlayer {
         this._rafId = requestAnimationFrame(step);
       }
     } else {
-      if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+      if (this._rafId) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+      }
       // Show exact position when paused
       if (v.paused && v.duration) {
         const pct = (v.currentTime / v.duration) * 100;
@@ -626,18 +819,22 @@ class VideoPlayer {
     }
   }
 
-  showOverlay(text, type) {
+  showOverlay(text, _type) {
     // Remove existing overlay if any
     const existing = this.container.querySelector('.video-key-overlay');
     if (existing) existing.remove();
     const el = document.createElement('div');
     el.className = 'video-key-overlay';
-    el.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;'
-      + 'background:rgba(0,0,0,0.7);color:#fff;padding:12px 20px;border-radius:10px;font-size:16px;font-weight:600;'
-      + 'text-align:center;white-space:pre-line;transition:opacity 0.3s';
+    el.style.cssText =
+      'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;' +
+      'background:rgba(0,0,0,0.7);color:#fff;padding:12px 20px;border-radius:10px;font-size:16px;font-weight:600;' +
+      'text-align:center;white-space:pre-line;transition:opacity 0.3s';
     el.innerHTML = text;
     this.container.appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 1200);
+    setTimeout(() => {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }, 1200);
   }
 
   handleKeyboard(e) {
@@ -664,12 +861,20 @@ class VideoPlayer {
       case 'ArrowUp':
         e.preventDefault();
         this.video.volume = Math.min(1, Math.round((this.video.volume + 0.1) * 10) / 10);
-        this.showOverlay('<i class=\"ri-volume-up-fill\" style=\"font-size:24px\"></i><br>' + Math.round(this.video.volume * 100) + '%');
+        this.showOverlay(
+          '<i class=\"ri-volume-up-fill\" style=\"font-size:24px\"></i><br>' +
+            Math.round(this.video.volume * 100) +
+            '%',
+        );
         break;
       case 'ArrowDown':
         e.preventDefault();
         this.video.volume = Math.max(0, Math.round((this.video.volume - 0.1) * 10) / 10);
-        this.showOverlay('<i class=\"ri-volume-down-fill\" style=\"font-size:24px\"></i><br>' + Math.round(this.video.volume * 100) + '%');
+        this.showOverlay(
+          '<i class=\"ri-volume-down-fill\" style=\"font-size:24px\"></i><br>' +
+            Math.round(this.video.volume * 100) +
+            '%',
+        );
         break;
       case 'f':
         if (document.fullscreenElement) document.exitFullscreen();

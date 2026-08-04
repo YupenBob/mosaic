@@ -33,12 +33,13 @@ function reportDwell(slug, seconds, apiBase) {
     const url = `${apiBase}/track/dwell/${encodeURIComponent(slug)}`;
     const blob = new Blob([JSON.stringify({ seconds })], { type: 'application/json' });
     navigator.sendBeacon(url, blob);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function trackDwellTime(slug, apiBase) {
   const startTime = Date.now();
-  let accumulated = 0; // Start fresh each session, don't accumulate across sessions
 
   const interval = setInterval(() => {
     const elapsed = Math.min(Math.floor((Date.now() - startTime) / 1000), MAX_SESSION);

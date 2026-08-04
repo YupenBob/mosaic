@@ -52,7 +52,7 @@
 
   "components": {
     "gallery": { "enabled": true, "zoom": true, "lazyLoad": true },
-    "video": { "enabled": true, "quality": ["480p","720p","1080p","4K"] },
+    "video": { "enabled": true, "quality": ["480p", "720p", "1080p", "4K"] },
     "comments": { "enabled": false, "provider": "giscus" },
     "search": { "enabled": true },
     "likes": { "enabled": true },

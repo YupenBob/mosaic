@@ -135,6 +135,10 @@ npm install
 npm run compress      # 压缩媒体（本地无媒体可跳过）
 npm run build         # 生成静态站点
 npm run serve         # 预览 http://localhost:3000
+npm run check         # 语法 + config 校验 + worker/build smoke
+npm run validate      # 校验 mosaic.config.json 与文章 frontmatter
+npm run lint          # ESLint（0 警告）
+npm run test:e2e:local# 本地静态预览 E2E（先 npm run build）
 ```
 
 > 从零到线上（Cloudflare 配置、Secrets、首次部署）见 **[docs/SETUP.md](docs/SETUP.md)**

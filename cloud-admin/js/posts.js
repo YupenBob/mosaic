@@ -56,9 +56,10 @@ export default async function renderPosts(signal) {
           <span class="search-count" id="post-match-count"></span>
         </div>
 
-        ${postsData.length === 0
-          ? `<div class="card">${emptyState('ri-article-line', t('posts.emptyTitle'), t('posts.emptyDesc'), `<button class="btn btn-primary" onclick="location.hash='editor'"><i class="ri-add-line"></i> ${t('posts.emptyCta')}</button>`)}</div>`
-          : `
+        ${
+          postsData.length === 0
+            ? `<div class="card">${emptyState('ri-article-line', t('posts.emptyTitle'), t('posts.emptyDesc'), `<button class="btn btn-primary" onclick="location.hash='editor'"><i class="ri-add-line"></i> ${t('posts.emptyCta')}</button>`)}</div>`
+            : `
           <div id="posts-table-view">
             <div class="table-wrap">
               <table class="data-table" id="posts-table">
@@ -82,15 +83,18 @@ export default async function renderPosts(signal) {
               ${postsData.slice(0, renderedCount).map(cardHtml).join('')}
             </div>
           </div>
-          ${postsData.length > renderedCount
-            ? `<div class="load-more-wrap"><button class="btn btn-secondary" onclick="loadMorePosts()"><i class="ri-arrow-down-line"></i> ${t('common.loadMore')} (${postsData.length - renderedCount})</button></div>`
-            : ''}
-        `}
+          ${
+            postsData.length > renderedCount
+              ? `<div class="load-more-wrap"><button class="btn btn-secondary" onclick="loadMorePosts()"><i class="ri-arrow-down-line"></i> ${t('common.loadMore')} (${postsData.length - renderedCount})</button></div>`
+              : ''
+          }
+        `
+        }
       </div>
     `,
     onMount() {
       const savedView = localStorage.getItem('mosaic_posts_view') || 'table';
-      switchPostsView(savedView, true);
+      window.switchPostsView(savedView, true);
     },
   };
 }
@@ -126,14 +130,19 @@ function cardHtml(p) {
   return `
     <a href="#editor&slug=${encodeURIComponent(p.slug)}" class="admin-post-card"
        data-search="${escHtml(((p.title || '') + ' ' + (p.category || '') + ' ' + (p.tags || []).join(' ')).toLowerCase())}" data-cat="${escHtml(p.category || '')}">
-      ${hasCover
-        ? `<div class="admin-card-cover"><img src="${escHtml(state.mediaBase)}/processed/${encodeURIComponent(p.slug)}/covers/cover-480p.webp" alt="${escHtml(p.title || p.slug)}" loading="lazy" onerror="this.closest('.admin-card-cover').classList.add('admin-card-cover-empty');this.style.display='none'" /></div>`
-        : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:30px;color:var(--color-text-tertiary)"></i></div>'}
+      ${
+        hasCover
+          ? `<div class="admin-card-cover"><img src="${escHtml(state.mediaBase)}/processed/${encodeURIComponent(p.slug)}/covers/cover-480p.webp" alt="${escHtml(p.title || p.slug)}" loading="lazy" onerror="this.closest('.admin-card-cover').classList.add('admin-card-cover-empty');this.style.display='none'" /></div>`
+          : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:30px;color:var(--color-text-tertiary)"></i></div>'
+      }
       <div class="admin-card-body">
         <span class="admin-card-cat">${escHtml((p.category || t('posts.uncategorized')).split('/').pop())}</span>
         <h3 class="admin-card-title">${escHtml(p.title || p.slug)}</h3>
         ${p.description ? `<p class="admin-card-desc">${escHtml(p.description)}</p>` : ''}
-        <div class="admin-card-tags">${(p.tags || []).slice(0, 5).map((tag) => '#' + escHtml(tag)).join(' ')}</div>
+        <div class="admin-card-tags">${(p.tags || [])
+          .slice(0, 5)
+          .map((tag) => '#' + escHtml(tag))
+          .join(' ')}</div>
       </div>
       <div class="admin-card-footer">
         <span>${p.date ? String(p.date).split('T')[0] : ''}</span>
@@ -150,7 +159,8 @@ function buildCatOptions(postsData) {
   for (const p of postsData) {
     if (!p.category) continue;
     const parts = String(p.category).split('/');
-    let node = tree, path = '';
+    let node = tree,
+      path = '';
     for (const part of parts) {
       const name = part.trim();
       if (!name) continue;
@@ -164,9 +174,12 @@ function buildCatOptions(postsData) {
       .filter(([k]) => !k.startsWith('_'))
       .map(([name, info]) => {
         const hasChildren = Object.keys(info).some((k) => !k.startsWith('_'));
-        return `<option value="${escHtml(info._path)}">${'&nbsp;&nbsp;'.repeat(depth)}${depth > 0 ? '└ ' : ''}${escHtml(name)}</option>`
-          + (hasChildren ? render(info, depth + 1) : '');
-      }).join('');
+        return (
+          `<option value="${escHtml(info._path)}">${'&nbsp;&nbsp;'.repeat(depth)}${depth > 0 ? '└ ' : ''}${escHtml(name)}</option>` +
+          (hasChildren ? render(info, depth + 1) : '')
+        );
+      })
+      .join('');
   }
   return render(tree, 0);
 }
@@ -199,7 +212,10 @@ window.filterPosts = (query) => {
 
 window.filterPostsByCat = (cat) => {
   document.querySelectorAll('#posts-table tbody tr, .admin-post-card').forEach((el) => {
-    if (!cat) { el.style.display = ''; return; }
+    if (!cat) {
+      el.style.display = '';
+      return;
+    }
     el.style.display = (el.dataset.cat || '') === cat ? '' : 'none';
   });
 };
@@ -218,9 +234,10 @@ window.loadMorePosts = () => {
   const wrap = document.querySelector('.load-more-wrap');
   if (wrap) {
     const remaining = state.posts.length - renderedCount;
-    wrap.innerHTML = remaining > 0
-      ? `<button class="btn btn-secondary" onclick="loadMorePosts()"><i class="ri-arrow-down-line"></i> ${t('common.loadMore')} (${remaining})</button>`
-      : '';
+    wrap.innerHTML =
+      remaining > 0
+        ? `<button class="btn btn-secondary" onclick="loadMorePosts()"><i class="ri-arrow-down-line"></i> ${t('common.loadMore')} (${remaining})</button>`
+        : '';
   }
 };
 

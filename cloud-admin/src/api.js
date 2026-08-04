@@ -12,7 +12,9 @@ export function getToken() {
   if (!_token) {
     try {
       _token = localStorage.getItem('mosaic_admin_token');
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   return _token;
 }
@@ -20,9 +22,13 @@ export function getToken() {
 export function setToken(t) {
   _token = t;
   if (t) {
-    try { localStorage.setItem('mosaic_admin_token', t); } catch {}
+    try {
+      localStorage.setItem('mosaic_admin_token', t);
+    } catch {}
   } else {
-    try { localStorage.removeItem('mosaic_admin_token'); } catch {}
+    try {
+      localStorage.removeItem('mosaic_admin_token');
+    } catch {}
   }
 }
 
@@ -60,11 +66,9 @@ async function apiFetch(path, options = {}) {
 
 // ── Auth ───────────────────────────────────
 export const auth = {
-  login: (password) =>
-    apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  login: (password) => apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
 
-  refresh: () =>
-    apiFetch('/auth/refresh', { method: 'POST' }),
+  refresh: () => apiFetch('/auth/refresh', { method: 'POST' }),
 };
 
 // ── Posts ──────────────────────────────────
@@ -79,14 +83,11 @@ export const posts = {
 
   get: (slug) => apiFetch(`/posts/${slug}`),
 
-  create: (data) =>
-    apiFetch('/posts', { method: 'POST', body: JSON.stringify(data) }),
+  create: (data) => apiFetch('/posts', { method: 'POST', body: JSON.stringify(data) }),
 
-  update: (slug, data) =>
-    apiFetch('/posts', { method: 'POST', body: JSON.stringify({ slug, ...data }) }),
+  update: (slug, data) => apiFetch('/posts', { method: 'POST', body: JSON.stringify({ slug, ...data }) }),
 
-  delete: (slug) =>
-    apiFetch(`/posts/${slug}`, { method: 'DELETE' }),
+  delete: (slug) => apiFetch(`/posts/${slug}`, { method: 'DELETE' }),
 
   duplicate: (slug, newSlug) =>
     apiFetch(`/posts/${slug}/duplicate`, { method: 'POST', body: JSON.stringify({ newSlug }) }),
@@ -150,10 +151,8 @@ export const taxonomy = {
     apiFetch('/taxonomy/category', { method: 'PUT', body: JSON.stringify({ oldName, newName }) }),
   renameTag: (oldName, newName) =>
     apiFetch('/taxonomy/tag', { method: 'PUT', body: JSON.stringify({ oldName, newName }) }),
-  removeCategory: (name) =>
-    apiFetch('/taxonomy/category', { method: 'DELETE', body: JSON.stringify({ name }) }),
-  removeTag: (name) =>
-    apiFetch('/taxonomy/tag', { method: 'DELETE', body: JSON.stringify({ name }) }),
+  removeCategory: (name) => apiFetch('/taxonomy/category', { method: 'DELETE', body: JSON.stringify({ name }) }),
+  removeTag: (name) => apiFetch('/taxonomy/tag', { method: 'DELETE', body: JSON.stringify({ name }) }),
 };
 
 // ── Trash ──────────────────────────────────

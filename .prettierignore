@@ -1,0 +1,14 @@
+node_modules/
+dist/
+worker/.wrangler/
+test-results/
+.playwright-cli/
+__pycache__/
+.claude/
+package-lock.json
+**/vendor/
+*.md
+.github/
+shared/
+functions/api/
+cloud-admin/functions/api/

@@ -69,7 +69,7 @@ export function getFilteredPosts(posts) {
       (p) =>
         p.title.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q))
+        p.tags.some((t) => t.toLowerCase().includes(q)),
     );
   }
   return filtered;
@@ -85,40 +85,92 @@ export function renderCards(posts) {
   const base = dataBase === 'data' ? '' : dataBase.replace(/\/?data$/, '');
 
   if (filtered.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><i class="ri-inbox-line"></i><p>' + (getPosts().length ? 'No results' : 'No posts') + '</p></div>';
+    grid.innerHTML =
+      '<div class="empty-state"><i class="ri-inbox-line"></i><p>' +
+      (getPosts().length ? 'No results' : 'No posts') +
+      '</p></div>';
     return;
   }
 
-  grid.innerHTML = filtered.map((post) => {
-    if (!post) return '';
-    const tags = post.tags || [];
-    const stats = post.stats || {};
-    const hasCover = !!post.cover;
-    const aspect = post.coverAspect || 1.778;
-    const pt = (100 / aspect).toFixed(2);
-    let coverHTML = '';
-    if (hasCover) {
-      const src = base + 'posts/' + post.slug + '/' + post.cover;
-      const srcset = post.coverSrcset
-        ? ' srcset="' + base + 'posts/' + post.slug + '/' + post.coverSrcset['480'] + ' 480w, ' + base + 'posts/' + post.slug + '/' + post.coverSrcset['720'] + ' 720w, ' + base + 'posts/' + post.slug + '/' + post.coverSrcset['1080'] + ' 1080w" sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"'
-        : '';
-      coverHTML = '<div class="post-card-cover" style="padding-top:' + pt + '%"><img src="' + src + '"' + srcset + ' alt="' + escapeHTML(post.title) + '" loading="lazy" /></div>';
-    }
-    return '<a href="' + base + 'posts/' + post.slug + '/" class="post-card' + (hasCover ? '' : ' post-card-text') + '">' +
-      coverHTML +
-      '<div class="post-card-body">' +
-      '<span class="post-card-category">' + escapeHTML(post.category || '') + '</span>' +
-      '<h3 class="post-card-title">' + escapeHTML(post.title || '') + '</h3>' +
-      '<p class="post-card-desc">' + escapeHTML(post.description || '') + '</p>' +
-      '<div class="post-card-tags">' +
-      tags.map((t) => '<span class="post-card-tag">' + escapeHTML(t) + '</span>').join('') +
-      '</div></div>' +
-      '<div class="post-card-footer">' +
-      '<span class="post-card-stat"><i class="ri-eye-line"></i>' + formatNumber(stats.views) + '</span>' +
-      '<span class="post-card-stat"><i class="ri-time-line"></i>' + (stats.dwell_time || 0) + 's</span>' +
-      '<span class="post-card-stat"><i class="ri-heart-line"></i>' + formatNumber(stats.likes) + '</span>' +
-      '</div></a>';
-  }).join('');
+  grid.innerHTML = filtered
+    .map((post) => {
+      if (!post) return '';
+      const tags = post.tags || [];
+      const stats = post.stats || {};
+      const hasCover = !!post.cover;
+      const aspect = post.coverAspect || 1.778;
+      const pt = (100 / aspect).toFixed(2);
+      let coverHTML = '';
+      if (hasCover) {
+        const src = base + 'posts/' + post.slug + '/' + post.cover;
+        const srcset = post.coverSrcset
+          ? ' srcset="' +
+            base +
+            'posts/' +
+            post.slug +
+            '/' +
+            post.coverSrcset['480'] +
+            ' 480w, ' +
+            base +
+            'posts/' +
+            post.slug +
+            '/' +
+            post.coverSrcset['720'] +
+            ' 720w, ' +
+            base +
+            'posts/' +
+            post.slug +
+            '/' +
+            post.coverSrcset['1080'] +
+            ' 1080w" sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"'
+          : '';
+        coverHTML =
+          '<div class="post-card-cover" style="padding-top:' +
+          pt +
+          '%"><img src="' +
+          src +
+          '"' +
+          srcset +
+          ' alt="' +
+          escapeHTML(post.title) +
+          '" loading="lazy" /></div>';
+      }
+      return (
+        '<a href="' +
+        base +
+        'posts/' +
+        post.slug +
+        '/" class="post-card' +
+        (hasCover ? '' : ' post-card-text') +
+        '">' +
+        coverHTML +
+        '<div class="post-card-body">' +
+        '<span class="post-card-category">' +
+        escapeHTML(post.category || '') +
+        '</span>' +
+        '<h3 class="post-card-title">' +
+        escapeHTML(post.title || '') +
+        '</h3>' +
+        '<p class="post-card-desc">' +
+        escapeHTML(post.description || '') +
+        '</p>' +
+        '<div class="post-card-tags">' +
+        tags.map((t) => '<span class="post-card-tag">' + escapeHTML(t) + '</span>').join('') +
+        '</div></div>' +
+        '<div class="post-card-footer">' +
+        '<span class="post-card-stat"><i class="ri-eye-line"></i>' +
+        formatNumber(stats.views) +
+        '</span>' +
+        '<span class="post-card-stat"><i class="ri-time-line"></i>' +
+        (stats.dwell_time || 0) +
+        's</span>' +
+        '<span class="post-card-stat"><i class="ri-heart-line"></i>' +
+        formatNumber(stats.likes) +
+        '</span>' +
+        '</div></a>'
+      );
+    })
+    .join('');
 }
 
 function updateFilterUI() {

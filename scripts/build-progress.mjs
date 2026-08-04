@@ -45,6 +45,11 @@ try {
 }
 // Upload immediately (one-shot; the caller step provides R2 creds).
 if (process.env.R2_ACCESS_KEY && process.env.R2_BUCKET) {
-  execFile('rclone', ['copyto', FILE, `r2:${process.env.R2_BUCKET}/site-data/build-progress.json`, '--low-level-retries', '1'], { timeout: 15000 }, () => {});
+  execFile(
+    'rclone',
+    ['copyto', FILE, `r2:${process.env.R2_BUCKET}/site-data/build-progress.json`, '--low-level-retries', '1'],
+    { timeout: 15000 },
+    () => {},
+  );
 }
 console.log(`[build-progress] ${stage}${message ? ' — ' + message : ''}`);

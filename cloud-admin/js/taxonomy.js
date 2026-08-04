@@ -10,7 +10,9 @@ let deleteSupported = null;
 
 export default async function renderTaxonomy(signal) {
   let tax = { categories: [], tags: [] };
-  try { tax = await taxonomy.get(); } catch {}
+  try {
+    tax = await taxonomy.get();
+  } catch {}
   if (signal.aborted) return '';
 
   // Detect whether the DELETE endpoints are deployed (non-mutating probe)
@@ -48,13 +50,19 @@ export default async function renderTaxonomy(signal) {
             <div class="tax-panel-header">
               <h2><i class="ri-hashtag"></i> ${t('taxonomy.tags')} <span class="badge badge-neutral">${tags.length}</span></h2>
             </div>
-            ${tags.length
-              ? `<div class="chips" style="padding:6px 0">${tags.map((tag) => `
+            ${
+              tags.length
+                ? `<div class="chips" style="padding:6px 0">${tags
+                    .map(
+                      (tag) => `
                   <span class="chip">#${escHtml(tag.name)} <span class="chip-count">${tag.count}</span>
                     <button class="icon-btn" style="width:20px;height:20px;font-size:12px" onclick="renameTag('${escHtml(tag.name)}')" title="${t('taxonomy.rename')}" aria-label="${t('taxonomy.rename')}"><i class="ri-edit-line"></i></button>
                     ${deleteSupported ? `<button class="icon-btn" style="width:20px;height:20px;font-size:12px;color:var(--color-danger)" onclick="removeTag('${escHtml(tag.name)}', ${tag.count})" title="${t('taxonomy.delete')}" aria-label="${t('taxonomy.delete')}"><i class="ri-close-line"></i></button>` : ''}
-                  </span>`).join('')}</div>`
-              : emptyState('ri-hashtag', t('taxonomy.emptyTag'))}
+                  </span>`,
+                    )
+                    .join('')}</div>`
+                : emptyState('ri-hashtag', t('taxonomy.emptyTag'))
+            }
           </div>
         </div>
       </div>
@@ -63,16 +71,19 @@ export default async function renderTaxonomy(signal) {
 }
 
 function buildCatTree(cats, prefix, depth = 0) {
-  return cats.map((c) => {
-    const fullName = prefix ? `${prefix}/${c.name}` : c.name;
-    const hasChildren = c.children && c.children.length > 0;
-    return `
+  return cats
+    .map((c) => {
+      const fullName = prefix ? `${prefix}/${c.name}` : c.name;
+      const hasChildren = c.children && c.children.length > 0;
+      return `
       <div style="border-bottom:1px solid var(--color-border-light)">
         <div class="tax-row" style="padding-left:${depth * 20}px">
           <span class="tax-row-name">
-            ${hasChildren
-              ? `<i class="ri-arrow-down-s-line cat-toggle" data-cat="${escHtml(fullName)}" onclick="toggleCatChildren(this)" aria-hidden="true"></i>`
-              : '<span style="display:inline-block;width:18px"></span>'}
+            ${
+              hasChildren
+                ? `<i class="ri-arrow-down-s-line cat-toggle" data-cat="${escHtml(fullName)}" onclick="toggleCatChildren(this)" aria-hidden="true"></i>`
+                : '<span style="display:inline-block;width:18px"></span>'
+            }
             ${escHtml(c.name)}
             <span class="badge badge-neutral">${c.count}</span>
           </span>
@@ -83,7 +94,8 @@ function buildCatTree(cats, prefix, depth = 0) {
         </div>
         ${hasChildren ? `<div class="cat-children" data-cat="${escHtml(fullName)}">${buildCatTree(c.children, fullName, depth + 1)}</div>` : ''}
       </div>`;
-  }).join('');
+    })
+    .join('');
 }
 
 async function probeDeleteSupport() {
@@ -92,7 +104,7 @@ async function probeDeleteSupport() {
   try {
     const resp = await fetch(`${API}/taxonomy/category`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || '') },
       body: JSON.stringify({ name: '' }),
     });
     return resp.status !== 404;
@@ -117,7 +129,7 @@ window.renameCategory = (oldName) => {
     desc: t('common.renameFrom', { old: oldName }),
     value: oldName,
     okLabel: t('common.confirm'),
-    validate: (v) => v ? null : t('taxonomy.nameRequired'),
+    validate: (v) => (v ? null : t('taxonomy.nameRequired')),
     onOk: async (newName) => {
       try {
         const r = await taxonomy.renameCategory(oldName, newName);
@@ -137,7 +149,7 @@ window.renameTag = (oldName) => {
     desc: t('common.renameFrom', { old: oldName }),
     value: oldName,
     okLabel: t('common.confirm'),
-    validate: (v) => v ? null : t('taxonomy.nameRequired'),
+    validate: (v) => (v ? null : t('taxonomy.nameRequired')),
     onOk: async (newName) => {
       try {
         const r = await taxonomy.renameTag(oldName, newName);
@@ -152,29 +164,39 @@ window.renameTag = (oldName) => {
 };
 
 window.removeCategory = (name, count) => {
-  modalConfirm(t('taxonomy.deleteCategoryConfirm', { name, count }), t('taxonomy.affected', { count }), async () => {
-    try {
-      await taxonomy.removeCategory(name);
-      window.checkDirty && window.checkDirty();
-      toast(t('taxonomy.deleted'), 'success');
-      location.reload();
-    } catch (err) {
-      toast(t('taxonomy.deleteFailed') + ': ' + err.message, 'error');
-    }
-  }, { requireText: count > 0 ? String(count) : null });
+  modalConfirm(
+    t('taxonomy.deleteCategoryConfirm', { name, count }),
+    t('taxonomy.affected', { count }),
+    async () => {
+      try {
+        await taxonomy.removeCategory(name);
+        window.checkDirty && window.checkDirty();
+        toast(t('taxonomy.deleted'), 'success');
+        location.reload();
+      } catch (err) {
+        toast(t('taxonomy.deleteFailed') + ': ' + err.message, 'error');
+      }
+    },
+    { requireText: count > 0 ? String(count) : null },
+  );
 };
 
 window.removeTag = (name, count) => {
-  modalConfirm(t('taxonomy.deleteTagConfirm', { name, count }), t('taxonomy.affected', { count }), async () => {
-    try {
-      await taxonomy.removeTag(name);
-      window.checkDirty && window.checkDirty();
-      toast(t('taxonomy.deleted'), 'success');
-      location.reload();
-    } catch (err) {
-      toast(t('taxonomy.deleteFailed') + ': ' + err.message, 'error');
-    }
-  }, { requireText: count > 0 ? String(count) : null });
+  modalConfirm(
+    t('taxonomy.deleteTagConfirm', { name, count }),
+    t('taxonomy.affected', { count }),
+    async () => {
+      try {
+        await taxonomy.removeTag(name);
+        window.checkDirty && window.checkDirty();
+        toast(t('taxonomy.deleted'), 'success');
+        location.reload();
+      } catch (err) {
+        toast(t('taxonomy.deleteFailed') + ': ' + err.message, 'error');
+      }
+    },
+    { requireText: count > 0 ? String(count) : null },
+  );
 };
 
 window.addCategory = () => {
@@ -184,8 +206,10 @@ window.addCategory = () => {
     label: t('taxonomy.newName'),
     placeholder: 'photography/nature',
     okLabel: t('common.confirm'),
-    validate: (v) => v ? null : t('taxonomy.nameRequired'),
-    onOk: (name) => { location.hash = 'editor&cat=' + encodeURIComponent(name); },
+    validate: (v) => (v ? null : t('taxonomy.nameRequired')),
+    onOk: (name) => {
+      location.hash = 'editor&cat=' + encodeURIComponent(name);
+    },
   });
 };
 
@@ -195,8 +219,10 @@ window.addTag = () => {
     desc: t('taxonomy.addHintTag'),
     label: t('taxonomy.newName'),
     okLabel: t('common.confirm'),
-    validate: (v) => v ? null : t('taxonomy.nameRequired'),
-    onOk: (name) => { location.hash = 'editor&tags=' + encodeURIComponent(name); },
+    validate: (v) => (v ? null : t('taxonomy.nameRequired')),
+    onOk: (name) => {
+      location.hash = 'editor&tags=' + encodeURIComponent(name);
+    },
   });
 };
 

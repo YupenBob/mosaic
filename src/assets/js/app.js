@@ -11,35 +11,47 @@ const DATA_BASE = document.querySelector('meta[name="data-base"]')?.content || '
 if (window.__I18N && window.__LANG) initI18n(window.__I18N, window.__LANG);
 
 // Register components
-register({ name: 'gallery', enabled: true, page: 'post',
-  async init(el, cfg) {
+register({
+  name: 'gallery',
+  enabled: true,
+  page: 'post',
+  async init() {
     if ($('.gallery-grid, .gallery-single')) {
       const { initGallery } = await import('./gallery.js');
       initGallery();
     }
-  }
+  },
 });
 
-register({ name: 'video', enabled: true, page: 'post',
-  async init(el, cfg) {
+register({
+  name: 'video',
+  enabled: true,
+  page: 'post',
+  async init() {
     if (document.querySelectorAll('.video-container').length > 0) {
       const { initVideoPlayers } = await import('./video.js');
       initVideoPlayers();
     }
-  }
+  },
 });
 
-register({ name: 'music', enabled: true, page: 'post',
-  async init(el, cfg) {
+register({
+  name: 'music',
+  enabled: true,
+  page: 'post',
+  async init() {
     if (document.querySelectorAll('.music-track').length > 0) {
       const { initMusicPlayer } = await import('./music.js');
       initMusicPlayer();
     }
-  }
+  },
 });
 
-register({ name: 'likes', enabled: true, page: 'post',
-  async init(el, cfg) {
+register({
+  name: 'likes',
+  enabled: true,
+  page: 'post',
+  async init() {
     if ($('.like-button')) {
       const apiBase = document.querySelector('meta[name="api-base"]')?.content;
       const slug = document.body.dataset.slug;
@@ -58,31 +70,41 @@ register({ name: 'likes', enabled: true, page: 'post',
             const lc = likeBtn?.querySelector('.like-count');
             if (lc && likeBtn && !likeBtn.classList.contains('liked') && d.likes != null) lc.textContent = d.likes;
           }
-        } catch { /* keep SSR fallback */ }
+        } catch {
+          /* keep SSR fallback */
+        }
       }
       const { initLikes } = await import('./likes.js');
       initLikes({ apiBase });
     }
-  }
+  },
 });
 
-register({ name: 'stats', enabled: true, page: 'post',
-  async init(el, cfg) {
+register({
+  name: 'stats',
+  enabled: true,
+  page: 'post',
+  async init() {
     const { initStats } = await import('./stats.js');
     const apiBase = document.querySelector('meta[name="api-base"]')?.content;
     initStats({ apiBase });
-  }
+  },
 });
 
-register({ name: 'filter', enabled: true, page: 'list',
-  async init(el, cfg) {
-    const posts = await fetch(`${DATA_BASE}/posts.json?t=${Date.now()}`, { cache: 'no-cache' }).then(r => r.json()).catch(() => []);
+register({
+  name: 'filter',
+  enabled: true,
+  page: 'list',
+  async init() {
+    const posts = await fetch(`${DATA_BASE}/posts.json?t=${Date.now()}`, { cache: 'no-cache' })
+      .then((r) => r.json())
+      .catch(() => []);
     setPosts(posts);
     const { initFilter } = await import('./filter.js');
     initFilter(posts);
     const { initSearch } = await import('./search.js');
     initSearch(posts);
-  }
+  },
 });
 
 async function init() {

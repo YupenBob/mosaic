@@ -10,21 +10,34 @@
 import { chromium } from 'playwright';
 
 const LOCAL = process.argv.includes('--local');
-const SITE = (LOCAL ? process.env.SITE || 'http://localhost:3000' : process.env.SITE || 'https://mosaic.xsanye.cn').replace(/\/+$/, '');
+const SITE = (
+  LOCAL ? process.env.SITE || 'http://localhost:3000' : process.env.SITE || 'https://mosaic.xsanye.cn'
+).replace(/\/+$/, '');
 const ADMIN = LOCAL ? null : (process.env.ADMIN || 'https://mosaic-admin.xsanye.cn').replace(/\/+$/, '');
-const API = (LOCAL ? process.env.API || 'http://localhost:8787' : process.env.API || 'https://mosaic-api.xsanye.cn').replace(/\/+$/, '');
+const API = (
+  LOCAL ? process.env.API || 'http://localhost:8787' : process.env.API || 'https://mosaic-api.xsanye.cn'
+).replace(/\/+$/, '');
 const MEDIA = (process.env.MEDIA || 'https://mosaic-media.xsanye.cn').replace(/\/+$/, '');
-const abs = (href) => href.startsWith('http') ? href : new URL(href, SITE + '/').href;
+const abs = (href) => (href.startsWith('http') ? href : new URL(href, SITE + '/').href);
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
-  let passed = 0, failed = 0;
+  let passed = 0,
+    failed = 0;
   const context = await browser.newContext();
   // Abort slow/irrelevant third-party scripts so domcontentloaded isn't blocked by CDNs
-  await context.route(/(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
+  await context.route(
+    /(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/,
+    (route) => route.abort(),
+  );
   const check = (name, ok, detail = '') => {
-    if (ok) { passed++; console.log(`  PASS ${name}${detail ? ': ' + detail : ''}`); }
-    else { failed++; console.log(`  FAIL ${name}${detail ? ': ' + detail : ''}`); }
+    if (ok) {
+      passed++;
+      console.log(`  PASS ${name}${detail ? ': ' + detail : ''}`);
+    } else {
+      failed++;
+      console.log(`  FAIL ${name}${detail ? ': ' + detail : ''}`);
+    }
   };
 
   try {
@@ -34,7 +47,9 @@ async function main() {
       const resp = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(15000) });
       const health = await resp.json();
       check('Health endpoint', resp.ok && health?.status === 'ok', `${resp.status} ${JSON.stringify(health)}`);
-    } catch (e) { check('Health endpoint', false, e.message); }
+    } catch (e) {
+      check('Health endpoint', false, e.message);
+    }
 
     // ── 2. Site loads ──
     console.log('\nHomepage');
@@ -53,7 +68,11 @@ async function main() {
       if (await catLink.count()) {
         const href = await catLink.getAttribute('href');
         await page.goto(abs(href), { timeout: 30000, waitUntil: 'domcontentloaded' });
-        const cssHref = await page.locator('link[rel="stylesheet"][href*="assets/"]').first().getAttribute('href').catch(() => null);
+        const cssHref = await page
+          .locator('link[rel="stylesheet"][href*="assets/"]')
+          .first()
+          .getAttribute('href')
+          .catch(() => null);
         const cssUrl = cssHref && !cssHref.startsWith('http') ? new URL(cssHref, page.url()).href : cssHref;
         if (cssUrl) {
           const cssResp = await fetch(cssUrl, { signal: AbortSignal.timeout(15000) });
@@ -83,8 +102,10 @@ async function main() {
         for (let i = 0; i < imgCount; i++) {
           const src = await imgs.nth(i).getAttribute('src');
           if (!src || src.startsWith('data:')) continue;
-          if (src.includes('/media/')) { bad++; badUrls.push(src.slice(0, 100)); }
-          else if (src.startsWith(MEDIA) || src.startsWith('http')) mediaBaseUrls++;
+          if (src.includes('/media/')) {
+            bad++;
+            badUrls.push(src.slice(0, 100));
+          } else if (src.startsWith(MEDIA) || src.startsWith('http')) mediaBaseUrls++;
         }
         check('No local media/ paths', bad === 0, bad > 0 ? badUrls.join(', ') : `${imgCount} images`);
         if (!LOCAL) {
@@ -116,11 +137,23 @@ async function main() {
         const adminPage = await browser.newPage();
         const adminResp = await adminPage.goto(ADMIN, { timeout: 30000, waitUntil: 'domcontentloaded' });
         await adminPage.waitForTimeout(3000);
-        const loginVisible = await adminPage.locator('#login-screen').isVisible().catch(() => false);
-        const appVisible = await adminPage.locator('#app').isVisible().catch(() => false);
-        check('Admin loads', !!adminResp && (loginVisible || appVisible), loginVisible ? 'login screen' : (appVisible ? 'app loaded' : 'unknown state'));
+        const loginVisible = await adminPage
+          .locator('#login-screen')
+          .isVisible()
+          .catch(() => false);
+        const appVisible = await adminPage
+          .locator('#app')
+          .isVisible()
+          .catch(() => false);
+        check(
+          'Admin loads',
+          !!adminResp && (loginVisible || appVisible),
+          loginVisible ? 'login screen' : appVisible ? 'app loaded' : 'unknown state',
+        );
         await adminPage.close();
-      } catch (e) { check('Admin loads', false, e.message); }
+      } catch (e) {
+        check('Admin loads', false, e.message);
+      }
     }
   } finally {
     console.log(`\nResults: ${passed} passed, ${failed} failed`);
@@ -129,4 +162,7 @@ async function main() {
   }
 }
 
-main().catch(e => { console.error('Fatal:', e.message); process.exit(1); });
+main().catch((e) => {
+  console.error('Fatal:', e.message);
+  process.exit(1);
+});

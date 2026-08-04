@@ -4,7 +4,7 @@
  */
 import { upload, getToken } from '../src/api.js';
 import { t } from './i18n.js';
-import { escHtml, toast } from './ui.js';
+import { escHtml } from './ui.js';
 
 const CONCURRENCY = 2;
 
@@ -21,7 +21,13 @@ function fileKind(name) {
 }
 
 function fileIcon(kind) {
-  return kind === 'image' ? 'ri-image-line' : kind === 'video' ? 'ri-video-line' : kind === 'audio' ? 'ri-music-line' : 'ri-file-line';
+  return kind === 'image'
+    ? 'ri-image-line'
+    : kind === 'video'
+      ? 'ri-video-line'
+      : kind === 'audio'
+        ? 'ri-music-line'
+        : 'ri-file-line';
 }
 
 function fileSize(size) {
@@ -144,8 +150,10 @@ function setState(item, status, text) {
     else if (status === 'cancelled') statusEl.textContent = '—';
     else statusEl.textContent = text;
   }
-  if (metaEl && status === 'done') metaEl.innerHTML = `<span style="color:var(--color-success)">${t('editor.done')}</span>`;
-  if (metaEl && status === 'error') metaEl.innerHTML = `<span style="color:var(--color-danger)">${escHtml(text)}</span>`;
+  if (metaEl && status === 'done')
+    metaEl.innerHTML = `<span style="color:var(--color-success)">${t('editor.done')}</span>`;
+  if (metaEl && status === 'error')
+    metaEl.innerHTML = `<span style="color:var(--color-danger)">${escHtml(text)}</span>`;
   if (retryBtn) retryBtn.style.display = status === 'error' ? '' : 'none';
   if (cancelBtn) cancelBtn.style.display = status === 'done' || status === 'cancelled' ? 'none' : '';
 }
@@ -198,35 +206,41 @@ async function runSingle(item) {
 }
 
 function uploadFilePresigned(item) {
-  return new Promise(async (resolve) => {
+  return async () => {
     let presigned;
     try {
       presigned = await upload.presign(item.slug, item.file.name, item.file.type || 'application/octet-stream');
     } catch {
-      resolve(false);
-      return;
+      return false;
     }
     const xhr = new XMLHttpRequest();
     item.controller = xhr;
     xhr.open('PUT', presigned.url);
     xhr.setRequestHeader('Content-Type', item.file.type || 'application/octet-stream');
     xhr.timeout = 600000;
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable && item.status !== 'cancelled') progressUI(item, Math.round((e.loaded / e.total) * 100));
+    return new Promise((resolve) => {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && item.status !== 'cancelled') progressUI(item, Math.round((e.loaded / e.total) * 100));
+      });
+      xhr.addEventListener('load', () => {
+        item.controller = null;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          upload.complete(item.slug, item.file.name).catch(() => {});
+          resolve(true);
+        } else {
+          resolve(false); // fall back to direct
+        }
+      });
+      xhr.addEventListener('error', () => {
+        item.controller = null;
+        resolve(false);
+      });
+      xhr.addEventListener('abort', () => {
+        item.controller = null;
+      });
+      xhr.send(item.file);
     });
-    xhr.addEventListener('load', () => {
-      item.controller = null;
-      if (xhr.status >= 200 && xhr.status < 300) {
-        upload.complete(item.slug, item.file.name).catch(() => {});
-        resolve(true);
-      } else {
-        resolve(false); // fall back to direct
-      }
-    });
-    xhr.addEventListener('error', () => { item.controller = null; resolve(false); });
-    xhr.addEventListener('abort', () => { item.controller = null; });
-    xhr.send(item.file);
-  });
+  };
 }
 
 function uploadFileDirect(item) {
@@ -246,8 +260,14 @@ function uploadFileDirect(item) {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new Error('HTTP ' + xhr.status));
     });
-    xhr.addEventListener('error', () => { item.controller = null; reject(new Error('Network error')); });
-    xhr.addEventListener('abort', () => { item.controller = null; reject(new Error('Cancelled')); });
+    xhr.addEventListener('error', () => {
+      item.controller = null;
+      reject(new Error('Network error'));
+    });
+    xhr.addEventListener('abort', () => {
+      item.controller = null;
+      reject(new Error('Cancelled'));
+    });
     xhr.send(item.file);
   });
 }

@@ -9,7 +9,6 @@ import { escHtml, formatTime, quick, loadLib, emptyState } from './ui.js';
 const CHART_URL = 'js/vendor/chart.umd.min.js';
 
 export default async function renderDashboard(signal) {
-  const timedOut = () => ({ _timeout: true });
   const [dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg, taxData] = await Promise.all([
     quick(() => stats.dashboard(), { posts: '...', categories: '...', tags: '...' }),
     quick(() => health.check(), { status: 'error' }),
@@ -34,7 +33,12 @@ export default async function renderDashboard(signal) {
   const postResult = await quick(() => postsApi.list(), { posts: [] }, 20000);
   const postList = postResult.posts || postResult || [];
   postList.slice(0, 5).forEach((p) => {
-    if (p.date) activities.push({ icon: 'ri-article-line', text: escHtml(p.title || p.slug) + ' ' + t('dashboard.updated'), time: p.date });
+    if (p.date)
+      activities.push({
+        icon: 'ri-article-line',
+        text: escHtml(p.title || p.slug) + ' ' + t('dashboard.updated'),
+        time: p.date,
+      });
   });
   try {
     const bs = await quick(() => build.status().catch(() => null), null, 5000);
@@ -56,8 +60,9 @@ export default async function renderDashboard(signal) {
   ];
   const allHealthy = healthItems.every((h) => h.status === 'ok');
 
-  const quickstart = (!postList.length && dashData.posts !== '...') || dashData.posts === 0
-    ? `
+  const quickstart =
+    (!postList.length && dashData.posts !== '...') || dashData.posts === 0
+      ? `
       <div class="card card-pad mb-4">
         <h3 style="margin-bottom:12px"><i class="ri-rocket-line" style="color:var(--color-accent)"></i> ${t('dashboard.quickTitle')}</h3>
         <div class="quickstart-card">
@@ -75,7 +80,8 @@ export default async function renderDashboard(signal) {
           </div>
         </div>
       </div>
-    ` : '';
+    `
+      : '';
 
   return {
     html: `
@@ -94,12 +100,16 @@ export default async function renderDashboard(signal) {
         </div>
 
         <div class="dash-health-bar" role="status" aria-label="Health">
-          ${healthItems.map((h) => `
+          ${healthItems
+            .map(
+              (h) => `
             <div class="dash-health-item">
               <span class="dash-health-dot ${h.status === 'ok' ? 'healthy' : 'down'}"></span>
               <span class="dash-health-name">${h.name}</span>
               <span class="dash-health-info">${h.status === 'ok' ? t('common.ok') : '—'}</span>
-            </div>`).join('')}
+            </div>`,
+            )
+            .join('')}
         </div>
 
         <div class="dash-cards">
@@ -130,25 +140,38 @@ export default async function renderDashboard(signal) {
         <div class="dash-bottom">
           <div class="dash-chart-card">
             <h3>${t('dashboard.leaderboard')}</h3>
-            ${(trafficData.top5 || []).length
-              ? trafficData.top5.map((item, i) => `
+            ${
+              (trafficData.top5 || []).length
+                ? trafficData.top5
+                    .map(
+                      (item, i) => `
                 <a href="#editor&slug=${encodeURIComponent(item.slug)}" class="dash-top-item">
                   <span class="dash-top-rank" style="color:${['var(--color-warning)', 'var(--color-text-tertiary)', '#cd7f32', 'var(--color-text-tertiary)', 'var(--color-text-tertiary)'][i] || 'var(--color-text-tertiary)'}">#${i + 1}</span>
                   <span class="dash-top-slug">${escHtml(item.title || item.slug)}</span>
                   <span class="dash-top-count">${item.count} ${t('dashboard.viewsShort')}</span>
-                </a>`).join('')
-              : emptyState('ri-bar-chart-line', t('dashboard.noData'), t('dashboard.noTraffic'))}
+                </a>`,
+                    )
+                    .join('')
+                : emptyState('ri-bar-chart-line', t('dashboard.noData'), t('dashboard.noTraffic'))
+            }
           </div>
           <div class="dash-chart-card">
             <h3>${t('dashboard.recentActivity')}</h3>
-            ${activities.length
-              ? activities.slice(0, 8).map((a) => `
+            ${
+              activities.length
+                ? activities
+                    .slice(0, 8)
+                    .map(
+                      (a) => `
                 <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--color-border-light);font-size:13px">
                   <i class="${a.icon}" style="color:var(--color-text-tertiary);font-size:14px"></i>
                   <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.text}</span>
                   <span style="color:var(--color-text-tertiary);font-size:11px;flex-shrink:0">${formatTime(a.time)}</span>
-                </div>`).join('')
-              : emptyState('ri-time-line', t('dashboard.noActivity'))}
+                </div>`,
+                    )
+                    .join('')
+                : emptyState('ri-time-line', t('dashboard.noActivity'))
+            }
           </div>
         </div>
       </div>
@@ -165,13 +188,30 @@ export default async function renderDashboard(signal) {
       const dayData = (trafficData.byDay || []).map((d) => d.count);
       // "分类 & 标签" reflects the real site taxonomy (article counts),
       // not the traffic view distribution (stats.json has no category data).
-      const catList = (taxData.categories || []).slice().sort((a, b) => b.count - a.count).slice(0, 8);
-      const tagList = (taxData.tags || []).slice().sort((a, b) => b.count - a.count).slice(0, 8);
+      const catList = (taxData.categories || [])
+        .slice()
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+      const tagList = (taxData.tags || [])
+        .slice()
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
       const catLabels = catList.map((c) => c.name);
       const catData = catList.map((c) => c.count);
       const tagLabels = tagList.map((tt) => tt.name);
       const tagData = tagList.map((tt) => tt.count);
-      const palette = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)', 'var(--chart-7)', 'var(--chart-8)', 'var(--chart-9)', 'var(--chart-10)'];
+      const palette = [
+        'var(--chart-1)',
+        'var(--chart-2)',
+        'var(--chart-3)',
+        'var(--chart-4)',
+        'var(--chart-5)',
+        'var(--chart-6)',
+        'var(--chart-7)',
+        'var(--chart-8)',
+        'var(--chart-9)',
+        'var(--chart-10)',
+      ];
       const noData = (id) => {
         const el = document.getElementById(id);
         if (el && el.parentElement) {
@@ -183,7 +223,8 @@ export default async function renderDashboard(signal) {
       else noData('chart-traffic');
       if (catData.some((v) => v > 0)) makeChart('chart-categories', 'doughnut', catLabels, catData, palette);
       else noData('chart-categories');
-      if (tagLabels.length && tagData.some((v) => v > 0)) makeChart('chart-tags', 'doughnut', tagLabels, tagData, palette);
+      if (tagLabels.length && tagData.some((v) => v > 0))
+        makeChart('chart-tags', 'doughnut', tagLabels, tagData, palette);
       else noData('chart-tags');
     },
   };
@@ -192,32 +233,66 @@ export default async function renderDashboard(signal) {
 function makeChart(id, type, labels, data, colors) {
   const canvas = document.getElementById(id);
   if (!canvas || !window.Chart || !labels.length) return;
-  const resolve = (c) => (c && c.startsWith('var(') ? getComputedStyle(document.documentElement).getPropertyValue(c.slice(4, -1)).trim() || '#4361ee' : c);
+  const resolve = (c) =>
+    c && c.startsWith('var(')
+      ? getComputedStyle(document.documentElement).getPropertyValue(c.slice(4, -1)).trim() || '#4361ee'
+      : c;
   new window.Chart(canvas, {
     type,
     data: {
       labels,
-      datasets: [{
-        data,
-        backgroundColor: Array.isArray(colors) ? colors.map(resolve) : resolve(colors) + '33',
-        borderColor: Array.isArray(colors) ? colors.map(resolve) : resolve(colors),
-        borderWidth: type === 'line' ? 2 : 1,
-        fill: type === 'line',
-        tension: 0.3,
-        pointRadius: type === 'line' ? 2 : 0,
-        pointHoverRadius: 4,
-      }],
+      datasets: [
+        {
+          data,
+          backgroundColor: Array.isArray(colors) ? colors.map(resolve) : resolve(colors) + '33',
+          borderColor: Array.isArray(colors) ? colors.map(resolve) : resolve(colors),
+          borderWidth: type === 'line' ? 2 : 1,
+          fill: type === 'line',
+          tension: 0.3,
+          pointRadius: type === 'line' ? 2 : 0,
+          pointHoverRadius: 4,
+        },
+      ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: type === 'doughnut' ? { display: true, position: 'right', labels: { boxWidth: 10, font: { size: 11 }, color: getComputedStyle(document.documentElement).getPropertyValue('--color-text-secondary').trim() || '#86868b' } } : { display: false },
+        legend:
+          type === 'doughnut'
+            ? {
+                display: true,
+                position: 'right',
+                labels: {
+                  boxWidth: 10,
+                  font: { size: 11 },
+                  color:
+                    getComputedStyle(document.documentElement).getPropertyValue('--color-text-secondary').trim() ||
+                    '#86868b',
+                },
+              }
+            : { display: false },
       },
-      scales: type !== 'doughnut' ? {
-        x: { display: type === 'bar', grid: { color: 'transparent' }, ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim() } },
-        y: { beginAtZero: true, ticks: { precision: 0, color: getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim() }, grid: { color: 'rgba(128,128,128,0.1)' } },
-      } : {},
+      scales:
+        type !== 'doughnut'
+          ? {
+              x: {
+                display: type === 'bar',
+                grid: { color: 'transparent' },
+                ticks: {
+                  color: getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim(),
+                },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0,
+                  color: getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim(),
+                },
+                grid: { color: 'rgba(128,128,128,0.1)' },
+              },
+            }
+          : {},
     },
   });
 }

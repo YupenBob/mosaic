@@ -46,7 +46,7 @@ export function updateThemeButton() {
   if (!btn) return;
   const pref = getThemePref();
   const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  let icon = 'ri-sun-line', label = 'Auto';
+  let icon;
   if (pref === 'dark') icon = 'ri-moon-line';
   else if (pref === 'light') icon = 'ri-sun-line';
   else icon = dark ? 'ri-moon-clear-line' : 'ri-sun-line';

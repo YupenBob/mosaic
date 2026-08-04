@@ -8,7 +8,7 @@ import { escHtml, modalConfirm, copyText, fmtSize } from './ui.js';
 
 export default async function renderCleanup() {
   const API = window.__API_BASE__ || '/api';
-  const hp = { 'Authorization': 'Bearer ' + (getToken() || '') };
+  const hp = { Authorization: 'Bearer ' + (getToken() || '') };
   try {
     const data = await fetch(API + '/cleanup', { headers: hp }).then((r) => r.json());
     const orphans = data.orphans || [];
@@ -25,22 +25,31 @@ export default async function renderCleanup() {
             <div class="dash-big-card"><span class="dash-big-num">${data.totalOrphans || 0}</span><span class="dash-big-label">${t('cleanup.orphanFiles')}</span></div>
             <div class="dash-big-card"><span class="dash-big-num">${total} MB</span><span class="dash-big-label">${t('cleanup.wastedSpace')}</span></div>
           </div>
-          ${orphans.length ? `
+          ${
+            orphans.length
+              ? `
             <div class="cleanup-actions">
               <button class="btn btn-danger" id="btn-cleanup" onclick="doCleanup()"><i class="ri-delete-bin-line"></i> ${t('cleanup.deleteOrphans')}</button>
               <span class="muted">${orphans.length} ${t('cleanup.files')}</span>
             </div>
             <div class="file-list" style="max-height:260px;overflow-y:auto">
-              ${orphans.slice(0, 50).map((o) => `
+              ${orphans
+                .slice(0, 50)
+                .map(
+                  (o) => `
                 <div class="file-row">
                   <i class="ri-file-line" style="color:var(--color-text-tertiary)"></i>
                   <code>${escHtml(o.key)}</code>
                   <span class="file-size">${fmtSize(o.size)}</span>
                   <button class="btn btn-ghost btn-sm" onclick="copyCleanupPath('${escHtml(o.key)}')" title="${t('cleanup.copyPath')}" aria-label="${t('cleanup.copyPath')}"><i class="ri-file-copy-line"></i></button>
-                </div>`).join('')}
+                </div>`,
+                )
+                .join('')}
               ${orphans.length > 50 ? `<div class="file-row muted">${t('cleanup.more', { n: orphans.length - 50 })}</div>` : ''}
             </div>
-          ` : `<p class="text-success" style="padding:10px 0;font-size:13px"><i class="ri-check-line"></i> ${t('cleanup.noOrphans')}</p>`}
+          `
+              : `<p class="text-success" style="padding:10px 0;font-size:13px"><i class="ri-check-line"></i> ${t('cleanup.noOrphans')}</p>`
+          }
         </div>
 
         <div class="card card-pad">
@@ -70,39 +79,59 @@ function showIndeterminate(text) {
 
 window.doCleanup = () => {
   const n = window._orphanCount || 0;
-  modalConfirm(t('cleanup.confirmOrphan'), t('cleanup.confirmOrphanDesc', { n }), async () => {
-    const API = window.__API_BASE__ || '/api';
-    const hp = { 'Authorization': 'Bearer ' + (getToken() || '') };
-    const btn = document.getElementById('btn-cleanup');
-    if (btn) btn.style.display = 'none';
-    showIndeterminate(t('cleanup.deleting'));
-    try {
-      const result = await fetch(API + '/cleanup', { method: 'DELETE', headers: hp }).then((r) => r.json());
-      if (result.error) { showResult(t('common.error') + ': ' + result.error, true); return; }
-      showResult(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), false);
-      setTimeout(() => { location.reload(); }, 1600);
-    } catch (e) {
-      showResult(e.message, true);
-    }
-  }, { requireText: n > 0 ? String(n) : null });
+  modalConfirm(
+    t('cleanup.confirmOrphan'),
+    t('cleanup.confirmOrphanDesc', { n }),
+    async () => {
+      const API = window.__API_BASE__ || '/api';
+      const hp = { Authorization: 'Bearer ' + (getToken() || '') };
+      const btn = document.getElementById('btn-cleanup');
+      if (btn) btn.style.display = 'none';
+      showIndeterminate(t('cleanup.deleting'));
+      try {
+        const result = await fetch(API + '/cleanup', { method: 'DELETE', headers: hp }).then((r) => r.json());
+        if (result.error) {
+          showResult(t('common.error') + ': ' + result.error, true);
+          return;
+        }
+        showResult(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), false);
+        setTimeout(() => {
+          location.reload();
+        }, 1600);
+      } catch (e) {
+        showResult(e.message, true);
+      }
+    },
+    { requireText: n > 0 ? String(n) : null },
+  );
 };
 
 window.doClearCache = () => {
-  modalConfirm(t('cleanup.confirmCache'), t('cleanup.confirmCacheDesc'), async () => {
-    const API = window.__API_BASE__ || '/api';
-    const hp = { 'Authorization': 'Bearer ' + (getToken() || '') };
-    const btn = document.getElementById('btn-clear-cache');
-    if (btn) btn.style.display = 'none';
-    showIndeterminate(t('cleanup.deletingCache'));
-    try {
-      const result = await fetch(API + '/processed-cache', { method: 'DELETE', headers: hp }).then((r) => r.json());
-      if (result.error) { showResult(t('common.error') + ': ' + result.error, true); return; }
-      showResult(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), false);
-      setTimeout(() => { location.reload(); }, 1600);
-    } catch (e) {
-      showResult(e.message, true);
-    }
-  }, { requireText: 'cache' });
+  modalConfirm(
+    t('cleanup.confirmCache'),
+    t('cleanup.confirmCacheDesc'),
+    async () => {
+      const API = window.__API_BASE__ || '/api';
+      const hp = { Authorization: 'Bearer ' + (getToken() || '') };
+      const btn = document.getElementById('btn-clear-cache');
+      if (btn) btn.style.display = 'none';
+      showIndeterminate(t('cleanup.deletingCache'));
+      try {
+        const result = await fetch(API + '/processed-cache', { method: 'DELETE', headers: hp }).then((r) => r.json());
+        if (result.error) {
+          showResult(t('common.error') + ': ' + result.error, true);
+          return;
+        }
+        showResult(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), false);
+        setTimeout(() => {
+          location.reload();
+        }, 1600);
+      } catch (e) {
+        showResult(e.message, true);
+      }
+    },
+    { requireText: 'cache' },
+  );
 };
 
 function showResult(msg, isError) {

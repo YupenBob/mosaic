@@ -25,8 +25,7 @@
 ### 直连 vs 代理
 
 - 图片/封面：`<img>` 不需要 CORS，直连 `mosaic-media.xsanye.cn`
-- HLS：hls.js 跨域 XHR 需要 CORS。当前策略为 R2 对象 `Cache-Control: no-store` + 桶级 CORS，保证每次响应都带 CORS 头（牺牲边缘缓存换确定性）
-- 若已配置媒体域 **Transform Rule**（强制 `Access-Control-Allow-Origin: *`），可把 CI 环境变量 `VIDEO_CACHE_CONTROL` 设为 `public, max-age=31536000`，恢复视频边缘缓存、进一步降低延迟
+- HLS：hls.js 跨域 XHR 需要 CORS。当前策略为 R2 对象 `Cache-Control: public, max-age=31536000`（pipeline 默认 `VIDEO_CACHE_CONTROL`）+ 桶级 CORS，前提是媒体域 **Transform Rule** 已强制 `Access-Control-Allow-Origin: *`；若移动端 HLS E2E（断言 ACAO=*）失败，回退 `no-store` 并排查 Transform Rule
 
 ### CORS 排查
 
@@ -62,6 +61,7 @@ npx wrangler secret put <NAME>      # 设置：ADMIN_PASSWORD/JWT_SECRET/GITHUB_
 - 访客 IP 信任：Pages 代理用 `PROXY_SECRET` 对 `IP:分钟桶` 做 HMAC-SHA256 签名（请求头 `X-Mosaic-Proxy-IP / X-Mosaic-Proxy-Time / X-Mosaic-Proxy-Sig`），Worker 校验签名（±2 分钟窗口），失败回退 `CF-Connecting-IP`；旧静态头方案（`X-Mosaic-Proxy` + `X-Real-IP`）兼容一个发布周期后移除。两份代理文件由 `node scripts/sync-proxy.mjs` 从 `shared/pages-proxy.mjs` 同步，勿手改 `functions/api/[[path]].js` 与 `cloud-admin/functions/api/[[path]].js`
 - 管理端点 CORS 白名单：`ALLOWED_ORIGINS`（逗号分隔，默认 `https://mosaic-admin.xsanye.cn`）；`/api/health*`、`/api/stats/*`、`/api/track/*`、`/api/media/*` 保持 `*` 开放
 - 登录限流（5 次/5 分钟）与浏览去重（10 分钟/IP）为 per-isolate 内存实现，多隔离部署下属 best-effort，不保证全局精确
+- R2 用量统计：`site-data/media-usage.json` 快照在每次上传/删除时增量更新；`/api/disk` 优先读快照（24h 内），缺失或过期时全量并行遍历并回写；批量清理（删除文章、cleanup delete、processed-cache）会使快照失效触发重建
 
 ## 生产巡检
 

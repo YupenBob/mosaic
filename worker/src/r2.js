@@ -19,17 +19,33 @@ import { markDirty } from './github.js';
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 const EXT_CONTENT_TYPE = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
-  gif: 'image/gif', svg: 'image/svg+xml', ico: 'image/x-icon',
-  mp4: 'video/mp4', mov: 'video/quicktime', mkv: 'video/x-matroska', webm: 'video/webm', avi: 'video/x-msvideo',
-  mp3: 'audio/mpeg', flac: 'audio/flac', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', aac: 'audio/aac',
-  txt: 'text/plain', json: 'application/json', md: 'text/markdown',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  ico: 'image/x-icon',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  mkv: 'video/x-matroska',
+  webm: 'video/webm',
+  avi: 'video/x-msvideo',
+  mp3: 'audio/mpeg',
+  flac: 'audio/flac',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  txt: 'text/plain',
+  json: 'application/json',
+  md: 'text/markdown',
 };
 
 function folderForExt(ext) {
-  if (['jpg','jpeg','png','webp','gif','svg'].includes(ext)) return 'photos';
-  if (['mp4','mov','mkv','webm','avi'].includes(ext)) return 'videos';
-  if (['mp3','flac','wav','ogg','m4a','aac'].includes(ext)) return 'music';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) return 'photos';
+  if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) return 'videos';
+  if (['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) return 'music';
   return 'others';
 }
 
@@ -56,7 +72,10 @@ export async function uploadDirect(c) {
 
   const length = parseInt(c.req.header('Content-Length') || '0', 10);
   if (length > MAX_UPLOAD_BYTES) {
-    return c.json({ error: 'File too large (max 100MB via Worker; use presigned upload above this)', code: 'PAYLOAD_TOO_LARGE' }, 413);
+    return c.json(
+      { error: 'File too large (max 100MB via Worker; use presigned upload above this)', code: 'PAYLOAD_TOO_LARGE' },
+      413,
+    );
   }
 
   const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -83,7 +102,9 @@ export async function uploadComplete(c) {
     await markDirty(c.env);
     await adjustUsage(c.env, obj.size || 0, 1);
     return c.json({ ok: true, key, size: obj.size });
-  } catch (e) { return c.json({ error: e.message, code: 'R2_ERROR' }, 500); }
+  } catch (e) {
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
+  }
 }
 
 // Delete a media file across originals/ and processed/ (paginated)
@@ -99,7 +120,7 @@ export async function deleteMediaFile(c) {
       const opts = { prefix: `${prefix}/${slug}/`, limit: 1000 };
       if (cursor) opts.cursor = cursor;
       const list = await c.env.MEDIA.list(opts);
-      for (const obj of (list.objects || [])) {
+      for (const obj of list.objects || []) {
         if (obj.key.split('/').pop() === filename) {
           deletedSize += obj.size || 0;
           await c.env.MEDIA.delete(obj.key);
@@ -128,19 +149,21 @@ export async function listMedia(c, mediaBaseOverride) {
       ? `${r2Public}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(name)}`
       : `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`;
     const ext = name.split('.').pop()?.toLowerCase();
-    if (['jpg','jpeg','png','webp','gif','svg'].includes(ext)) result.photos.push({ name, url, size });
-    else if (['mp4','mov','mkv','webm','avi'].includes(ext)) result.videos.push({ name, url, size });
-    else if (['mp3','flac','wav','ogg','m4a','aac'].includes(ext)) result.music.push({ name, url, size });
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) result.photos.push({ name, url, size });
+    else if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) result.videos.push({ name, url, size });
+    else if (['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) result.music.push({ name, url, size });
   };
 
   try {
     const list = await c.env.MEDIA.list({ prefix: `originals/${slug}/` });
-    for (const obj of (list.objects || [])) {
+    for (const obj of list.objects || []) {
       const name = obj.key.split('/').pop();
       if (!name || name.startsWith('.')) continue;
       add(name, obj.size);
     }
-  } catch (e) { /* return empty */ }
+  } catch (e) {
+    /* return empty */
+  }
   return c.json(result);
 }
 
@@ -158,7 +181,7 @@ export async function serveMediaFile(c) {
           headers: {
             'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
             'Cache-Control': 'public, max-age=86400',
-            'ETag': obj.httpEtag || '',
+            ETag: obj.httpEtag || '',
             // Media fetched via hls.js (XHR/fetch) requires CORS; R2's own
             // edge responses sometimes omit it on cached range responses.
             'Access-Control-Allow-Origin': '*',
@@ -183,7 +206,7 @@ export async function serveMediaFile(c) {
             headers: {
               'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
               'Cache-Control': 'public, max-age=31536000',
-              'ETag': obj.httpEtag || '',
+              ETag: obj.httpEtag || '',
               'Access-Control-Allow-Origin': '*',
             },
           });
@@ -219,5 +242,11 @@ export async function generatePresignedUrl(c) {
   const url = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 3600 });
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   const folder = slug === 'site-data' ? 'site-data' : folderForExt(ext);
-  return c.json({ url, key, folder, expires: 3600, contentType: contentType || EXT_CONTENT_TYPE[ext] || 'application/octet-stream' });
+  return c.json({
+    url,
+    key,
+    folder,
+    expires: 3600,
+    contentType: contentType || EXT_CONTENT_TYPE[ext] || 'application/octet-stream',
+  });
 }

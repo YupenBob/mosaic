@@ -21,7 +21,7 @@ const STEP_LABELS_ZH = {
   'Progress — upload': '阶段：上传媒体',
   'Progress — deploy': '阶段：部署',
   'Finish build progress': '结束构建进度上报',
-  'Checkout': '检出代码',
+  Checkout: '检出代码',
   'Setup Node': '安装 Node.js',
   'Install tools': '安装工具（ffmpeg / rclone / exiftool）',
   'Install deps': '安装依赖',
@@ -41,15 +41,15 @@ const STEP_LABELS_ZH = {
 };
 
 function stepLabel(name) {
-  return localStorage.getItem('mosaic_admin_lang') === 'en' ? name : (STEP_LABELS_ZH[name] || name);
+  return localStorage.getItem('mosaic_admin_lang') === 'en' ? name : STEP_LABELS_ZH[name] || name;
 }
 
 let stepsDetailOpen = false;
 let lastSteps = [];
-let tipStep = null;
 
 export default async function renderBuild(signal) {
-  let statusData = null, historyData = { runs: [] };
+  let statusData = null,
+    historyData = { runs: [] };
   try {
     [statusData, historyData] = await Promise.all([
       build.status().catch(() => null),
@@ -86,14 +86,18 @@ export default async function renderBuild(signal) {
         </div>
 
         <div id="build-status-card">${latest ? renderStatusCard(latest) : renderEmptyState()}</div>
-        ${runs.length > 0 ? `
+        ${
+          runs.length > 0
+            ? `
           <div id="build-history">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
               <h2 style="margin:0">${t('build.history')}</h2>
               ${repoUrl ? `<a href="${escHtml(repoUrl)}/actions/workflows/pipeline.yml" target="_blank" rel="noopener" style="font-size:13px;color:var(--color-accent);text-decoration:none">${t('build.viewAll')} <i class="ri-external-link-line"></i></a>` : ''}
             </div>
             ${renderRunHistory(runs)}
-          </div>` : ''}
+          </div>`
+            : ''
+        }
       </div>
     `,
     onMount() {
@@ -122,11 +126,14 @@ export default async function renderBuild(signal) {
           tipDur.textContent = t('build.elapsedShort', { t: fmtDuration(sec) });
         }
         const upd = document.getElementById('build-updated');
-        if (upd) upd.textContent = t('build.updatedAgo', { s: Math.max(1, Math.round((Date.now() - lastPollAt) / 1000)) });
+        if (upd)
+          upd.textContent = t('build.updatedAgo', { s: Math.max(1, Math.round((Date.now() - lastPollAt) / 1000)) });
       };
       durTicker = setInterval(tickDur, 1000);
 
-      const schedule = (ms) => { if (!stopped) pollTimer = setTimeout(poll, ms); };
+      const schedule = (ms) => {
+        if (!stopped) pollTimer = setTimeout(poll, ms);
+      };
 
       const updateLive = async () => {
         const live = document.getElementById('build-live-progress');
@@ -236,9 +243,12 @@ function buildSummary(runs, latest) {
 function buildDuration(run) {
   if (!run.createdAt) return '';
   const start = new Date(run.createdAt).getTime();
-  const end = run.status === 'in_progress' || run.status === 'queued'
-    ? Date.now()
-    : (run.updatedAt ? new Date(run.updatedAt).getTime() : Date.now());
+  const end =
+    run.status === 'in_progress' || run.status === 'queued'
+      ? Date.now()
+      : run.updatedAt
+        ? new Date(run.updatedAt).getTime()
+        : Date.now();
   return fmtDuration(Math.floor((end - start) / 1000));
 }
 
@@ -281,7 +291,9 @@ function renderPipeline(run) {
   const avgCompleted = completedDurs.length ? completedDurs.reduce((a, b) => a + b, 0) / completedDurs.length : 10000;
   const stepDur = (s) => {
     if (s.status === 'completed') {
-      return s.startedAt && s.completedAt ? Math.max(1000, new Date(s.completedAt) - new Date(s.startedAt)) : avgCompleted;
+      return s.startedAt && s.completedAt
+        ? Math.max(1000, new Date(s.completedAt) - new Date(s.startedAt))
+        : avgCompleted;
     }
     if (s.status === 'in_progress') {
       return s.startedAt ? Math.max(1000, now - new Date(s.startedAt)) : avgCompleted;
@@ -306,17 +318,19 @@ function renderPipeline(run) {
   } else {
     label = t('build.stepsDone', { done, total: steps.length });
   }
-  const segs = steps.map((s, i) => {
-    let cls = 'pending';
-    if (s.status === 'completed' && s.conclusion === 'success') cls = 'done';
-    else if (s.status === 'completed' && s.conclusion === 'failure') cls = 'failed';
-    else if (s.status === 'in_progress') cls = 'active';
-    else if (s.status === 'completed') cls = 'skipped';
-    // flex-grow weights the segment by its real duration; gaps share the
-    // remaining space so the bar never overflows its container.
-    const g = weights[i] || 1;
-    return `<span class="pipeline-seg ${cls}" data-step="${s.number}" style="flex-grow:${g.toFixed(1)}" aria-label="${escHtml(stepLabel(s.name))} (#${s.number}) · ${fmtDuration(Math.round(weights[i] / 1000))}"></span>`;
-  }).join('');
+  const segs = steps
+    .map((s, i) => {
+      let cls = 'pending';
+      if (s.status === 'completed' && s.conclusion === 'success') cls = 'done';
+      else if (s.status === 'completed' && s.conclusion === 'failure') cls = 'failed';
+      else if (s.status === 'in_progress') cls = 'active';
+      else if (s.status === 'completed') cls = 'skipped';
+      // flex-grow weights the segment by its real duration; gaps share the
+      // remaining space so the bar never overflows its container.
+      const g = weights[i] || 1;
+      return `<span class="pipeline-seg ${cls}" data-step="${s.number}" style="flex-grow:${g.toFixed(1)}" aria-label="${escHtml(stepLabel(s.name))} (#${s.number}) · ${fmtDuration(Math.round(weights[i] / 1000))}"></span>`;
+    })
+    .join('');
 
   // ETA: rate-based estimate from elapsed time + progress ratio
   let etaText = '';
@@ -328,15 +342,16 @@ function renderPipeline(run) {
     if (etaSec > 0) etaText = t('build.eta', { t: fmtDuration(etaSec) });
   }
 
-  const detailRows = steps.map((s) => {
-    const { cls, label: statusLabel } = stepStatusInfo(s);
-    let d = '';
-    if (s.status === 'completed' && s.startedAt && s.completedAt) {
-      d = fmtDuration(Math.round((new Date(s.completedAt) - new Date(s.startedAt)) / 1000));
-    } else if (s.status === 'in_progress' && s.startedAt) {
-      d = `<span id="step-elapsed" data-start="${s.startedAt}">${t('build.elapsedShort', { t: fmtDuration(Math.max(0, Math.round((now - new Date(s.startedAt)) / 1000))) })}</span>`;
-    }
-    return `
+  const detailRows = steps
+    .map((s) => {
+      const { cls, label: statusLabel } = stepStatusInfo(s);
+      let d = '';
+      if (s.status === 'completed' && s.startedAt && s.completedAt) {
+        d = fmtDuration(Math.round((new Date(s.completedAt) - new Date(s.startedAt)) / 1000));
+      } else if (s.status === 'in_progress' && s.startedAt) {
+        d = `<span id="step-elapsed" data-start="${s.startedAt}">${t('build.elapsedShort', { t: fmtDuration(Math.max(0, Math.round((now - new Date(s.startedAt)) / 1000))) })}</span>`;
+      }
+      return `
       <div class="build-step-row" data-step="${s.number}">
         <span class="step-num">#${s.number}</span>
         <span class="step-dot ${cls}"></span>
@@ -344,7 +359,8 @@ function renderPipeline(run) {
         <span class="step-status ${cls}">${escHtml(statusLabel)}</span>
         ${d ? `<span class="step-dur">${d}</span>` : ''}
       </div>`;
-  }).join('');
+    })
+    .join('');
 
   return `
     <div class="build-pipeline">
@@ -416,13 +432,11 @@ function showPipelineTip(seg, step) {
   `;
   tip.classList.add('show');
   positionTip(tip, seg);
-  tipStep = step.number;
 }
 
 function hidePipelineTip() {
   const tip = document.getElementById('pipeline-tip');
   if (tip) tip.classList.remove('show');
-  tipStep = null;
 }
 
 function highlightStepRow(n) {
@@ -440,7 +454,9 @@ function highlightStepRow(n) {
 }
 
 function clearStepHighlight() {
-  document.querySelectorAll('.build-step-row.pipeline-row-active').forEach((el) => el.classList.remove('pipeline-row-active'));
+  document
+    .querySelectorAll('.build-step-row.pipeline-row-active')
+    .forEach((el) => el.classList.remove('pipeline-row-active'));
 }
 
 function onSegEnter(e) {
@@ -480,7 +496,8 @@ function renderStatusCard(run) {
   const def = getStatusDef(run.status, run.conclusion);
   const time = formatTime(run.createdAt);
   const dur = buildDuration(run);
-  const durLabel = (run.status === 'in_progress' || run.status === 'queued') ? t('build.durationRunning') : t('build.durationDone');
+  const durLabel =
+    run.status === 'in_progress' || run.status === 'queued' ? t('build.durationRunning') : t('build.durationDone');
   return `
     <div class="card build-status-card">
       <div class="build-status-head">
@@ -493,21 +510,27 @@ function renderStatusCard(run) {
 
       ${renderPipeline(run)}
 
-      ${run.failedStep ? `
+      ${
+        run.failedStep
+          ? `
         <div class="build-failed-step">
           <i class="ri-close-circle-line"></i>
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(run.failedStep.name)}</span>
           ${run.failedStep.logUrl ? `<a class="btn btn-danger btn-sm" href="${escHtml(run.failedStep.logUrl)}" target="_blank" rel="noopener"><i class="ri-terminal-line"></i> ${t('build.viewLog')}</a>` : ''}
-        </div>` : ''}
+        </div>`
+          : ''
+      }
 
       <div class="build-meta">
         <div><span class="build-meta-label">${t('build.branch')}</span><code>${escHtml(run.headBranch || 'main')}</code></div>
         <div>
           <span class="build-meta-label">${t('build.commit')}</span>
           <span style="display:inline-flex;gap:4px;align-items:center">
-            ${run.commitUrl
-              ? `<a href="${escHtml(run.commitUrl)}" target="_blank" rel="noopener" class="mono" style="font-size:12px;color:var(--color-text-primary);text-decoration:none" title="${escHtml(run.headShaFull || run.headSha)}">${escHtml(run.headSha || '—')}</a>`
-              : `<code>${escHtml(run.headSha || '—')}</code>`}
+            ${
+              run.commitUrl
+                ? `<a href="${escHtml(run.commitUrl)}" target="_blank" rel="noopener" class="mono" style="font-size:12px;color:var(--color-text-primary);text-decoration:none" title="${escHtml(run.headShaFull || run.headSha)}">${escHtml(run.headSha || '—')}</a>`
+                : `<code>${escHtml(run.headSha || '—')}</code>`
+            }
             ${run.headSha ? `<button class="btn btn-ghost btn-sm" onclick="window.copySha('${escHtml(run.headSha)}')" title="${t('build.copySha')}" aria-label="${t('build.copySha')}"><i class="ri-file-copy-line"></i></button>` : ''}
           </span>
         </div>
@@ -523,23 +546,27 @@ function renderStatusCard(run) {
 function renderRunHistory(runs) {
   return `
     <div style="display:flex;flex-direction:column;gap:2px">
-      ${runs.map((r) => {
-        const s = getStatusDef(r.status, r.conclusion);
-        const time = formatTime(r.createdAt);
-        const dur = buildDuration(r);
-        return `
+      ${runs
+        .map((r) => {
+          const s = getStatusDef(r.status, r.conclusion);
+          const time = formatTime(r.createdAt);
+          const dur = buildDuration(r);
+          return `
           <div class="build-history-row">
             <span class="build-history-run">#${r.runNumber}</span>
             ${statusBadge(s)}
             <span class="build-history-title">${escHtml(r.displayTitle || r.commitMessage || '')}</span>
             ${dur ? `<span class="muted" style="min-width:64px;text-align:right">${dur}</span>` : ''}
-            ${r.commitUrl
-              ? `<a href="${escHtml(r.commitUrl)}" target="_blank" rel="noopener" class="build-history-meta" title="${escHtml(r.headShaFull || r.headSha)}">${escHtml(r.headSha || '')}</a>`
-              : `<span class="build-history-meta">${escHtml(r.headSha || '')}</span>`}
+            ${
+              r.commitUrl
+                ? `<a href="${escHtml(r.commitUrl)}" target="_blank" rel="noopener" class="build-history-meta" title="${escHtml(r.headShaFull || r.headSha)}">${escHtml(r.headSha || '')}</a>`
+                : `<span class="build-history-meta">${escHtml(r.headSha || '')}</span>`
+            }
             <span class="build-history-time">${time}</span>
             ${r.htmlUrl ? `<a href="${r.htmlUrl}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none">${t('build.viewOnGitHub')} <i class="ri-external-link-line"></i></a>` : ''}
           </div>`;
-      }).join('')}
+        })
+        .join('')}
     </div>
   `;
 }

@@ -21,15 +21,17 @@ const SERVE_MAIN = require.resolve('serve/build/main.js');
 
 function waitForServer() {
   return new Promise((resolve, reject) => {
-    const deadline = Date.now() + 10000;
+    const deadline = Date.now() + 20000;
     const ping = () => {
-      http.get(`http://${HOST}:${PORT}/index.html`, (r) => {
-        r.resume();
-        resolve();
-      }).on('error', () => {
-        if (Date.now() > deadline) reject(new Error('static server did not start in time'));
-        else setTimeout(ping, 250);
-      });
+      http
+        .get(`http://${HOST}:${PORT}/index.html`, (r) => {
+          r.resume();
+          resolve();
+        })
+        .on('error', () => {
+          if (Date.now() > deadline) reject(new Error('static server did not start in time'));
+          else setTimeout(ping, 300);
+        });
     };
     ping();
   });
@@ -41,13 +43,12 @@ async function main() {
     process.exit(1);
   }
 
-  const server = spawn(
-    process.execPath,
-    [SERVE_MAIN, 'dist', '-l', `tcp://${HOST}:${PORT}`, '--no-clipboard'],
-    { cwd: ROOT, stdio: 'ignore' }
-  );
+  const server = spawn(process.execPath, [SERVE_MAIN, 'dist', '-l', `tcp://${HOST}:${PORT}`, '--no-clipboard'], {
+    cwd: ROOT,
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
+  server.on('error', (e) => console.error('static server error:', e.message));
 
-  let exitCode = 1;
   try {
     await waitForServer();
     console.log(`Serving ${DIST} at http://${HOST}:${PORT}`);
@@ -64,11 +65,10 @@ async function main() {
       env: { ...process.env, SITE: `http://${HOST}:${PORT}`, ADMIN: 'skip' },
       timeout: 10 * 60 * 1000,
     });
-    exitCode = result.status ?? 1;
+    process.exit(result.status ?? 1);
   } finally {
     server.kill();
   }
-  process.exit(exitCode);
 }
 
 main().catch((e) => {

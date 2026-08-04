@@ -5,8 +5,8 @@
 import { $, $$ } from './utils.js';
 
 const RESOLUTIONS = ['480p', '720p', '1080p', 'orig'];
-const RES_LABELS = { '480p': '低清', '720p': '中清', '1080p': '高清', 'orig': '原图' };
-const PRELOAD_RANGE = { 3: { '480p': 10, '720p': 3, '1080p': 1, 'orig': 0 } };
+const RES_LABELS = { '480p': '低清', '720p': '中清', '1080p': '高清', orig: '原图' };
+const PRELOAD_RANGE = { 3: { '480p': 10, '720p': 3, '1080p': 1, orig: 0 } };
 
 let state = {
   photos: [],
@@ -56,9 +56,17 @@ function setupLazyLoading() {
     $$('.gallery-item img, .gallery-single-item img').forEach(loadThumb);
     return;
   }
-  const obs = new IntersectionObserver((entries) => {
-    entries.forEach((e) => { if (e.isIntersecting) { loadThumb(e.target); obs.unobserve(e.target); } });
-  }, { rootMargin: '200px' });
+  const obs = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          loadThumb(e.target);
+          obs.unobserve(e.target);
+        }
+      });
+    },
+    { rootMargin: '200px' },
+  );
   $$('.gallery-item img, .gallery-single-item img').forEach((img) => obs.observe(img));
 }
 
@@ -100,7 +108,9 @@ function createOverlay() {
   $('#gallery-done').addEventListener('click', close);
   $('#gallery-prev').addEventListener('click', () => nav(-1));
   $('#gallery-next').addEventListener('click', () => nav(1));
-  ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+  ov.addEventListener('click', (e) => {
+    if (e.target === ov) close();
+  });
 
   // Quality pills
   $$('.gq-pill').forEach((pill) => {
@@ -188,13 +198,16 @@ function showQualityFlash(label) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'gallery-quality-flash';
-    el.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.75);color:#fff;padding:6px 16px;border-radius:20px;font-size:14px;pointer-events:none;opacity:0;transition:opacity 0.15s ease';
+    el.style.cssText =
+      'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.75);color:#fff;padding:6px 16px;border-radius:20px;font-size:14px;pointer-events:none;opacity:0;transition:opacity 0.15s ease';
     document.body.appendChild(el);
   }
   el.textContent = label;
   el.style.opacity = '1';
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.style.opacity = '0'; }, 800);
+  el._timer = setTimeout(() => {
+    el.style.opacity = '0';
+  }, 800);
 }
 
 function updateQualityPills() {
@@ -217,8 +230,6 @@ function preloadNeighbors(idx) {
 }
 
 /* ========== Filmstrip ========== */
-let filmstripRendered = false;
-
 function renderFilmstrip() {
   const N = state.photos.length;
   const track = $('#filmstrip-track');
@@ -237,24 +248,23 @@ function renderFilmstrip() {
     if (!('IntersectionObserver' in window)) {
       for (let i = initialCount; i < N; i++) track.appendChild(createThumb(i));
     } else {
-    const obs = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        const currentCount = track.children.length;
-        const batchEnd = Math.min(currentCount + 100, N);
-        for (let i = currentCount; i < batchEnd; i++) {
-          track.appendChild(createThumb(i));
+      const obs = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          const currentCount = track.children.length;
+          const batchEnd = Math.min(currentCount + 100, N);
+          for (let i = currentCount; i < batchEnd; i++) {
+            track.appendChild(createThumb(i));
+          }
+          if (batchEnd >= N) obs.disconnect();
         }
-        if (batchEnd >= N) obs.disconnect();
-      }
-    });
-    const sentinel = document.createElement('div');
-    sentinel.style.width = '1px';
-    track.appendChild(sentinel);
-    obs.observe(sentinel);
+      });
+      const sentinel = document.createElement('div');
+      sentinel.style.width = '1px';
+      track.appendChild(sentinel);
+      obs.observe(sentinel);
     } // end IntersectionObserver else
   }
 
-  filmstripRendered = true;
   // Scroll to current
   requestAnimationFrame(() => scrollFilmstripToCurrent());
 }
@@ -301,17 +311,43 @@ function scrollFilmstrip(delta) {
 function handleKeyboard(e) {
   if (!state.isOpen) return;
   switch (e.key) {
-    case 'ArrowLeft':  nav(-1); break;
-    case 'ArrowRight': nav(1); break;
-    case 'Home': state.currentIndex = 0; updateImage(); scrollFilmstripToCurrent(); break;
-    case 'End':  state.currentIndex = state.photos.length - 1; updateImage(); scrollFilmstripToCurrent(); break;
-    case 'PageUp':   nav(-10); break;
-    case 'PageDown': nav(10); break;
-    case 'Escape': close(); break;
-    case '1': switchQuality('480p'); break;
-    case '2': switchQuality('720p'); break;
-    case '3': switchQuality('1080p'); break;
-    case '4': switchQuality('orig'); break;
+    case 'ArrowLeft':
+      nav(-1);
+      break;
+    case 'ArrowRight':
+      nav(1);
+      break;
+    case 'Home':
+      state.currentIndex = 0;
+      updateImage();
+      scrollFilmstripToCurrent();
+      break;
+    case 'End':
+      state.currentIndex = state.photos.length - 1;
+      updateImage();
+      scrollFilmstripToCurrent();
+      break;
+    case 'PageUp':
+      nav(-10);
+      break;
+    case 'PageDown':
+      nav(10);
+      break;
+    case 'Escape':
+      close();
+      break;
+    case '1':
+      switchQuality('480p');
+      break;
+    case '2':
+      switchQuality('720p');
+      break;
+    case '3':
+      switchQuality('1080p');
+      break;
+    case '4':
+      switchQuality('orig');
+      break;
   }
 }
 
@@ -336,43 +372,61 @@ function applyTransform() {
 function setupGestures(overlay) {
   // --- Touch (swipe + pinch) ---
   let touchState = { sx: 0, sy: 0, cx: 0, cy: 0, active: false, startDist: 0, startScale: 1, fingers: 0 };
-  overlay.addEventListener('touchstart', (e) => {
-    touchState.fingers = e.touches.length;
-    if (e.touches.length === 1) {
-      touchState.sx = e.touches[0].clientX; touchState.sy = e.touches[0].clientY;
-      touchState.cx = touchState.sx; touchState.cy = touchState.sy;
-      touchState.active = true;
-    } else if (e.touches.length === 2) {
-      touchState.startDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      touchState.startScale = zoomState.scale;
-      touchState.active = false; // Cancel swipe when pinch starts
-    }
-  }, { passive: true });
-
-  overlay.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 1 && touchState.active && zoomState.scale === 1) {
-      touchState.cx = e.touches[0].clientX; touchState.cy = e.touches[0].clientY;
-      const img = $('#gallery-current-img');
-      if (img) img.style.transform = zoomState.scale > 1 ? '' : `translateX(${touchState.cx - touchState.sx}px)`;
-    } else if (e.touches.length === 2) {
-      const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      // Pinch center point — zoom toward it
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const img = $('#gallery-current-img');
-      if (!img) return;
-      const imgRect = img.getBoundingClientRect();
-      const cx = midX - (imgRect.left + imgRect.width / 2), cy = midY - (imgRect.top + imgRect.height / 2);
-      if (touchState.startDist > 0) {
-        const oldScale = zoomState.scale;
-        const newScale = Math.max(0.5, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
-        zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
-        zoomState.panY = cy - (cy - zoomState.panY) * (newScale / oldScale);
-        zoomState.scale = newScale;
-        applyTransform();
+  overlay.addEventListener(
+    'touchstart',
+    (e) => {
+      touchState.fingers = e.touches.length;
+      if (e.touches.length === 1) {
+        touchState.sx = e.touches[0].clientX;
+        touchState.sy = e.touches[0].clientY;
+        touchState.cx = touchState.sx;
+        touchState.cy = touchState.sy;
+        touchState.active = true;
+      } else if (e.touches.length === 2) {
+        touchState.startDist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY,
+        );
+        touchState.startScale = zoomState.scale;
+        touchState.active = false; // Cancel swipe when pinch starts
       }
-    }
-  }, { passive: true });
+    },
+    { passive: true },
+  );
+
+  overlay.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.touches.length === 1 && touchState.active && zoomState.scale === 1) {
+        touchState.cx = e.touches[0].clientX;
+        touchState.cy = e.touches[0].clientY;
+        const img = $('#gallery-current-img');
+        if (img) img.style.transform = zoomState.scale > 1 ? '' : `translateX(${touchState.cx - touchState.sx}px)`;
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY,
+        );
+        // Pinch center point — zoom toward it
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const img = $('#gallery-current-img');
+        if (!img) return;
+        const imgRect = img.getBoundingClientRect();
+        const cx = midX - (imgRect.left + imgRect.width / 2),
+          cy = midY - (imgRect.top + imgRect.height / 2);
+        if (touchState.startDist > 0) {
+          const oldScale = zoomState.scale;
+          const newScale = Math.max(0.5, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
+          zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
+          zoomState.panY = cy - (cy - zoomState.panY) * (newScale / oldScale);
+          zoomState.scale = newScale;
+          applyTransform();
+        }
+      }
+    },
+    { passive: true },
+  );
 
   overlay.addEventListener('touchend', () => {
     if (touchState.active && zoomState.scale <= 1) {
@@ -384,21 +438,25 @@ function setupGestures(overlay) {
   });
 
   // --- Mouse wheel zoom (centered on cursor) ---
-  overlay.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const img = $('#gallery-current-img');
-    if (!img) return;
-    const imgRect = img.getBoundingClientRect();
-    const cx = e.clientX - (imgRect.left + imgRect.width / 2);
-    const cy = e.clientY - (imgRect.top + imgRect.height / 2);
-    const oldScale = zoomState.scale;
-    const newScale = Math.max(0.5, Math.min(5, oldScale + (e.deltaY > 0 ? -0.15 : 0.15)));
-    const ratio = newScale / oldScale;
-    zoomState.panX = cx - (cx - zoomState.panX) * ratio;
-    zoomState.panY = cy - (cy - zoomState.panY) * ratio;
-    zoomState.scale = newScale;
-    applyTransform();
-  }, { passive: false });
+  overlay.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      const img = $('#gallery-current-img');
+      if (!img) return;
+      const imgRect = img.getBoundingClientRect();
+      const cx = e.clientX - (imgRect.left + imgRect.width / 2);
+      const cy = e.clientY - (imgRect.top + imgRect.height / 2);
+      const oldScale = zoomState.scale;
+      const newScale = Math.max(0.5, Math.min(5, oldScale + (e.deltaY > 0 ? -0.15 : 0.15)));
+      const ratio = newScale / oldScale;
+      zoomState.panX = cx - (cx - zoomState.panX) * ratio;
+      zoomState.panY = cy - (cy - zoomState.panY) * ratio;
+      zoomState.scale = newScale;
+      applyTransform();
+    },
+    { passive: false },
+  );
 
   // --- Free drag when zoomed ---
   let dragStart = null;
@@ -417,18 +475,26 @@ function setupGestures(overlay) {
       applyTransform();
     });
     document.addEventListener('mouseup', () => {
-      if (dragStart) { dragStart = null; img.style.cursor = 'grab'; }
+      if (dragStart) {
+        dragStart = null;
+        img.style.cursor = 'grab';
+      }
     });
   }
 
   // --- Double tap zoom (centered on tap point) ---
   overlay.addEventListener('dblclick', (e) => {
     e.preventDefault();
-    if (zoomState.scale > 1.2) { resetZoom(); applyTransform(); return; }
+    if (zoomState.scale > 1.2) {
+      resetZoom();
+      applyTransform();
+      return;
+    }
     const img = $('#gallery-current-img');
     if (!img) return;
     const imgRect = img.getBoundingClientRect();
-    const cx = e.clientX - (imgRect.left + imgRect.width / 2), cy = e.clientY - (imgRect.top + imgRect.height / 2);
+    const cx = e.clientX - (imgRect.left + imgRect.width / 2),
+      cy = e.clientY - (imgRect.top + imgRect.height / 2);
     const oldScale = zoomState.scale;
     const newScale = 2;
     zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);

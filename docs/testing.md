@@ -52,11 +52,15 @@ node tests/admin-smoke.mjs
 每次构建自动执行：
 
 ```bash
-node --check scripts/compress.js scripts/generate.js scripts/upload.js
-node tests/worker-smoke.mjs
+npm run check             # node --check 全部脚本 + proxy 同步校验 + config 校验 + worker-smoke + build-smoke
+npm run lint              # ESLint（0 警告）
+npm run format:check      # Prettier 格式校验
+npx playwright install --with-deps chromium
+SITE=http://127.0.0.1:3000 ADMIN=skip npx playwright test tests/frontend.spec.js \
+  --grep-invert "Worker health|mobile viewport|admin login"   # 本地静态预览 E2E
 ```
 
-任何失败都会中断构建，阻止部署。
+任何失败都会中断构建，阻止部署。本地等价命令：`npm run check`、`npm run validate`、`npm run lint`、`npm run format:check`、`npm run test:e2e:local`（先 `npm run build`）。
 
 ### 生产健康检查（health-check.yml）
 

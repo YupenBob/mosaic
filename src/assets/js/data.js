@@ -4,8 +4,12 @@
  */
 
 let _posts = [];
-export function setPosts(p) { _posts = p || []; }
-export function getPosts() { return _posts; }
+export function setPosts(p) {
+  _posts = p || [];
+}
+export function getPosts() {
+  return _posts;
+}
 
 let _i18n = {};
 let _lang = 'zh-CN';

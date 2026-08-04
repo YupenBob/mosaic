@@ -6,7 +6,6 @@ import { posts as postsApi, media as mediaApi } from '../src/api.js';
 import { t } from './i18n.js';
 import { state } from './state.js';
 import { escHtml, toast, modalConfirm, loadLib, openModal, closeModal } from './ui.js';
-import { handleUploadFiles } from './upload.js';
 
 const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';
@@ -26,18 +25,21 @@ export default async function renderEditor(signal) {
   const slug = state.params.slug || '';
   let post = { slug: '', frontMatter: {}, body: '' };
   if (slug) {
-    try { post = await postsApi.get(slug); } catch {}
+    try {
+      post = await postsApi.get(slug);
+    } catch {}
   }
   if (signal.aborted) return '';
 
   const fm = post.frontMatter || {};
   const draft = loadDraft(slug);
-  const prefillCat = !slug ? (state.params.cat || '') : '';
-  const prefillTags = !slug ? (state.params.tags || '') : '';
-  const fmv = (key, fallback = '') => draft && draft[key] !== undefined && draft[key] !== null ? draft[key] : (fm[key] ?? fallback);
-  const body = draft ? (draft.body !== undefined ? draft.body : (post.body || '')) : (post.body || '');
+  const prefillCat = !slug ? state.params.cat || '' : '';
+  const prefillTags = !slug ? state.params.tags || '' : '';
+  const fmv = (key, fallback = '') =>
+    draft && draft[key] !== undefined && draft[key] !== null ? draft[key] : (fm[key] ?? fallback);
+  const body = draft ? (draft.body !== undefined ? draft.body : post.body || '') : post.body || '';
   const catValue = fmv('category') || prefillCat;
-  const tagsValue = (fmv('tags') || prefillTags);
+  const tagsValue = fmv('tags') || prefillTags;
 
   return {
     html: `
@@ -53,7 +55,9 @@ export default async function renderEditor(signal) {
           </div>
         </div>
 
-        ${draft ? `
+        ${
+          draft
+            ? `
           <div class="draft-banner" id="draft-banner">
             <i class="ri-time-line"></i>
             <span>${t('editor.draftRestore', { time: new Date(draft.updatedAt).toLocaleString() })}</span>
@@ -61,11 +65,13 @@ export default async function renderEditor(signal) {
               <button class="btn btn-secondary btn-sm" onclick="window.restoreDraft()"><i class="ri-arrow-up-line"></i> ${t('editor.restore')}</button>
               <button class="btn btn-ghost btn-sm" onclick="window.discardDraft()"><i class="ri-close-line"></i> ${t('editor.discard')}</button>
             </span>
-          </div>` : ''}
+          </div>`
+            : ''
+        }
 
         <div class="editor-layout">
           <div class="editor-fields">
-            <div class="editor-section-title">${t('editor.title')}</div>
+            <div class="editor-section-title">${t('editor.sectionTitle')}</div>
             <label class="field">
               <span class="field-label">${t('editor.slug')}</span>
               <input type="text" id="fm-slug" class="input" value="${escHtml(slug)}" ${slug ? 'readonly' : ''} placeholder="my-post" />
@@ -184,7 +190,9 @@ function loadDraft(slug) {
   try {
     const raw = localStorage.getItem(draftKey(slug));
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function saveDraft() {
@@ -195,7 +203,10 @@ function saveDraft() {
     title: document.getElementById('fm-title')?.value || '',
     date: document.getElementById('fm-date')?.value || '',
     category: document.getElementById('fm-category')?.value || '',
-    tags: (document.getElementById('fm-tags')?.value || '').split(',').map((s) => s.trim()).filter(Boolean),
+    tags: (document.getElementById('fm-tags')?.value || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     description: document.getElementById('fm-desc')?.value || '',
     layout: document.getElementById('fm-layout')?.value || 'default',
     cover: document.getElementById('fm-cover')?.value || '',
@@ -210,7 +221,9 @@ function saveDraft() {
 }
 
 function wireEditorInputs() {
-  const fields = document.querySelectorAll('#fm-title, #fm-date, #fm-category, #fm-tags, #fm-desc, #fm-layout, #fm-cover, #fm-views, #fm-likes, #fm-slug, #fm-body');
+  const fields = document.querySelectorAll(
+    '#fm-title, #fm-date, #fm-category, #fm-tags, #fm-desc, #fm-layout, #fm-cover, #fm-views, #fm-likes, #fm-slug, #fm-body',
+  );
   const onInput = () => {
     state.editorDirty = true;
     clearTimeout(draftTimer);
@@ -222,7 +235,10 @@ function wireEditorInputs() {
 window.restoreDraft = () => {
   const d = window._draftSnapshot;
   if (!d) return;
-  const set = (id, v) => { const el = document.getElementById(id); if (el && el.value !== v) el.value = v; };
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (el && el.value !== v) el.value = v;
+  };
   set('fm-title', d.title || '');
   set('fm-date', d.date || '');
   set('fm-category', d.category || '');
@@ -262,7 +278,11 @@ window.doSavePost = async (goBack) => {
     title,
     date: document.getElementById('fm-date').value,
     category: document.getElementById('fm-category').value.trim(),
-    tags: document.getElementById('fm-tags').value.split(',').map((s) => s.trim()).filter(Boolean),
+    tags: document
+      .getElementById('fm-tags')
+      .value.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     description: document.getElementById('fm-desc').value,
     layout: document.getElementById('fm-layout').value,
     cover: document.getElementById('fm-cover').value.trim(),
@@ -279,7 +299,9 @@ window.doSavePost = async (goBack) => {
       await postsApi.create({ slug, frontMatter, body });
       location.hash = 'editor&slug=' + encodeURIComponent(slug);
     }
-    try { localStorage.removeItem(draftKey(slug)); } catch {}
+    try {
+      localStorage.removeItem(draftKey(slug));
+    } catch {}
     state.editorDirty = false;
     window.checkDirty && window.checkDirty();
     toast(t('editor.saved'), 'success');
@@ -295,7 +317,8 @@ window.doSavePost = async (goBack) => {
 function wrapSelection(before, after, placeholder) {
   const ta = document.getElementById('fm-body');
   if (!ta) return;
-  const start = ta.selectionStart, end = ta.selectionEnd;
+  const start = ta.selectionStart,
+    end = ta.selectionEnd;
   const selected = ta.value.slice(start, end) || placeholder;
   ta.setRangeText(before + selected + after, start, end, 'end');
   ta.dispatchEvent(new Event('input'));
@@ -357,7 +380,10 @@ async function renderPreview() {
   // Resolve relative media paths against the originals bucket for preview
   if (slug) {
     const base = (state.mediaBase || '').replace(/\/$/, '');
-    html = html.replace(/(src|href)="((?:photos|videos|covers)\/[^"]+)"/g, (m, attr, path) => `${attr}="${base}/originals/${encodeURIComponent(slug)}/${path}"`);
+    html = html.replace(
+      /(src|href)="((?:photos|videos|covers)\/[^"]+)"/g,
+      (m, attr, path) => `${attr}="${base}/originals/${encodeURIComponent(slug)}/${path}"`,
+    );
   }
   preview.innerHTML = html;
 }
@@ -379,7 +405,10 @@ export function updateCoverPreview() {
 
 window.openCoverPicker = async () => {
   const slug = getCurrentSlug();
-  if (!slug) { toast(t('editor.needSlugTitle'), 'info'); return; }
+  if (!slug) {
+    toast(t('editor.needSlugTitle'), 'info');
+    return;
+  }
   let data;
   try {
     data = await mediaApi.list(slug);
@@ -394,22 +423,32 @@ window.openCoverPicker = async () => {
     content = `<div class="media-empty">${t('editor.noMedia')}</div>`;
   } else {
     if (photos.length) {
-      content += `<div class="editor-section-title" style="margin:10px 0 6px">${t('editor.cover')} — ${t('editor.views')}</div><div class="media-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">`
-        + photos.map((f) => `
+      content +=
+        `<div class="editor-section-title" style="margin:10px 0 6px">${t('editor.cover')} — ${t('editor.views')}</div><div class="media-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">` +
+        photos
+          .map(
+            (f) => `
           <div class="media-cell" onclick="pickCover('${escHtml(f.name)}')" title="${escHtml(f.name)}" style="cursor:pointer">
             <img src="${escHtml(f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />
             <div class="media-cell-name">${escHtml(f.name)}</div>
-          </div>`).join('')
-        + '</div>';
+          </div>`,
+          )
+          .join('') +
+        '</div>';
     }
     if (videos.length) {
-      content += `<div class="editor-section-title" style="margin:10px 0 6px">${t('editor.cover')} — ${t('editor.upload')}</div><div class="media-grid" style="grid-template-columns:repeat(4,1fr)">`
-        + videos.map((f) => `
+      content +=
+        `<div class="editor-section-title" style="margin:10px 0 6px">${t('editor.cover')} — ${t('editor.upload')}</div><div class="media-grid" style="grid-template-columns:repeat(4,1fr)">` +
+        videos
+          .map(
+            (f) => `
           <div class="media-cell" onclick="pickCover('video:0')" title="${escHtml(f.name)}">
             <div class="media-cell-icon"><i class="ri-video-line"></i></div>
             <div class="media-cell-name">${escHtml(f.name)}</div>
-          </div>`).join('')
-        + '</div>';
+          </div>`,
+          )
+          .join('') +
+        '</div>';
     }
   }
   openModal({ title: t('editor.coverPicker'), desc: t('editor.coverHint'), content, wide: true, actions: [] });
@@ -446,20 +485,34 @@ export async function loadExistingMedia(slug) {
       html += `<p class="media-empty">${t('editor.noMedia')}</p>`;
     } else {
       if (photos.length) {
-        html += '<div class="media-grid">' + photos.map((f) => `
+        html +=
+          '<div class="media-grid">' +
+          photos
+            .map(
+              (f) => `
           <div class="media-cell" onclick="window.pickCover('${escHtml(f.name)}')" title="${escHtml(f.name)}">
             <img src="${escHtml(f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />
             <div class="media-cell-name">${escHtml(f.name)}</div>
             <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','photos')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line"></i></button>
-          </div>`).join('') + '</div>';
+          </div>`,
+            )
+            .join('') +
+          '</div>';
       }
       if (videos.length) {
-        html += '<div class="media-grid" style="margin-top:8px">' + videos.map((f) => `
+        html +=
+          '<div class="media-grid" style="margin-top:8px">' +
+          videos
+            .map(
+              (f) => `
           <div class="media-cell" title="${escHtml(f.name)}">
             <div class="media-cell-icon"><i class="ri-video-line"></i></div>
             <div class="media-cell-name">${escHtml(f.name)}</div>
             <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','videos')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line"></i></button>
-          </div>`).join('') + '</div>';
+          </div>`,
+            )
+            .join('') +
+          '</div>';
       }
     }
     el.innerHTML = html;

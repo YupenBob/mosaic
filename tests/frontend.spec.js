@@ -8,14 +8,17 @@
 import { test, expect } from '@playwright/test';
 
 const SITE = (process.env.SITE || 'https://mosaic.xsanye.cn').replace(/\/+$/, '');
-const ADMIN = process.env.ADMIN !== undefined ? process.env.ADMIN.replace(/\/+$/, '') : 'https://mosaic-admin.xsanye.cn';
+const ADMIN =
+  process.env.ADMIN !== undefined ? process.env.ADMIN.replace(/\/+$/, '') : 'https://mosaic-admin.xsanye.cn';
 const API = (process.env.API || 'https://mosaic-api.xsanye.cn').replace(/\/+$/, '');
 const MEDIA = (process.env.MEDIA || 'https://mosaic-media.xsanye.cn').replace(/\/+$/, '');
 const SKIP_ADMIN = !ADMIN || ADMIN === 'skip';
 
 test.beforeEach(async ({ page }) => {
   // Abort slow/irrelevant third-party scripts so domcontentloaded isn't blocked by CDNs
-  await page.route(/(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
+  await page.route(/(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) =>
+    route.abort(),
+  );
 });
 
 test('homepage loads and shows posts', async ({ page }) => {
@@ -37,8 +40,10 @@ test('images use R2 media domain, not local media/ paths', async ({ page }) => {
     for (let i = 0; i < Math.min(count, 10); i++) {
       const src = await imgs.nth(i).getAttribute('src');
       if (!src || src.startsWith('data:')) continue;
-      if (src.includes('/media/')) { bad++; console.log('  LOCAL:', src.slice(0, 100)); }
-      else if (src.startsWith('http') && !src.startsWith(MEDIA) && !src.startsWith('/api/')) {
+      if (src.includes('/media/')) {
+        bad++;
+        console.log('  LOCAL:', src.slice(0, 100));
+      } else if (src.startsWith('http') && !src.startsWith(MEDIA) && !src.startsWith('/api/')) {
         console.log('  EXTERNAL:', src.slice(0, 100));
       }
     }
@@ -92,7 +97,9 @@ test('mobile viewport: video post loads with HLS source', async ({ page, browser
   await page.waitForTimeout(3000);
   const hlsLoaded = await page.evaluate(() => typeof window.Hls !== 'undefined');
   expect(hlsLoaded).toBe(true);
-  console.log(`Mobile HLS: source=${hlsUrl} status=${playlistResp.status()} acao=${playlistResp.headers()['access-control-allow-origin']} hls.js=${hlsLoaded}`);
+  console.log(
+    `Mobile HLS: source=${hlsUrl} status=${playlistResp.status()} acao=${playlistResp.headers()['access-control-allow-origin']} hls.js=${hlsLoaded}`,
+  );
 });
 
 test('admin login page loads', async ({ page }) => {
@@ -100,8 +107,14 @@ test('admin login page loads', async ({ page }) => {
   const response = await page.goto(ADMIN);
   expect(response.status()).toBe(200);
   await page.waitForTimeout(3000);
-  const loginVisible = await page.locator('#login-screen').isVisible().catch(() => false);
-  const appVisible = await page.locator('#app').isVisible().catch(() => false);
+  const loginVisible = await page
+    .locator('#login-screen')
+    .isVisible()
+    .catch(() => false);
+  const appVisible = await page
+    .locator('#app')
+    .isVisible()
+    .catch(() => false);
   console.log(`Login visible: ${loginVisible}, App visible: ${appVisible}`);
   expect(loginVisible || appVisible).toBe(true);
 });

@@ -61,8 +61,11 @@ export function entry(map, slug) {
 }
 
 export function aggregate(map) {
-  const byCategory = {}, byTag = {}, byDay = {};
-  let total = 0, totalLikes = 0;
+  const byCategory = {},
+    byTag = {},
+    byDay = {};
+  let total = 0,
+    totalLikes = 0;
   const entries = [];
   for (const [slug, raw] of Object.entries(map)) {
     const val = typeof raw === 'number' ? { views: raw, likes: 0, history: [], category: '', tags: [] } : raw;
@@ -73,8 +76,8 @@ export function aggregate(map) {
     entries.push({ slug, count, likes, category: val.category || '', tags: val.tags || [] });
     const topCat = (val.category || '').split('/')[0].trim() || 'uncategorized';
     byCategory[topCat] = (byCategory[topCat] || 0) + count;
-    for (const t of (val.tags || [])) byTag[t] = (byTag[t] || 0) + count;
-    for (const ts of (val.history || [])) {
+    for (const t of val.tags || []) byTag[t] = (byTag[t] || 0) + count;
+    for (const ts of val.history || []) {
       const d = String(ts).slice(0, 10);
       byDay[d] = (byDay[d] || 0) + 1;
     }
@@ -86,10 +89,17 @@ export function aggregate(map) {
     days.push({ date: d, count: byDay[d] || 0 });
   }
   return {
-    total, totalLikes, posts: entries.length,
+    total,
+    totalLikes,
+    posts: entries.length,
     byDay: days,
-    byCategory: Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count })),
-    byTag: Object.entries(byTag).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count })),
+    byCategory: Object.entries(byCategory)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count })),
+    byTag: Object.entries(byTag)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count })),
     top5: entries.slice(0, 5).map((e) => ({ slug: e.slug, count: e.count, likes: e.likes })),
   };
 }
@@ -110,7 +120,9 @@ export class StatsDurableObject {
     const url = new URL(request.url);
     const path = url.pathname;
     let body = {};
-    try { body = await request.json(); } catch {}
+    try {
+      body = await request.json();
+    } catch {}
     const slug = url.searchParams.get('slug') || body.slug || '';
     if (!slug && path !== '/traffic') return json({ error: 'slug required' }, 400);
 
@@ -133,13 +145,17 @@ export class StatsDurableObject {
       try {
         const map = await this._load();
         return json(entry(map, slug));
-      } catch (e) { return json({ error: e.message, stack: String(e.stack || e) }, 500); }
+      } catch (e) {
+        return json({ error: e.message, stack: String(e.stack || e) }, 500);
+      }
     }
     if (path === '/traffic') {
       try {
         const map = await this._load();
         return json(aggregate(map));
-      } catch (e) { return json({ error: e.message, stack: String(e.stack || e) }, 500); }
+      } catch (e) {
+        return json({ error: e.message, stack: String(e.stack || e) }, 500);
+      }
     }
     return json({ error: 'Not found' }, 404);
   }
@@ -162,9 +178,13 @@ export class StatsDurableObject {
     const run = async () => {
       const map = await this._load();
       const result = fn(map);
-      try { await this.state.storage.put(STORAGE_KEY, map); } catch {}
       try {
-        await this.env.MEDIA.put('site-data/stats.json', JSON.stringify(map), { httpMetadata: { contentType: 'application/json' } });
+        await this.state.storage.put(STORAGE_KEY, map);
+      } catch {}
+      try {
+        await this.env.MEDIA.put('site-data/stats.json', JSON.stringify(map), {
+          httpMetadata: { contentType: 'application/json' },
+        });
       } catch {}
       return result;
     };

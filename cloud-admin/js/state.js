@@ -7,7 +7,7 @@ export const state = {
   authStatus: 'checking', // 'checking' | 'ok' | 'expired'
   abortController: null,
   posts: [],
-  postStats: {},       // slug -> { views, likes }
+  postStats: {}, // slug -> { views, likes }
   siteUrl: '',
   mediaBase: window.__MEDIA_BASE__ || '/api/media/file',
   config: {},

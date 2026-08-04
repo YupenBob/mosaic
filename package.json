@@ -7,21 +7,28 @@
     "compress": "node scripts/compress.js",
     "build": "node scripts/generate.js && node scripts/generate-brand-assets.js && node scripts/minify.mjs",
     "serve": "npx serve dist",
-    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs scripts/sync-proxy.mjs scripts/minify.mjs shared/pages-proxy.mjs && node scripts/sync-proxy.mjs --check && node tests/worker-smoke.mjs && node tests/build-smoke.mjs",
+    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs scripts/sync-proxy.mjs scripts/minify.mjs scripts/validate-config.mjs shared/pages-proxy.mjs && node scripts/sync-proxy.mjs --check && node scripts/validate-config.mjs && node tests/worker-smoke.mjs && node tests/build-smoke.mjs",
     "validate": "node scripts/validate-config.mjs",
     "minify": "node scripts/minify.mjs",
-    "test:e2e:local": "node tests/local-e2e.mjs"
+    "test:e2e:local": "node tests/local-e2e.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "ejs": "^3.1.10",
     "esbuild": "^0.28.1",
+    "eslint": "^10.8.0",
     "fs-extra": "^11.3.0",
     "glob": "^11.0.1",
+    "globals": "^17.9.0",
     "gray-matter": "^4.0.3",
     "html-minifier-terser": "^7.2.0",
     "marked": "^15.0.7",
     "playwright": "^1.60.0",
+    "prettier": "^3.9.6",
     "serve": "^14.2.6",
     "sharp": "^0.33.5"
   }

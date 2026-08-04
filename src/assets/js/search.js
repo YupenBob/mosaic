@@ -3,10 +3,6 @@
  */
 import { $, debounce, escapeHTML, highlightTerm } from './utils.js';
 import { updateFilterState, renderCards } from './filter.js';
-import { getPosts } from './data.js';
-
-const DATA_BASE = document.querySelector('meta[name="data-base"]')?.content || '/data';
-
 export function initSearch(allPosts) {
   const searchInput = $('.search-input');
   if (!searchInput) return;
@@ -17,9 +13,11 @@ export function initSearch(allPosts) {
     updateFilterState({ searchQuery: query });
 
     if (query.length > 0) {
-      import('./filter.js').then(({ getFilteredPosts }) => {
-        renderSearchResults(getFilteredPosts(allPosts).slice(0, 10), query);
-      }).catch(() => {});
+      import('./filter.js')
+        .then(({ getFilteredPosts }) => {
+          renderSearchResults(getFilteredPosts(allPosts).slice(0, 10), query);
+        })
+        .catch(() => {});
     } else {
       hideDropdown();
     }
@@ -66,14 +64,30 @@ function renderSearchResults(posts, query) {
   const base = dataBase === 'data' ? '' : dataBase.replace(/\/?data$/, '');
 
   if (posts.length === 0) {
-    dropdown.innerHTML = '<div class="search-result-item"><span style="color:var(--color-text-tertiary)">' + 'No results' + '</span></div>';
+    dropdown.innerHTML =
+      '<div class="search-result-item"><span style="color:var(--color-text-tertiary)">' +
+      'No results' +
+      '</span></div>';
   } else {
-    dropdown.innerHTML = posts.map((p) =>
-      '<a href="' + base + 'posts/' + p.slug + '/" class="search-result-item">' +
-      '<div class="search-result-title">' + highlightTerm(p.title, query) + '</div>' +
-      '<div class="search-result-meta">' + escapeHTML(p.category) + ' &middot; ' + (p.tags || []).map((t) => escapeHTML(t)).join(', ') + '</div>' +
-      '</a>'
-    ).join('');
+    dropdown.innerHTML = posts
+      .map(
+        (p) =>
+          '<a href="' +
+          base +
+          'posts/' +
+          p.slug +
+          '/" class="search-result-item">' +
+          '<div class="search-result-title">' +
+          highlightTerm(p.title, query) +
+          '</div>' +
+          '<div class="search-result-meta">' +
+          escapeHTML(p.category) +
+          ' &middot; ' +
+          (p.tags || []).map((t) => escapeHTML(t)).join(', ') +
+          '</div>' +
+          '</a>',
+      )
+      .join('');
   }
   dropdown.classList.add('show');
 }

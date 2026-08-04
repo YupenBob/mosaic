@@ -24,7 +24,9 @@ function envOrDev(key) {
     const dv = fs.readFileSync(path.join(__dirname, '..', '.dev.vars'), 'utf8');
     const m = dv.match(new RegExp('^' + key + '=(.*)$', 'm'));
     return m ? m[1].trim() : undefined;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 const bucket = process.env.R2_BUCKET || 'mosaic-media';
@@ -51,12 +53,17 @@ const CONTENT_TYPE = {
   '.m3u8': 'application/vnd.apple.mpegurl',
   '.ts': 'video/mp2t',
   '.mp4': 'video/mp4',
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.png': 'image/png', '.webp': 'image/webp',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
 };
 
 const postsDir = path.join(DIST, 'posts');
-if (!fs.existsSync(postsDir)) { console.log('No dist/posts/'); process.exit(0); }
+if (!fs.existsSync(postsDir)) {
+  console.log('No dist/posts/');
+  process.exit(0);
+}
 
 let total = 0;
 for (const slug of fs.readdirSync(postsDir)) {
@@ -67,13 +74,15 @@ for (const slug of fs.readdirSync(postsDir)) {
     const key = `processed/${slug}/videos/${f}`;
     const ext = path.extname(f).toLowerCase();
     try {
-      await client.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: fs.createReadStream(filePath),
-        CacheControl: cacheControl,
-        ContentType: CONTENT_TYPE[ext] || 'application/octet-stream',
-      }));
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: fs.createReadStream(filePath),
+          CacheControl: cacheControl,
+          ContentType: CONTENT_TYPE[ext] || 'application/octet-stream',
+        }),
+      );
       total++;
     } catch (e) {
       console.error(`  FAIL ${key}: ${e.message}`);

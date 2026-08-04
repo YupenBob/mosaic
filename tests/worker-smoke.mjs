@@ -18,10 +18,16 @@ const media = {
     return { text: async () => store.get(key), httpMetadata: { contentType: 'application/json' }, httpEtag: 'etag1' };
   },
   head: async (key) => (store.has(key) ? { size: store.get(key).length || 1 } : null),
-  put: async (key, value) => { store.set(key, typeof value === 'string' ? value : String(value)); },
-  delete: async (key) => { store.delete(key); },
+  put: async (key, value) => {
+    store.set(key, typeof value === 'string' ? value : String(value));
+  },
+  delete: async (key) => {
+    store.delete(key);
+  },
   list: async ({ prefix = '' } = {}) => {
-    const objects = [...store.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, size: store.get(key).length || 1 }));
+    const objects = [...store.keys()]
+      .filter((k) => k.startsWith(prefix))
+      .map((key) => ({ key, size: store.get(key).length || 1 }));
     return { objects, truncated: false, cursor: null };
   },
 };
@@ -31,7 +37,9 @@ const statsStore = new Map();
 const statsState = {
   storage: {
     get: async (k) => (statsStore.has(k) ? statsStore.get(k) : null),
-    put: async (k, v) => { statsStore.set(k, v); },
+    put: async (k, v) => {
+      statsStore.set(k, v);
+    },
   },
 };
 const statsDO = new StatsDurableObject(statsState, { MEDIA: media });
@@ -42,12 +50,20 @@ const STATS = {
 
 // ── Mock GitHub contents API ──
 const gh = new Map([
-  ['mosaic.config.json', JSON.stringify({
-    title: 'Mosaic', url: 'https://example.com',
-    imageQuality: { '480p': 75 },
-    components: { gallery: { enabled: true }, video: { enabled: true } },
-    plugins: { 'generate-feed': { enabled: true }, 'generate-sitemap': { enabled: true } },
-  }, null, 2)],
+  [
+    'mosaic.config.json',
+    JSON.stringify(
+      {
+        title: 'Mosaic',
+        url: 'https://example.com',
+        imageQuality: { '480p': 75 },
+        components: { gallery: { enabled: true }, video: { enabled: true } },
+        plugins: { 'generate-feed': { enabled: true }, 'generate-sitemap': { enabled: true } },
+      },
+      null,
+      2,
+    ),
+  ],
   ['content/posts/a/index.md', '---\ntitle: A\ncategory: photo\ntags: [x, y]\n---\n\nbody'],
 ]);
 
@@ -58,16 +74,25 @@ const ghFetch = async (url, opts = {}) => {
   const key = decodeURIComponent(href.slice(prefix.length)).replace(/\/+$/, '');
   if (key === 'content/posts') {
     const names = [...gh.keys()].filter((k) => k.startsWith('content/posts/')).map((k) => k.split('/')[2]);
-    return new Response(JSON.stringify([...new Set(names)].map((name) => ({ type: 'dir', name }))), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify([...new Set(names)].map((name) => ({ type: 'dir', name }))), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
   if (opts.method === 'PUT') {
     const body = JSON.parse(opts.body);
     gh.set(key, Buffer.from(body.content, 'base64').toString('utf8'));
-    return new Response(JSON.stringify({ content: { sha: body.sha || 'new' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ content: { sha: body.sha || 'new' } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
   const val = gh.get(key);
   if (!val) return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
-  return new Response(JSON.stringify({ content: Buffer.from(val, 'utf8').toString('base64'), sha: 'sha1' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify({ content: Buffer.from(val, 'utf8').toString('base64'), sha: 'sha1' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 };
 
 const realFetch = globalThis.fetch;
@@ -95,14 +120,27 @@ async function call(path, { method = 'GET', body, token, headers = {}, bindings 
   const h = { ...headers };
   if (body !== undefined) h['Content-Type'] = 'application/json';
   if (token) h['Authorization'] = `Bearer ${token}`;
-  return app.request(path, { method, headers: h, body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)) }, bindings);
+  return app.request(
+    path,
+    {
+      method,
+      headers: h,
+      body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
+    },
+    bindings,
+  );
 }
 
 let passed = 0;
 const results = [];
 async function record(name, fn) {
-  try { await fn(); passed++; results.push(`PASS ${name}`); }
-  catch (e) { results.push(`FAIL ${name}: ${e.message}`); }
+  try {
+    await fn();
+    passed++;
+    results.push(`PASS ${name}`);
+  } catch (e) {
+    results.push(`FAIL ${name}: ${e.message}`);
+  }
 }
 
 // ── 1. Health (public) ──
@@ -155,9 +193,11 @@ await record('track/dwell/stats (+7200 cap)', async () => {
 
 // ── 5b. Concurrent views are serialized by the Durable Object ──
 await record('concurrent views serialized (10/10 counted)', async () => {
-  await Promise.all([...Array(10)].map((_, i) =>
-    call('/api/track/view/race-post', { method: 'POST', headers: { 'CF-Connecting-IP': `10.1.0.${i}` } })
-  ));
+  await Promise.all(
+    [...Array(10)].map((_, i) =>
+      call('/api/track/view/race-post', { method: 'POST', headers: { 'CF-Connecting-IP': `10.1.0.${i}` } }),
+    ),
+  );
   const r = await (await call('/api/stats/race-post')).json();
   assert.equal(r.views, 10);
 });
@@ -175,7 +215,11 @@ await record('listPosts reads R2 posts cache (when not dirty)', async () => {
 
 // ── 7. Config deep merge ──
 await record('config deep merge (nested fields preserved)', async () => {
-  const r = await call('/api/config', { method: 'PUT', token: TOKEN, body: { components: { gallery: { enabled: false } } } });
+  const r = await call('/api/config', {
+    method: 'PUT',
+    token: TOKEN,
+    body: { components: { gallery: { enabled: false } } },
+  });
   assert.equal(r.status, 200);
   const cfg = await (await call('/api/config', { token: TOKEN })).json();
   assert.equal(cfg.components.gallery.enabled, false);
@@ -200,7 +244,11 @@ await record('media delete (both prefixes, keeps others)', async () => {
 
 // ── 8. Taxonomy rename (category + tag) ──
 await record('taxonomy rename (category + tag)', async () => {
-  const rc = await call('/api/taxonomy/category', { method: 'PUT', token: TOKEN, body: { oldName: 'photo', newName: 'photography' } });
+  const rc = await call('/api/taxonomy/category', {
+    method: 'PUT',
+    token: TOKEN,
+    body: { oldName: 'photo', newName: 'photography' },
+  });
   assert.equal((await rc.json()).renamed, 1);
   assert.ok(gh.get('content/posts/a/index.md').includes('category: photography'));
   const rt = await call('/api/taxonomy/tag', { method: 'PUT', token: TOKEN, body: { oldName: 'x', newName: 'z' } });
@@ -212,12 +260,27 @@ await record('taxonomy rename (category + tag)', async () => {
 await record('upload auth/size-limit/site-data namespace', async () => {
   const noToken = await call('/api/upload/direct/a/x.jpg', { method: 'POST' });
   assert.equal(noToken.status, 401);
-  const tooBig = await call('/api/upload/direct/a/x.jpg', { method: 'POST', token: TOKEN, headers: { 'Content-Length': String(3 * 1024 * 1024 * 1024) }, body: '{}' });
+  const tooBig = await call('/api/upload/direct/a/x.jpg', {
+    method: 'POST',
+    token: TOKEN,
+    headers: { 'Content-Length': String(3 * 1024 * 1024 * 1024) },
+    body: '{}',
+  });
   assert.equal(tooBig.status, 413);
-  const ok = await call('/api/upload/direct/a/x.jpg', { method: 'POST', token: TOKEN, headers: { 'Content-Length': '5' }, body: 'abcde' });
+  const ok = await call('/api/upload/direct/a/x.jpg', {
+    method: 'POST',
+    token: TOKEN,
+    headers: { 'Content-Length': '5' },
+    body: 'abcde',
+  });
   assert.equal(ok.status, 200);
   assert.ok(store.has('originals/a/photos/x.jpg'));
-  const favicon = await call('/api/upload/direct/site-data/favicon.svg', { method: 'POST', token: TOKEN, headers: { 'Content-Length': '3' }, body: '<svg/>' });
+  const favicon = await call('/api/upload/direct/site-data/favicon.svg', {
+    method: 'POST',
+    token: TOKEN,
+    headers: { 'Content-Length': '3' },
+    body: '<svg/>',
+  });
   assert.equal(favicon.status, 200);
   assert.ok(store.has('site-data/favicon.svg'));
 });
@@ -225,7 +288,8 @@ await record('upload auth/size-limit/site-data namespace', async () => {
 // ── 9b. Presigned direct upload flow ──
 await record('presign URL + complete (direct-to-R2 flow)', async () => {
   const pr = await call('/api/upload/presign', {
-    method: 'POST', token: TOKEN,
+    method: 'POST',
+    token: TOKEN,
     body: { slug: 'a', filename: 'clip.mp4', contentType: 'video/mp4' },
   });
   assert.equal(pr.status, 200);
@@ -263,7 +327,7 @@ const signHmac = async (secret, message) => {
     new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign']
+    ['sign'],
   );
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -281,11 +345,14 @@ await record('HMAC client IP (valid signature passes)', async () => {
   const bucket = Math.floor(Date.now() / 60000);
   const ip = '203.0.113.7';
   const sig = await signHmac('proxy-secret-1', `${ip}:${bucket}`);
-  assert.equal(await hmacIp({
-    'X-Mosaic-Proxy-IP': ip,
-    'X-Mosaic-Proxy-Time': String(bucket),
-    'X-Mosaic-Proxy-Sig': sig,
-  }), ip);
+  assert.equal(
+    await hmacIp({
+      'X-Mosaic-Proxy-IP': ip,
+      'X-Mosaic-Proxy-Time': String(bucket),
+      'X-Mosaic-Proxy-Sig': sig,
+    }),
+    ip,
+  );
 });
 
 await record('HMAC client IP (forged signature rejected)', async () => {

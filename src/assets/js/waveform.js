@@ -16,13 +16,7 @@
  * @param {Function} [options.onSeek] - Called with fraction [0..1] on click
  */
 export function createWaveform(canvas, peaks, options = {}) {
-  const {
-    color = 'var(--color-accent)',
-    progressColor = 'var(--color-text-primary)',
-    barWidth = 3,
-    barGap = 1,
-    onSeek = null,
-  } = options;
+  const { barWidth = 3, barGap = 1, onSeek = null } = options;
 
   const ctx = canvas.getContext('2d');
   let progress = 0; // 0..1

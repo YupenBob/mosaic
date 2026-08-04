@@ -54,7 +54,10 @@
   font-size: 2rem;
   color: #1d1d1f;
   pointer-events: auto;
-  transition: transform var(--transition-fast), background var(--transition-fast), opacity var(--transition-normal);
+  transition:
+    transform var(--transition-fast),
+    background var(--transition-fast),
+    opacity var(--transition-normal);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
@@ -79,7 +82,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.6));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.6));
   font-size: var(--font-size-xs);
   color: #fff;
   user-select: none;
@@ -138,75 +141,150 @@
   transition: height var(--transition-fast);
 }
 
-.vc-progress:hover .vc-progress-track { height: 7px; }
+.vc-progress:hover .vc-progress-track {
+  height: 7px;
+}
 
 .vc-progress-buffer {
-  position: absolute; left: 0; top: 0; height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
   background: rgba(255, 255, 255, 0.25);
-  border-radius: 3px; pointer-events: none; width: 0;
+  border-radius: 3px;
+  pointer-events: none;
+  width: 0;
   transition: width 0.3s ease;
 }
 
 .vc-progress-fill {
-  position: absolute; left: 0; top: 0; height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
   background: var(--color-accent);
-  border-radius: 3px; pointer-events: none; width: 0;
+  border-radius: 3px;
+  pointer-events: none;
+  width: 0;
   z-index: 1;
   transition: width 0.15s linear;
 }
 
 .vc-progress-thumb {
-  position: absolute; top: 50%; transform: translate(-50%, -50%);
-  width: 13px; height: 13px; background: #fff;
-  border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,.3);
-  pointer-events: none; opacity: 0; transition: opacity var(--transition-fast);
-  z-index: 2; left: 0;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 13px;
+  height: 13px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 2;
+  left: 0;
 }
 
-.vc-progress:hover .vc-progress-thumb { opacity: 1; }
+.vc-progress:hover .vc-progress-thumb {
+  opacity: 1;
+}
 
 .vc-progress-hover {
-  position: absolute; bottom: calc(100% + 6px);
+  position: absolute;
+  bottom: calc(100% + 6px);
   transform: translateX(-50%);
-  background: rgba(0,0,0,.8); color: #fff;
-  padding: 2px 6px; border-radius: 4px;
-  font-size: 11px; font-family: var(--font-mono);
-  pointer-events: none; opacity: 0; transition: opacity .15s;
-  white-space: nowrap; z-index: 3;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+  z-index: 3;
 }
 
 /* Volume */
-.vc-volume { display: flex; align-items: center; position: relative; flex-shrink: 0; }
-.vc-volume-btn { font-size: 1.15rem !important; }
-.vc-volume-slider { width: 0; overflow: hidden; transition: width var(--transition-fast); }
-.vc-volume:hover .vc-volume-slider { width: 60px; }
+.vc-volume {
+  display: flex;
+  align-items: center;
+  position: relative;
+  flex-shrink: 0;
+}
+.vc-volume-btn {
+  font-size: 1.15rem !important;
+}
+.vc-volume-slider {
+  width: 0;
+  overflow: hidden;
+  transition: width var(--transition-fast);
+}
+.vc-volume:hover .vc-volume-slider {
+  width: 60px;
+}
 .vc-volume-range {
-  width: 56px; height: 4px; -webkit-appearance: none; appearance: none;
-  background: rgba(255,255,255,.25); border-radius: 2px; outline: none; cursor: pointer;
+  width: 56px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
 }
 .vc-volume-range::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; cursor: pointer;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
 }
 
 /* Quality switch toast */
 .vc-switch-toast {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-  background: rgba(0,0,0,.8); color: #fff; padding: 6px 16px;
-  border-radius: 20px; font-size: 12px; z-index: 5;
-  pointer-events: none; opacity: 0; transition: opacity .2s;
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
-.vc-switch-toast.show { opacity: 1; }
+.vc-switch-toast.show {
+  opacity: 1;
+}
 
 /* Loading spinner */
 .video-container.buffering::after {
-  content: ''; position: absolute; top: 50%; left: 50%;
-  width: 36px; height: 36px; margin: -18px 0 0 -18px;
-  border: 3px solid rgba(255,255,255,.2);
-  border-top-color: #fff; border-radius: 50%;
-  animation: vc-spin .8s linear infinite; z-index: 4;
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: vc-spin 0.8s linear infinite;
+  z-index: 4;
 }
 
-@keyframes vc-spin { to { transform: rotate(360deg); } }
+@keyframes vc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* Speed / Quality dropdown */
 .vc-speed,
@@ -238,7 +316,7 @@
   display: none;
   flex-direction: column;
   min-width: 80px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   z-index: 10;
 }
 
@@ -308,53 +386,106 @@
   max-width: 100%;
 }
 .post-playlist-panel {
-  width: 240px; flex-shrink: 0;
+  width: 240px;
+  flex-shrink: 0;
   background: var(--color-surface);
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-md);
   overflow: hidden;
   max-height: calc(100vh - 120px);
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
   margin-left: var(--space-3);
 }
 
 .post-playlist-panel .playlist-header {
   padding: 12px 16px;
-  font-size: 13px; font-weight: 600;
+  font-size: 13px;
+  font-weight: 600;
   border-bottom: 1px solid var(--color-border-light);
-  display: flex; align-items: center; gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--color-text-primary);
 }
 
 .post-playlist-panel .playlist-list {
-  overflow-y: auto; flex: 1;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .post-playlist-panel .pl-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; cursor: pointer;
-  font-size: 13px; color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text-secondary);
   transition: all var(--transition-fast);
   border-bottom: 1px solid var(--color-border-light);
 }
 
-.post-playlist-panel .pl-item:last-child { border-bottom: none; }
-.post-playlist-panel .pl-item:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
-.post-playlist-panel .pl-item.active { background: rgba(67,97,238,.08); color: var(--color-accent); font-weight: 500; }
+.post-playlist-panel .pl-item:last-child {
+  border-bottom: none;
+}
+.post-playlist-panel .pl-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.post-playlist-panel .pl-item.active {
+  background: rgba(67, 97, 238, 0.08);
+  color: var(--color-accent);
+  font-weight: 500;
+}
 
-.post-playlist-panel .pl-num { width: 24px; height: 24px; border-radius: 6px; background: var(--color-tag-bg); display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
-.post-playlist-panel .pl-item.active .pl-num { background: var(--color-accent); color: #fff; }
-.post-playlist-panel .pl-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.post-playlist-panel .pl-playing { display: none; font-size: 12px; }
-.post-playlist-panel .pl-item.active .pl-playing { display: inline; }
+.post-playlist-panel .pl-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--color-tag-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.post-playlist-panel .pl-item.active .pl-num {
+  background: var(--color-accent);
+  color: #fff;
+}
+.post-playlist-panel .pl-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.post-playlist-panel .pl-playing {
+  display: none;
+  font-size: 12px;
+}
+.post-playlist-panel .pl-item.active .pl-playing {
+  display: inline;
+}
 
 /* Old inline playlist — simplified */
-.video-playlist-wrap { display: block; }
-.video-playlist-wrap .video-container { margin-bottom: 0; }
-.video-playlist-wrap .playlist-bar { display: none; } /* Hide inline bar when page panel is used */
+.video-playlist-wrap {
+  display: block;
+}
+.video-playlist-wrap .video-container {
+  margin-bottom: 0;
+}
+.video-playlist-wrap .playlist-bar {
+  display: none;
+} /* Hide inline bar when page panel is used */
 
 @media (max-width: 1024px) {
-  .post-playlist-panel { position: static; width: 100%; max-height: 200px; margin-top: 16px; }
+  .post-playlist-panel {
+    position: static;
+    width: 100%;
+    max-height: 200px;
+    margin-top: 16px;
+  }
 }
 
 /* Mobile adjustments */
@@ -400,11 +531,25 @@
   top: 80px;
 }
 @media (max-width: 1024px) {
-  .post-page-wrapper { flex-direction: column; }
-  .post-playlist-panel { width: 100%; position: static; max-height: 200px; }
+  .post-page-wrapper {
+    flex-direction: column;
+  }
+  .post-playlist-panel {
+    width: 100%;
+    position: static;
+    max-height: 200px;
+  }
 }
 
 @media (max-width: 1024px) {
-  .post-page-wrapper { flex-direction: column; }
-  .post-playlist-panel { width: 100%; position: static; margin-left: 0; margin-top: 16px; max-height: 200px; }
+  .post-page-wrapper {
+    flex-direction: column;
+  }
+  .post-playlist-panel {
+    width: 100%;
+    position: static;
+    margin-left: 0;
+    margin-top: 16px;
+    max-height: 200px;
+  }
 }

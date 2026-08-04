@@ -34,7 +34,11 @@ const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'),
 const title = config.title || 'Mosaic';
 const subtitle = config.subtitle || '';
 const host = (() => {
-  try { return new URL(config.url || '').host; } catch { return ''; }
+  try {
+    return new URL(config.url || '').host;
+  } catch {
+    return '';
+  }
 })();
 
 // Inner markup of the user's logo (defs + shapes), reused inside generated SVGs.
@@ -46,12 +50,16 @@ const logoInner = fs
 const escXml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // --- apple-touch-icon: the logo centered on the site's light surface ---
-await sharp(Buffer.from(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">` +
-  `<rect width="180" height="180" fill="#f5f5f7"/>` +
-  `<g transform="translate(26 26)">${logoInner}</g>` +
-  `</svg>`
-)).png().toFile(path.join(DIST_ASSETS, 'apple-touch-icon.png'));
+await sharp(
+  Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">` +
+      `<rect width="180" height="180" fill="#f5f5f7"/>` +
+      `<g transform="translate(26 26)">${logoInner}</g>` +
+      `</svg>`,
+  ),
+)
+  .png()
+  .toFile(path.join(DIST_ASSETS, 'apple-touch-icon.png'));
 
 // --- og-card: light social card with logo + title + subtitle + host ---
 const ogSvg =

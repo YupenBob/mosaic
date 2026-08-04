@@ -27,7 +27,10 @@ function runUpload(label, cmd) {
 
 // Walk dist/posts/*/media/ and upload each directory
 const postsDir = path.join(DIST, 'posts');
-if (!fs.existsSync(postsDir)) { console.log('No dist/posts/'); process.exit(0); }
+if (!fs.existsSync(postsDir)) {
+  console.log('No dist/posts/');
+  process.exit(0);
+}
 
 let total = 0;
 try {
@@ -38,21 +41,30 @@ try {
     // Upload photos
     const photosDir = path.join(mediaDir, 'photos');
     if (fs.existsSync(photosDir)) {
-      runUpload(`${slug}/photos`, `rclone copy "${photosDir}" "r2:mosaic-media/processed/${slug}/photos/" --transfers 4 --retries 3`);
+      runUpload(
+        `${slug}/photos`,
+        `rclone copy "${photosDir}" "r2:mosaic-media/processed/${slug}/photos/" --transfers 4 --retries 3`,
+      );
       total += fs.readdirSync(photosDir).length;
     }
 
     // Upload covers
-    const coverFiles = fs.readdirSync(mediaDir).filter(f => f.startsWith('cover-'));
+    const coverFiles = fs.readdirSync(mediaDir).filter((f) => f.startsWith('cover-'));
     if (coverFiles.length) {
-      runUpload(`${slug}/covers`, `rclone copy "${mediaDir}" "r2:mosaic-media/processed/${slug}/covers/" --include "cover-*" --transfers 4 --retries 3`);
+      runUpload(
+        `${slug}/covers`,
+        `rclone copy "${mediaDir}" "r2:mosaic-media/processed/${slug}/covers/" --include "cover-*" --transfers 4 --retries 3`,
+      );
       total += coverFiles.length;
     }
 
     // Upload music
     const musicDir = path.join(mediaDir, 'music');
     if (fs.existsSync(musicDir)) {
-      runUpload(`${slug}/music`, `rclone copy "${musicDir}" "r2:mosaic-media/processed/${slug}/music/" --transfers 4 --retries 3`);
+      runUpload(
+        `${slug}/music`,
+        `rclone copy "${musicDir}" "r2:mosaic-media/processed/${slug}/music/" --transfers 4 --retries 3`,
+      );
       total += fs.readdirSync(musicDir).length;
     }
   }

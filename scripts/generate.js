@@ -18,7 +18,11 @@ const DIST = path.join(ROOT, 'dist');
 // Media manifest written by compress.js (and restored via the CI checksum
 // cache): lets cache-hit builds emit HLS/multi-res URLs without local outputs.
 const mediaChecksums = (() => {
-  try { return JSON.parse(fs.readFileSync(path.join(DIST, '.media-checksums.json'), 'utf-8')); } catch { return {}; }
+  try {
+    return JSON.parse(fs.readFileSync(path.join(DIST, '.media-checksums.json'), 'utf-8'));
+  } catch {
+    return {};
+  }
 })();
 
 // Load config
@@ -42,7 +46,7 @@ const t = (key) => i18n[key]?.[SITE.language] || key;
 
 // ── Parse posts ──
 const posts = [];
-const postDirs = fs.readdirSync(CONTENT).filter(d => {
+const postDirs = fs.readdirSync(CONTENT).filter((d) => {
   const s = fs.statSync(path.join(CONTENT, d));
   return s.isDirectory() && fs.existsSync(path.join(CONTENT, d, 'index.md'));
 });
@@ -56,7 +60,12 @@ for (const dir of postDirs) {
   const date = data.date ? new Date(data.date).toISOString() : '';
   const category = data.category || 'uncategorized';
   const tags = data.tags || [];
-  const description = data.description || content.slice(0, 200).replace(/[#*`\[\]()\n]/g, '').trim();
+  const description =
+    data.description ||
+    content
+      .slice(0, 200)
+      .replace(/[#*`\[\]()\n]/g, '')
+      .trim();
   const layout = data.layout || 'default';
   const videoMode = data.video_mode || 'stacked';
   const bodyHTML = marked.parse(content, { breaks: false, gfm: true });
@@ -96,7 +105,9 @@ for (const dir of postDirs) {
       let hasHLS = false;
       const manifestRaw = mediaChecksums[`__video__/${slug}/${base}`];
       let manifest = null;
-      try { manifest = manifestRaw ? JSON.parse(manifestRaw) : null; } catch {}
+      try {
+        manifest = manifestRaw ? JSON.parse(manifestRaw) : null;
+      } catch {}
       if (manifest) {
         hasHLS = (manifest.tiers || []).length > 0;
         for (const res of manifest.tiers || []) {
@@ -107,7 +118,7 @@ for (const dir of postDirs) {
         if (fs.existsSync(outDir)) {
           const masterM3U8 = path.join(outDir, `${base}-master.m3u8`);
           hasHLS = fs.existsSync(masterM3U8);
-          for (const res of ['4K','1080p','720p','480p','360p','240p']) {
+          for (const res of ['4K', '1080p', '720p', '480p', '360p', '240p']) {
             const mp4 = path.join(outDir, `${base}-${res}.mp4`);
             if (fs.existsSync(mp4)) sources[res] = pUrl(slug, 'videos', base + '-' + res + '.mp4');
           }
@@ -115,7 +126,12 @@ for (const dir of postDirs) {
       }
 
       if (hasHLS) {
-        videos.push({ base, poster, hls: pUrl(slug, 'videos', base + '-master.m3u8'), ...(Object.keys(sources).length ? { sources } : {}) });
+        videos.push({
+          base,
+          poster,
+          hls: pUrl(slug, 'videos', base + '-master.m3u8'),
+          ...(Object.keys(sources).length ? { sources } : {}),
+        });
       } else if (Object.keys(sources).length) {
         videos.push({ base, poster, sources });
       } else {
@@ -169,7 +185,9 @@ for (const dir of postDirs) {
     else if (photos.length) {
       cover = photos[0].src480;
       try {
-        const meta = JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'photos', `${photos[0].base}-meta.json`), 'utf-8'));
+        const meta = JSON.parse(
+          fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'photos', `${photos[0].base}-meta.json`), 'utf-8'),
+        );
         coverAspect = meta.aspect || 1.5;
       } catch {
         const a = parseFloat(mediaChecksums[`__photo-meta__/${slug}/${photos[0].base}`]);
@@ -180,7 +198,9 @@ for (const dir of postDirs) {
   // Check if compressed cover exists (manual cover, not auto-detected from media)
   if (cover && !cover.startsWith('http') && !cover.startsWith('/')) {
     const coverMeta = (() => {
-      try { return JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'cover-meta.json'), 'utf-8')); } catch {}
+      try {
+        return JSON.parse(fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'cover-meta.json'), 'utf-8'));
+      } catch {}
       const a = parseFloat(mediaChecksums[`__cover-meta__/${slug}`]);
       return Number.isFinite(a) ? { aspect: a } : null;
     })();
@@ -188,9 +208,9 @@ for (const dir of postDirs) {
       coverAspect = coverMeta.aspect || 1.778;
       cover = pUrl(slug, 'covers', 'cover-10p.webp');
       coverSrcset = {
-        '480': pUrl(slug, 'covers', 'cover-480p.webp'),
-        '720': pUrl(slug, 'covers', 'cover-720p.webp'),
-        '1080': pUrl(slug, 'covers', 'cover-1080p.webp'),
+        480: pUrl(slug, 'covers', 'cover-480p.webp'),
+        720: pUrl(slug, 'covers', 'cover-720p.webp'),
+        1080: pUrl(slug, 'covers', 'cover-1080p.webp'),
       };
     } else {
       cover = ''; // No cover file on disk
@@ -198,11 +218,30 @@ for (const dir of postDirs) {
   }
 
   // Music tracks inherit the post cover when they have none
-  for (const t of music) { if (!t.cover && cover) t.cover = cover; }
+  for (const t of music) {
+    if (!t.cover && cover) t.cover = cover;
+  }
 
   const stats = { views: data.views || 0, likes: data.likes || 0, dwell_time: data.dwell_time || 0 };
   if (coverAspect > 1.5) coverAspect = 1.5;
-  posts.push({ slug, title, date, category, tags, description, layout, videoMode, cover, coverAspect, coverSrcset, bodyHTML, photos, videos, music, stats });
+  posts.push({
+    slug,
+    title,
+    date,
+    category,
+    tags,
+    description,
+    layout,
+    videoMode,
+    cover,
+    coverAspect,
+    coverSrcset,
+    bodyHTML,
+    photos,
+    videos,
+    music,
+    stats,
+  });
 }
 
 // Sort by date desc
@@ -221,17 +260,28 @@ for (const p of posts) {
     node[name]._count++;
     node = node[name]._children;
   }
-  for (const t of p.tags) { tagMap[t] = (tagMap[t] || 0) + 1; }
+  for (const t of p.tags) {
+    tagMap[t] = (tagMap[t] || 0) + 1;
+  }
 }
 
 function flattenTree(obj, depth = 0) {
-  return Object.keys(obj).filter(k => !k.startsWith('_')).map(k => ({
-    name: k, slug: k.toLowerCase().replace(/\s+/g, '-'), count: obj[k]._count, depth,
-    children: flattenTree(obj[k]._children, depth + 1)
-  }));
+  return Object.keys(obj)
+    .filter((k) => !k.startsWith('_'))
+    .map((k) => ({
+      name: k,
+      slug: k.toLowerCase().replace(/\s+/g, '-'),
+      count: obj[k]._count,
+      depth,
+      children: flattenTree(obj[k]._children, depth + 1),
+    }));
 }
 const categories = flattenTree(catTree);
-const tags = Object.entries(tagMap).map(([name, count]) => ({ name, slug: name.toLowerCase().replace(/\s+/g, '-'), count }));
+const tags = Object.entries(tagMap).map(([name, count]) => ({
+  name,
+  slug: name.toLowerCase().replace(/\s+/g, '-'),
+  count,
+}));
 
 // ── Write data files ──
 fs.mkdirSync(path.join(DIST, 'data'), { recursive: true });
@@ -240,9 +290,12 @@ fs.writeFileSync(path.join(DIST, 'data', 'categories.json'), JSON.stringify(cate
 fs.writeFileSync(path.join(DIST, 'data', 'tags.json'), JSON.stringify(tags));
 
 // Build search index
-const searchIndex = posts.map(p => ({
-  slug: p.slug, title: p.title, description: p.description,
-  category: p.category, tags: p.tags.join(' '),
+const searchIndex = posts.map((p) => ({
+  slug: p.slug,
+  title: p.title,
+  description: p.description,
+  category: p.category,
+  tags: p.tags.join(' '),
 }));
 fs.writeFileSync(path.join(DIST, 'data', 'search-index.json'), JSON.stringify(searchIndex));
 
@@ -257,22 +310,27 @@ function buildFeed() {
   const siteDesc = SITE.description || '';
   const authorName = (SITE.author && SITE.author.name) || '';
   const authorEmail = (SITE.author && SITE.author.email) || '';
-  const items = posts.map((p) => {
-    const link = `${base}/posts/${encodeURIComponent(p.slug)}/`;
-    const pubDate = p.date ? new Date(p.date).toUTCString() : new Date().toUTCString();
-    return [
-      '  <item>',
-      `    <title><![CDATA[${p.title || p.slug}]]></title>`,
-      `    <link>${link}</link>`,
-      `    <guid isPermaLink="true">${link}</guid>`,
-      `    <description><![CDATA[${p.description || ''}]]></description>`,
-      `    <pubDate>${pubDate}</pubDate>`,
-      authorName ? `    <dc:creator><![CDATA[${authorName}]]></dc:creator>` : '',
-      '  </item>',
-    ].filter(Boolean).join('\n');
-  }).join('\n');
+  const items = posts
+    .map((p) => {
+      const link = `${base}/posts/${encodeURIComponent(p.slug)}/`;
+      const pubDate = p.date ? new Date(p.date).toUTCString() : new Date().toUTCString();
+      return [
+        '  <item>',
+        `    <title><![CDATA[${p.title || p.slug}]]></title>`,
+        `    <link>${link}</link>`,
+        `    <guid isPermaLink="true">${link}</guid>`,
+        `    <description><![CDATA[${p.description || ''}]]></description>`,
+        `    <pubDate>${pubDate}</pubDate>`,
+        authorName ? `    <dc:creator><![CDATA[${authorName}]]></dc:creator>` : '',
+        '  </item>',
+      ]
+        .filter(Boolean)
+        .join('\n');
+    })
+    .join('\n');
   const self = base ? `<atom:link href="${base}/feed.xml" rel="self" type="application/rss+xml"/>` : '';
-  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">\n` +
     `<channel>\n` +
     `  <title><![CDATA[${siteTitle}]]></title>\n` +
@@ -281,14 +339,16 @@ function buildFeed() {
     (self ? `  ${self}\n` : '') +
     (authorEmail && authorName ? `  <managingEditor>${authorEmail} (${authorName})</managingEditor>\n` : '') +
     `${items}\n` +
-    `</channel>\n</rss>\n`;
+    `</channel>\n</rss>\n`
+  );
 }
 
 function buildSitemap() {
   const base = (SITE.url || '').replace(/\/+$/, '');
-  const lastmod = posts.length && posts[0].date
-    ? new Date(posts[0].date).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+  const lastmod =
+    posts.length && posts[0].date
+      ? new Date(posts[0].date).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
   const locs = [
     `${base}/`,
     `${base}/404.html`,
@@ -296,9 +356,13 @@ function buildSitemap() {
     ...tags.map((t) => `${base}/tags/${t.slug}/`),
     ...posts.map((p) => `${base}/posts/${encodeURIComponent(p.slug)}/`),
   ];
-  const urls = locs.map((loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  const urls = locs
+    .map((loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`)
+    .join('\n');
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`
+  );
 }
 
 if (feedEnabled) {
@@ -324,16 +388,26 @@ const relativePath = (outPath) => {
 function renderFile(template, outPath, data) {
   const rp = relativePath(outPath);
   const html = ejs.render(fs.readFileSync(path.join(viewsDir, template), 'utf-8'), {
-    ...data, rp, site: SITE, t, i18n, categories, tags, lang: SITE.language || 'zh-CN',
+    ...data,
+    rp,
+    site: SITE,
+    t,
+    i18n,
+    categories,
+    tags,
+    lang: SITE.language || 'zh-CN',
     activeCategory: data.activeCategory || '',
     activeTag: data.activeTag || '',
     pageTitle: data.titleExtra ? SITE.title + (data.titleExtra || '') : SITE.title,
     pageDescription: SITE.description,
-    currentPage: data.page || 1, totalPages: data.totalPages || 1,
-    ...(data.page ? {
-      prev: data.page > 1 ? (data.page === 2 ? 'index.html' : `page/${data.page - 1}/index.html`) : '',
-      next: data.page < data.totalPages ? `page/${data.page + 1}/index.html` : '',
-    } : {}),
+    currentPage: data.page || 1,
+    totalPages: data.totalPages || 1,
+    ...(data.page
+      ? {
+          prev: data.page > 1 ? (data.page === 2 ? 'index.html' : `page/${data.page - 1}/index.html`) : '',
+          next: data.page < data.totalPages ? `page/${data.page + 1}/index.html` : '',
+        }
+      : {}),
   });
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, html);
@@ -345,16 +419,28 @@ const totalPages = Math.ceil(posts.length / pageSize);
 for (let page = 1; page <= totalPages; page++) {
   const pagePosts = posts.slice((page - 1) * pageSize, page * pageSize);
   renderFile('index.ejs', path.join(DIST, page === 1 ? 'index.html' : `page/${page}/index.html`), {
-    posts: pagePosts, categories, tags, page, totalPages,
+    posts: pagePosts,
+    categories,
+    tags,
+    page,
+    totalPages,
   });
 }
 
 // Post pages
 for (const post of posts) {
-  const related = posts.filter(p => p.slug !== post.slug && ((p.category || '') === (post.category || '') || (p.tags || []).some(t => (post.tags || []).includes(t)))).slice(0, 4);
+  const related = posts
+    .filter(
+      (p) =>
+        p.slug !== post.slug &&
+        ((p.category || '') === (post.category || '') || (p.tags || []).some((t) => (post.tags || []).includes(t))),
+    )
+    .slice(0, 4);
   const idx = posts.indexOf(post);
   renderFile('post.ejs', path.join(DIST, 'posts', post.slug, 'index.html'), {
-    post, posts, related,
+    post,
+    posts,
+    related,
     prev: posts[idx + 1] || null,
     next: posts[idx - 1] || null,
   });
@@ -362,23 +448,35 @@ for (const post of posts) {
 
 // Category pages
 for (const cat of categories) {
-  const catPosts = posts.filter(p => (p.category || '').startsWith(cat.name));
+  const catPosts = posts.filter((p) => (p.category || '').startsWith(cat.name));
   renderFile('index.ejs', path.join(DIST, 'categories', cat.slug, 'index.html'), {
-    posts: catPosts, categories, tags, activeCategory: cat.name, titleExtra: ` / ${cat.name}`,
+    posts: catPosts,
+    categories,
+    tags,
+    activeCategory: cat.name,
+    titleExtra: ` / ${cat.name}`,
   });
   for (const child of cat.children) {
-    const childPosts = catPosts.filter(p => (p.category || '').startsWith(`${cat.name}/${child.name}`));
+    const childPosts = catPosts.filter((p) => (p.category || '').startsWith(`${cat.name}/${child.name}`));
     renderFile('index.ejs', path.join(DIST, 'categories', cat.slug, child.slug, 'index.html'), {
-      posts: childPosts, categories, tags, activeCategory: `${cat.name}/${child.name}`, titleExtra: ` / ${cat.name} / ${child.name}`,
+      posts: childPosts,
+      categories,
+      tags,
+      activeCategory: `${cat.name}/${child.name}`,
+      titleExtra: ` / ${cat.name} / ${child.name}`,
     });
   }
 }
 
 // Tag pages
 for (const tag of tags) {
-  const tagPosts = posts.filter(p => (p.tags || []).includes(tag.name));
+  const tagPosts = posts.filter((p) => (p.tags || []).includes(tag.name));
   renderFile('index.ejs', path.join(DIST, 'tags', tag.slug, 'index.html'), {
-    posts: tagPosts, categories, tags, activeTag: tag.name, titleExtra: ` / #${tag.name}`,
+    posts: tagPosts,
+    categories,
+    tags,
+    activeTag: tag.name,
+    titleExtra: ` / #${tag.name}`,
   });
 }
 

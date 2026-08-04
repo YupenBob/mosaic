@@ -26,8 +26,13 @@ export function initLikes({ apiBase = '/api' } = {}) {
     const action = wasLiked ? 'unlike' : 'like';
 
     // Optimistic UI
-    if (wasLiked) { set.delete(slug); count = Math.max(0, count - 1); }
-    else { set.add(slug); count += 1; }
+    if (wasLiked) {
+      set.delete(slug);
+      count = Math.max(0, count - 1);
+    } else {
+      set.add(slug);
+      count += 1;
+    }
     saveLikedSet(set);
     updateBtn(btn, count, !wasLiked);
 
@@ -43,7 +48,9 @@ export function initLikes({ apiBase = '/api' } = {}) {
         count = data.likes;
         updateBtn(btn, count, !wasLiked);
       }
-    } catch { /* offline: localStorage is truth */ }
+    } catch {
+      /* offline: localStorage is truth */
+    }
   });
 }
 
@@ -55,12 +62,17 @@ function trackView(apiBase, slug) {
 }
 
 function loadLikedSet() {
-  try { return new Set(JSON.parse(localStorage.getItem(LIKES_KEY) || '[]')); }
-  catch { return new Set(); }
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LIKES_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
 }
 
 function saveLikedSet(set) {
-  try { localStorage.setItem(LIKES_KEY, JSON.stringify([...set])); } catch {}
+  try {
+    localStorage.setItem(LIKES_KEY, JSON.stringify([...set]));
+  } catch {}
 }
 
 function updateBtn(btn, count, liked) {

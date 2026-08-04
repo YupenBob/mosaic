@@ -27,7 +27,8 @@ export function formatTime(ts) {
   const days = Math.floor(hrs / 24);
   if (days < 7) return t('time.daysAgo', { n: days });
   return d.toLocaleDateString(localStorage.getItem('mosaic_admin_lang') === 'en' ? 'en-US' : 'zh-CN', {
-    month: 'short', day: 'numeric',
+    month: 'short',
+    day: 'numeric',
   });
 }
 
@@ -65,7 +66,12 @@ export function toast(msg, type = 'info', duration = 5000) {
     container.setAttribute('aria-live', 'polite');
     document.body.appendChild(container);
   }
-  const icons = { success: 'ri-check-line', error: 'ri-close-line', warning: 'ri-error-warning-line', info: 'ri-information-line' };
+  const icons = {
+    success: 'ri-check-line',
+    error: 'ri-close-line',
+    warning: 'ri-error-warning-line',
+    info: 'ri-information-line',
+  };
   const el = document.createElement('div');
   el.className = 'toast toast-' + type;
   el.innerHTML = `
@@ -90,7 +96,9 @@ export function toast(msg, type = 'info', duration = 5000) {
       if (progressEl) {
         progressEl.style.width = '100%';
         progressEl.style.transition = `width ${duration}ms linear`;
-        requestAnimationFrame(() => { progressEl.style.width = '0%'; });
+        requestAnimationFrame(() => {
+          progressEl.style.width = '0%';
+        });
       }
     });
     setTimeout(dismiss, duration);
@@ -109,7 +117,16 @@ export function closeModal() {
   }
 }
 
-export function openModal({ title = '', desc = '', icon = null, iconColor = '', content = '', actions = [], wide = false, focusSelector = null }) {
+export function openModal({
+  title = '',
+  desc = '',
+  icon = null,
+  iconColor = '',
+  content = '',
+  actions = [],
+  wide = false,
+  focusSelector = null,
+}) {
   closeModal();
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -141,15 +158,26 @@ export function openModal({ title = '', desc = '', icon = null, iconColor = '', 
     };
     actionsEl.appendChild(btn);
   }
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeModal();
+  });
   overlay.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
+    }
     if (e.key === 'Tab') {
       const focusables = overlay.querySelectorAll('button, input, select, textarea, a[href]');
       if (!focusables.length) return;
-      const first = focusables[0], last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      const first = focusables[0],
+        last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   });
   requestAnimationFrame(() => {
@@ -185,7 +213,7 @@ export function modalConfirm(title, desc, onOk, opts = {}) {
         className: danger ? 'btn-danger' : 'btn-primary',
         icon: danger ? 'ri-delete-bin-line' : 'ri-check-line',
         closeOnClick: false,
-        onClick: async (e) => {
+        onClick: async () => {
           if (requireText) {
             const input = document.getElementById('modal-confirm-input');
             const err = document.getElementById('modal-confirm-error');
@@ -205,7 +233,16 @@ export function modalConfirm(title, desc, onOk, opts = {}) {
   return overlay;
 }
 
-export function modalInput({ title, desc = '', label = '', value = '', placeholder = '', okLabel = t('common.confirm'), validate = null, onOk }) {
+export function modalInput({
+  title,
+  desc = '',
+  label = '',
+  value = '',
+  placeholder = '',
+  okLabel = t('common.confirm'),
+  validate = null,
+  onOk,
+}) {
   openModal({
     title,
     desc,
@@ -221,7 +258,9 @@ export function modalInput({ title, desc = '', label = '', value = '', placehold
     actions: [
       { label: t('common.cancel'), className: 'btn-secondary', onClick: () => {} },
       {
-        label: okLabel, className: 'btn-primary', closeOnClick: false,
+        label: okLabel,
+        className: 'btn-primary',
+        closeOnClick: false,
         onClick: async () => {
           const input = document.getElementById('modal-input');
           const err = document.getElementById('modal-input-error');
@@ -258,12 +297,21 @@ export function emptyState(icon, title, desc = '', ctaHtml = '') {
 
 export function getStatusDef(status, conclusion) {
   if (status === 'in_progress' || status === 'queued') {
-    return { label: status === 'queued' ? t('build.queued') : t('build.running'), cls: 'badge-warning', color: 'var(--color-warning)', dot: 'busy' };
+    return {
+      label: status === 'queued' ? t('build.queued') : t('build.running'),
+      cls: 'badge-warning',
+      color: 'var(--color-warning)',
+      dot: 'busy',
+    };
   }
-  if (conclusion === 'success') return { label: t('build.success'), cls: 'badge-success', color: 'var(--color-success)', dot: 'ok' };
-  if (conclusion === 'failure') return { label: t('build.failed'), cls: 'badge-danger', color: 'var(--color-danger)', dot: 'down' };
-  if (conclusion === 'cancelled') return { label: t('build.cancelled'), cls: 'badge-neutral', color: 'var(--color-text-tertiary)', dot: '' };
-  if (conclusion === 'skipped') return { label: t('build.skipped'), cls: 'badge-neutral', color: 'var(--color-text-tertiary)', dot: '' };
+  if (conclusion === 'success')
+    return { label: t('build.success'), cls: 'badge-success', color: 'var(--color-success)', dot: 'ok' };
+  if (conclusion === 'failure')
+    return { label: t('build.failed'), cls: 'badge-danger', color: 'var(--color-danger)', dot: 'down' };
+  if (conclusion === 'cancelled')
+    return { label: t('build.cancelled'), cls: 'badge-neutral', color: 'var(--color-text-tertiary)', dot: '' };
+  if (conclusion === 'skipped')
+    return { label: t('build.skipped'), cls: 'badge-neutral', color: 'var(--color-text-tertiary)', dot: '' };
   return { label: status || t('common.unknown'), cls: 'badge-neutral', color: 'var(--color-text-tertiary)', dot: '' };
 }
 
@@ -297,8 +345,13 @@ export function loadLib(src) {
   const p = new Promise((resolve, reject) => {
     const el = document.createElement('script');
     el.src = src;
-    el.onload = () => { resolve(); };
-    el.onerror = () => { delete _libCache[src]; reject(new Error('Failed to load ' + src)); };
+    el.onload = () => {
+      resolve();
+    };
+    el.onerror = () => {
+      delete _libCache[src];
+      reject(new Error('Failed to load ' + src));
+    };
     document.head.appendChild(el);
   });
   _libCache[src] = p;
@@ -319,7 +372,9 @@ export function setBtnBusy(btn, busy, busyHtml) {
 
 export function quick(promiseFn, fallback, ms = 15000) {
   return Promise.race([
-    Promise.resolve().then(promiseFn).catch(() => fallback),
+    Promise.resolve()
+      .then(promiseFn)
+      .catch(() => fallback),
     new Promise((r) => setTimeout(() => r(fallback), ms)),
   ]);
 }

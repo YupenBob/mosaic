@@ -2,8 +2,6 @@
  * Frontend Component Loader — dynamically loads and initializes components
  * based on config. Components register via { name, enabled, init(container, config) }
  */
-import { $ } from './utils.js';
-
 const _registry = [];
 
 export function register(component) {
@@ -11,7 +9,7 @@ export function register(component) {
 }
 
 export async function loadComponents(config, pageType) {
-  const components = _registry.filter(c => c.enabled !== false);
+  const components = _registry.filter((c) => c.enabled !== false);
   for (const comp of components) {
     if (comp.page !== pageType && comp.page !== 'all') continue;
     const compConfig = (config && config[comp.name]) || {};

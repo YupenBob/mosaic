@@ -8,19 +8,19 @@ import { setTheme, getThemePref } from './theme.js';
 import { state } from './state.js';
 import { escHtml, toast } from './ui.js';
 
-let configDirty = false;
-
-const LOGO_DATA_URI = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.9'/%3E%3Crect x='26' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.65'/%3E%3Crect x='2' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.4'/%3E%3Crect x='26' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.75'/%3E%3C/svg%3E";
+const LOGO_DATA_URI =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.9'/%3E%3Crect x='26' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.65'/%3E%3Crect x='2' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.4'/%3E%3Crect x='26' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.75'/%3E%3C/svg%3E";
 
 export default async function renderConfig(signal) {
   let cfg = {};
-  try { cfg = await config.get(); } catch {}
+  try {
+    cfg = await config.get();
+  } catch {}
   if (signal.aborted) return '';
   state.config = cfg;
-  configDirty = false;
 
   const sections = [
-    ['prefs', 'ri-sliders-line', t('config.prefs'), prefsSection(cfg)],
+    ['prefs', 'ri-sliders-line', t('config.prefs'), prefsSection()],
     ['general', 'ri-information-line', t('config.general'), generalSection(cfg)],
     ['author', 'ri-user-line', t('config.author'), authorSection(cfg)],
     ['theme', 'ri-palette-line', t('config.theme'), themeSection(cfg)],
@@ -54,11 +54,15 @@ export default async function renderConfig(signal) {
             ${sections.map(([id, icon, label]) => `<a href="#config-${id}" data-target="${id}"><i class="${icon}"></i> ${escHtml(label)}</a>`).join('')}
           </nav>
           <div class="config-grid">
-            ${sections.map(([id, icon, label, body]) => `
+            ${sections
+              .map(
+                ([id, icon, label, body]) => `
               <section class="config-section" id="config-section-${id}" data-section="${id}">
                 <h3 class="config-section-title"><i class="${icon}"></i> ${escHtml(label)}</h3>
                 <div class="config-fields">${body}</div>
-              </section>`).join('')}
+              </section>`,
+              )
+              .join('')}
           </div>
         </div>
       </div>
@@ -90,13 +94,14 @@ export default async function renderConfig(signal) {
 
 function wireConfigDirty() {
   document.querySelectorAll('[data-config]').forEach((el) => {
-    ['input', 'change'].forEach((evt) => el.addEventListener(evt, () => {
-      configDirty = true;
-      const hint = document.getElementById('config-dirty-hint');
-      const discard = document.getElementById('config-discard-btn');
-      if (hint) hint.style.display = 'block';
-      if (discard) discard.style.display = '';
-    }));
+    ['input', 'change'].forEach((evt) =>
+      el.addEventListener(evt, () => {
+        const hint = document.getElementById('config-dirty-hint');
+        const discard = document.getElementById('config-discard-btn');
+        if (hint) hint.style.display = 'block';
+        if (discard) discard.style.display = '';
+      }),
+    );
   });
 }
 
@@ -136,7 +141,6 @@ window.doSaveConfig = async () => {
   btn.disabled = true;
   try {
     await config.update(data);
-    configDirty = false;
     const hint = document.getElementById('config-dirty-hint');
     const discard = document.getElementById('config-discard-btn');
     if (hint) hint.style.display = 'none';
@@ -153,9 +157,6 @@ window.doSaveConfig = async () => {
 // ── Field helpers ──────────────────────────
 function cfgGet(obj, path, def = '') {
   return path.split('.').reduce((o, k) => (o || {})[k], obj) ?? def;
-}
-function sec(title, body) {
-  return `<div class="config-section"><h3 class="config-section-title">${title}</h3><div class="config-fields">${body}</div></div>`;
 }
 function txt(key, label, hint, cfg, type = 'text') {
   return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><input type="${type}" class="input" data-config="${key}" value="${escHtml(String(cfgGet(cfg, key)))}" /></div>`;
@@ -176,7 +177,7 @@ function tog(key, label, hint, cfg) {
 }
 
 // ── Sections ───────────────────────────────
-function prefsSection(cfg) {
+function prefsSection() {
   const themePref = getThemePref();
   const lang = localStorage.getItem('mosaic_admin_lang') || 'zh-CN';
   return `
@@ -198,7 +199,9 @@ function prefsSection(cfg) {
   `;
 }
 
-window.setAdminTheme = (pref) => { setTheme(pref); };
+window.setAdminTheme = (pref) => {
+  setTheme(pref);
+};
 window.setAdminLang = (lang) => setLang(lang);
 
 function generalSection(cfg) {
@@ -218,7 +221,11 @@ function generalSection(cfg) {
     ${txt('url', t('config.url'), t('config.urlHint'), cfg, 'url')}
     ${txt('apiBase', t('config.apiBase'), t('config.apiBaseHint'), cfg, 'url')}
     ${txt('mediaBase', t('config.mediaBase'), t('config.mediaBaseHint'), cfg, 'url')}
-    ${sel('language', t('config.lang'), t('config.langHint'), cfg, [['zh-CN', '中文简体'], ['en', 'English'], ['ja', '日本語']])}
+    ${sel('language', t('config.lang'), t('config.langHint'), cfg, [
+      ['zh-CN', '中文简体'],
+      ['en', 'English'],
+      ['ja', '日本語'],
+    ])}
     ${txt('dateFormat', t('config.dateFmt'), t('config.dateFmtHint'), cfg)}
   `;
 }
@@ -232,7 +239,11 @@ function authorSection(cfg) {
 
 function themeSection(cfg) {
   return `
-    ${sel('theme', t('config.theme'), t('config.themeHint'), cfg, [['auto', t('config.themeAuto')], ['light', t('config.themeLight')], ['dark', t('config.themeDark')]])}
+    ${sel('theme', t('config.theme'), t('config.themeHint'), cfg, [
+      ['auto', t('config.themeAuto')],
+      ['light', t('config.themeLight')],
+      ['dark', t('config.themeDark')],
+    ])}
     ${num('pageSize', t('config.pageSize'), t('config.pageSizeHint'), cfg)}
     ${num('gallerySingleThreshold', t('config.galleryThresh'), t('config.galleryThreshHint'), cfg)}
     ${tog('cardShowTags', t('config.cardTags'), t('config.cardTagsHint'), cfg)}
@@ -256,7 +267,19 @@ function mediaSection(cfg) {
       <div class="config-quality-group">
         <label>${t('config.crf')}<input type="number" class="input" data-config="videoQuality.crf" value="${cfgGet(cfg, 'videoQuality.crf', 23)}" min="0" max="51" style="width:60px" /></label>
         <select class="select" data-config="videoQuality.preset" style="width:110px">${['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow'].map((p) => `<option value="${p}" ${cfgGet(cfg, 'videoQuality.preset', 'fast') === p ? 'selected' : ''}>${p}</option>`).join('')}</select>
-        <label>${t('config.maxHeight')}<select class="select" data-config="videoQuality.maxHeight" data-type="number" style="width:110px">${[[2160, '4K'], [1080, '1080p'], [720, '720p'], [480, '480p'], [360, '360p'], [240, '240p']].map(([v, l]) => `<option value="${v}" ${Number(cfgGet(cfg, 'videoQuality.maxHeight', 1080)) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>${t('config.maxHeight')}<select class="select" data-config="videoQuality.maxHeight" data-type="number" style="width:110px">${[
+          [2160, '4K'],
+          [1080, '1080p'],
+          [720, '720p'],
+          [480, '480p'],
+          [360, '360p'],
+          [240, '240p'],
+        ]
+          .map(
+            ([v, l]) =>
+              `<option value="${v}" ${Number(cfgGet(cfg, 'videoQuality.maxHeight', 1080)) === v ? 'selected' : ''}>${l}</option>`,
+          )
+          .join('')}</select></label>
       </div>
     </div>
   `;
@@ -271,7 +294,7 @@ function featuresSection(cfg) {
     ${tog('components.gallery.enabled', t('config.gallery'), t('config.galleryHint'), cfg)}
     ${tog('components.video.enabled', t('config.video'), t('config.videoHint'), cfg)}
     ${tog('components.comments.enabled', t('config.comments'), t('config.commentsHint'), cfg)}
-    ${tog('components.search.enabled', t('config.search'), t('config.searchHint'), cfg)}
+    ${tog('components.search.enabled', t('config.searchToggle'), t('config.searchToggleHint'), cfg)}
     ${tog('components.likes.enabled', t('config.likes'), t('config.likesHint'), cfg)}
     ${tog('components.stats.enabled', t('config.stats'), t('config.statsHint'), cfg)}
   `;
@@ -299,15 +322,21 @@ function pluginsSection(cfg) {
 window.uploadFavicon = async (input) => {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 102400) { toast(t('config.faviconTooBig'), 'error'); return; }
+  if (file.size > 102400) {
+    toast(t('config.faviconTooBig'), 'error');
+    return;
+  }
   const ext = file.name.split('.').pop()?.toLowerCase();
-  if (!['svg', 'png', 'ico'].includes(ext)) { toast(t('config.faviconType'), 'error'); return; }
+  if (!['svg', 'png', 'ico'].includes(ext)) {
+    toast(t('config.faviconType'), 'error');
+    return;
+  }
   const token = getToken();
   const API = window.__API_BASE__ || '/api';
   try {
     const resp = await fetch(`${API}/upload/direct/site-data/favicon.${ext}`, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': file.type || 'image/svg+xml' },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': file.type || 'image/svg+xml' },
       body: file,
     });
     if (!resp.ok) throw new Error('Upload failed');

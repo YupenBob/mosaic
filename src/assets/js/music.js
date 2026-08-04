@@ -11,23 +11,22 @@
  *   - Background playback across page navigation
  */
 
-import { $, $$, formatNumber, escapeHTML } from './utils.js';
+import { $, $$ } from './utils.js';
 
 const STORAGE_KEY = 'mosaic_music';
 
 // Global state (survives page navigations when script doesn't reload)
 let playerState = {
-  queue: [],           // Array of track objects
+  queue: [], // Array of track objects
   currentIndex: -1,
   isPlaying: false,
-  loopMode: 'all',     // 'one' | 'all' | 'shuffle'
+  loopMode: 'all', // 'one' | 'all' | 'shuffle'
   volume: 1,
   currentTime: 0,
   duration: 0,
 };
 
 let audioElement = null;
-let progressRAF = null;
 let _waveformInstance = null;
 
 /** Load persisted state */
@@ -42,20 +41,35 @@ function loadState() {
       playerState.queue = saved.queue || [];
       playerState.currentTime = saved.currentTime || 0;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Save state */
 function saveState() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      volume: playerState.volume,
-      loopMode: playerState.loopMode,
-      currentIndex: playerState.currentIndex,
-      queue: playerState.queue.map(t => ({ file: t.file, title: t.title, artist: t.artist, cover: t.cover, sources: t.sources, duration: t.duration, waveform: t.waveform })),
-      currentTime: audioElement ? audioElement.currentTime : playerState.currentTime,
-    }));
-  } catch { /* ignore */ }
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        volume: playerState.volume,
+        loopMode: playerState.loopMode,
+        currentIndex: playerState.currentIndex,
+        queue: playerState.queue.map((t) => ({
+          file: t.file,
+          title: t.title,
+          artist: t.artist,
+          cover: t.cover,
+          sources: t.sources,
+          duration: t.duration,
+          waveform: t.waveform,
+        })),
+        currentTime: audioElement ? audioElement.currentTime : playerState.currentTime,
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Initialize audio element (singleton) */
@@ -158,14 +172,13 @@ function togglePlay() {
 /** Play specific track (or add and play) */
 function playTrack(track, trackList) {
   // If this track list is different from current queue, replace
-  const isNewQueue = !playerState.queue.length ||
-    playerState.queue[0]?.file !== trackList?.[0]?.file;
+  const isNewQueue = !playerState.queue.length || playerState.queue[0]?.file !== trackList?.[0]?.file;
 
   if (isNewQueue && trackList) {
     playerState.queue = [...trackList];
   }
 
-  const idx = playerState.queue.findIndex(t => t.file === track.file);
+  const idx = playerState.queue.findIndex((t) => t.file === track.file);
   if (idx >= 0) {
     loadTrack(idx);
   } else {
@@ -220,10 +233,8 @@ function seekTo(pct) {
 /** ── UI Updates ── */
 function updatePlayUI() {
   const btns = $$('[data-music-action="play"]');
-  btns.forEach(btn => {
-    btn.innerHTML = playerState.isPlaying
-      ? '<i class="ri-pause-fill"></i>'
-      : '<i class="ri-play-fill"></i>';
+  btns.forEach((btn) => {
+    btn.innerHTML = playerState.isPlaying ? '<i class="ri-pause-fill"></i>' : '<i class="ri-play-fill"></i>';
   });
 }
 
@@ -232,8 +243,10 @@ function updateProgressUI() {
   if (!audio.duration) return;
   const pct = (audio.currentTime / audio.duration) * 100;
 
-  $$('.music-mini-progress-fill').forEach(el => { el.style.width = pct + '%'; });
-  $$('.music-track').forEach(el => {
+  $$('.music-mini-progress-fill').forEach((el) => {
+    el.style.width = pct + '%';
+  });
+  $$('.music-track').forEach((el) => {
     el.classList.toggle('playing', el.dataset.index === String(playerState.currentIndex));
   });
 

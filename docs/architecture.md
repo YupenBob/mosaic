@@ -50,7 +50,7 @@ flowchart LR
 
 - `originals/{slug}/photos|videos|music/` —— 原始媒体（上传后由管线剥离 EXIF）
 - `processed/{slug}/photos|videos|music|covers/` —— 压缩产物（WebP 多档、HLS+MP4、MP3）
-- `site-data/` —— 运行时数据：`stats.json`（统计，DO 备份）、`dirty.json`（脏标记）、`posts.json`（文章列表缓存）、`build-progress.json`（构建进度）、`favicon.*`
+- `site-data/` —— 运行时数据：`stats.json`（统计，DO 备份）、`dirty.json`（脏标记）、`posts.json`（文章列表缓存）、`build-progress.json`（构建进度）、`media-usage.json`（用量快照）、`favicon.*`
 
 媒体由自定义域名 `mosaic-media.xsanye.cn` 直连提供（`<img>` 等不需要 CORS 的资源直连；HLS 由 Worker 代理保证确定性 CORS 或依赖桶级 CORS 配置，见 [operations.md](operations.md)）。
 
@@ -58,22 +58,23 @@ flowchart LR
 
 `pipeline.yml` 在 push 或 workflow_dispatch 时执行：
 
-1. 恢复媒体 checksum 缓存（`actions/cache`）
+1. 校验配置与 frontmatter（`npm run validate`）；恢复媒体 checksum 缓存（`actions/cache`）
 2. 同步 `originals/` → `content/posts/`，exiftool 剥离原图 EXIF
 3. `compress.js`：图片 WebP（480/720/1080 + LQIP）、视频 HLS+MP4（240p–1080p，4K 可配）、音乐 MP3（128k/320k），并把**产物清单**写回 checksums（缓存命中时跳过转码、generate 仍能拿到档位信息）
-4. 测试（`node --check` + `worker-smoke`）
-5. `generate.js`：Markdown → 静态 HTML + RSS/Sitemap + 前端数据
-6. 上传 processed（rclone）+ 视频媒体（SDK 上传器，`Cache-Control: no-store` + 正确 Content-Type）
-7. 剥离后的 originals 回传 R2；剥离 `dist` 媒体目录
-8. `wrangler pages deploy` 部署前台
+4. `generate.js`：Markdown → 静态 HTML + RSS/Sitemap + 前端数据
+5. 测试：`npm run check`（语法 + proxy 同步 + worker/build smoke）、`npm run lint`、`npm run format:check`、Playwright 本地静态预览 E2E
+6. 上传 processed（rclone）+ 视频媒体（SDK 上传器，`Cache-Control: public, max-age=31536000` + 正确 Content-Type）
+7. 剥离后的 originals 回传 R2
+8. `minify.js`（esbuild）压缩 `dist/assets` 前端资源（保留 ESM import）；剥离 `dist` 媒体目录并拷贝 Functions
+9. `wrangler pages deploy` 部署前台
 
 另有 `health-check.yml` 每 6 小时对线上域名跑一遍 `check-site.mjs`，失败即告警。
 
 ### 4. Cloudflare Pages（展示层）
 
-- 前台静态站（`mosaic.xsanye.cn`）：HTML/CSS/JS + JSON 数据 + RSS/Sitemap，媒体引用 R2 URL
+- 前台静态站（`mosaic.xsanye.cn`）：HTML/CSS/JS（构建时 esbuild 压缩）+ JSON 数据 + RSS/Sitemap，媒体引用 R2 URL
 - 管理后台（`mosaic-admin.xsanye.cn`）：零构建 Vanilla JS SPA
-- 两者都带 `functions/api/[[path]].js`，把 `/api/*` 同源代理到 Worker，并透传真实访客 IP（`X-Real-IP` + `X-Mosaic-Proxy` 签名）
+- 两者都带 `functions/api/[[path]].js`，把 `/api/*` 同源代理到 Worker，并用 HMAC-SHA256 签名真实访客 IP（`X-Mosaic-Proxy-IP/Time/Sig`，见 [operations.md](operations.md)）；两份代理由 `shared/pages-proxy.mjs` 经 `scripts/sync-proxy.mjs` 同步生成
 
 ### 5. Worker API（API 层）
 

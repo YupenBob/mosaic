@@ -36,6 +36,9 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Validate config + frontmatter
+        run: npm run validate
+
       - name: Restore media checksums cache
         id: checksums-cache
         uses: actions/cache@v4
@@ -123,6 +126,11 @@ jobs:
 
       - name: Run checks (syntax + smoke)
         run: npm run check
+
+      - name: Lint + format check
+        run: |
+          npm run lint
+          npm run format:check
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium

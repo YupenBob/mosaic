@@ -7,7 +7,7 @@ import { auth, getToken, setToken, posts as postsApi, build } from '../src/api.j
 import { t, setLang, onLangChange } from './i18n.js';
 import { initTheme, cycleTheme } from './theme.js';
 import { state } from './state.js';
-import { toast, modalConfirm, openModal, escHtml, debounce, formatTime } from './ui.js';
+import { toast, modalConfirm, escHtml, debounce, formatTime } from './ui.js';
 import { setupUploadZone } from './upload.js';
 
 import renderDashboard, { dashboardSkeleton } from './dashboard.js';
@@ -20,12 +20,27 @@ import renderCleanup, { cleanupSkeleton } from './cleanup.js';
 import renderTrash, { renderDeployRedirect, trashSkeleton } from './trash.js';
 
 const pages = {
-  dashboard: { render: renderDashboard, skeleton: dashboardSkeleton, label: () => t('nav.dashboard'), icon: 'ri-dashboard-line' },
+  dashboard: {
+    render: renderDashboard,
+    skeleton: dashboardSkeleton,
+    label: () => t('nav.dashboard'),
+    icon: 'ri-dashboard-line',
+  },
   posts: { render: renderPosts, skeleton: postsSkeleton, label: () => t('nav.posts'), icon: 'ri-article-line' },
-  editor: { render: renderEditor, skeleton: editorSkeleton, label: () => state.params.slug ? (t('nav.editor') + ' · ' + state.params.slug) : t('nav.editor'), icon: 'ri-edit-line' },
+  editor: {
+    render: renderEditor,
+    skeleton: editorSkeleton,
+    label: () => (state.params.slug ? t('nav.editor') + ' · ' + state.params.slug : t('nav.editor')),
+    icon: 'ri-edit-line',
+  },
   build: { render: renderBuild, skeleton: buildSkeleton, label: () => t('nav.build'), icon: 'ri-tools-line' },
   config: { render: renderConfig, skeleton: configSkeleton, label: () => t('nav.config'), icon: 'ri-settings-line' },
-  taxonomy: { render: renderTaxonomy, skeleton: taxonomySkeleton, label: () => t('nav.taxonomy'), icon: 'ri-price-tag-3-line' },
+  taxonomy: {
+    render: renderTaxonomy,
+    skeleton: taxonomySkeleton,
+    label: () => t('nav.taxonomy'),
+    icon: 'ri-price-tag-3-line',
+  },
   cleanup: { render: renderCleanup, skeleton: cleanupSkeleton, label: () => t('nav.cleanup'), icon: 'ri-broom-line' },
   trash: { render: renderTrash, skeleton: trashSkeleton, label: () => t('nav.trash'), icon: 'ri-delete-bin-6-line' },
   deploy: { render: () => renderDeployRedirect(), skeleton: null, label: () => 'Deploy', icon: 'ri-tools-line' },
@@ -50,10 +65,15 @@ function onHashChange() {
     // Revert to the editor hash; if already there, allow re-render
     if (target !== _lastHash) {
       history.replaceState(null, '', _lastHash || '#editor');
-      modalConfirm(t('common.unsavedTitle'), t('common.unsavedMsg'), () => {
-        state.editorDirty = false;
-        location.hash = target;
-      }, { danger: false, okLabel: t('common.discard') });
+      modalConfirm(
+        t('common.unsavedTitle'),
+        t('common.unsavedMsg'),
+        () => {
+          state.editorDirty = false;
+          location.hash = target;
+        },
+        { danger: false, okLabel: t('common.discard') },
+      );
       return;
     }
   }
@@ -94,7 +114,9 @@ async function renderPage(page, signal) {
     }
     return;
   }
-  const skeleton = renderer.skeleton ? renderer.skeleton() : '<div class="page-anim" style="text-align:center;padding:60px"><i class="ri-loader-4-line" style="font-size:26px;animation:spin 1s linear infinite;color:var(--color-text-tertiary)"></i></div>';
+  const skeleton = renderer.skeleton
+    ? renderer.skeleton()
+    : '<div class="page-anim" style="text-align:center;padding:60px"><i class="ri-loader-4-line" style="font-size:26px;animation:spin 1s linear infinite;color:var(--color-text-tertiary)"></i></div>';
   m.innerHTML = skeleton;
   try {
     const result = await renderer.render(signal);
@@ -205,10 +227,10 @@ window.checkDirty = async () => {
 // ── Pollers ────────────────────────────────
 function startPollers() {
   stopPollers();
-  checkDirty();
+  window.checkDirty();
   pollBuildStatus();
   loadSiteUrl();
-  _dirtyPollTimer = setInterval(checkDirty, 60000);
+  _dirtyPollTimer = setInterval(window.checkDirty, 60000);
   _buildPollTimer = setInterval(pollBuildStatus, 30000);
 }
 
@@ -234,8 +256,14 @@ async function loadSiteUrl() {
 }
 
 function stopPollers() {
-  if (_dirtyPollTimer) { clearInterval(_dirtyPollTimer); _dirtyPollTimer = null; }
-  if (_buildPollTimer) { clearInterval(_buildPollTimer); _buildPollTimer = null; }
+  if (_dirtyPollTimer) {
+    clearInterval(_dirtyPollTimer);
+    _dirtyPollTimer = null;
+  }
+  if (_buildPollTimer) {
+    clearInterval(_buildPollTimer);
+    _buildPollTimer = null;
+  }
 }
 
 async function pollBuildStatus() {
@@ -357,7 +385,9 @@ function renderGlobalSearch(q) {
     pop.classList.remove('open');
     return;
   }
-  const posts = state.posts.filter((p) => (p.title || '').toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)).slice(0, 8);
+  const posts = state.posts
+    .filter((p) => (p.title || '').toLowerCase().includes(q) || p.slug.toLowerCase().includes(q))
+    .slice(0, 8);
   const commands = [
     { icon: 'ri-add-line', title: t('command.newPost'), meta: 'N', key: 'new' },
     { icon: 'ri-play-fill', title: t('command.triggerBuild'), meta: '', key: 'build' },
@@ -365,19 +395,31 @@ function renderGlobalSearch(q) {
   ];
   let html = '';
   if (posts.length) {
-    html += `<div class="gs-section-label">${t('nav.posts')}</div>` + posts.map((p) => `
+    html +=
+      `<div class="gs-section-label">${t('nav.posts')}</div>` +
+      posts
+        .map(
+          (p) => `
       <button class="gs-item" data-gs-post="${escHtml(p.slug)}">
         <i class="ri-article-line"></i>
         <span class="gs-title">${escHtml(p.title || p.slug)}</span>
         <span class="gs-meta">${escHtml(p.slug)}</span>
-      </button>`).join('');
+      </button>`,
+        )
+        .join('');
   }
-  html += `<div class="gs-section-label">${t('command.actions')}</div>` + commands.map((c) => `
+  html +=
+    `<div class="gs-section-label">${t('command.actions')}</div>` +
+    commands
+      .map(
+        (c) => `
     <button class="gs-item" data-gs-cmd="${c.key}">
       <i class="${c.icon}"></i>
       <span class="gs-title">${c.title}</span>
       ${c.meta ? `<span class="gs-meta"><kbd style="font-family:var(--font-mono);font-size:10px;color:var(--color-text-tertiary)">${c.meta}</kbd></span>` : ''}
-    </button>`).join('');
+    </button>`,
+      )
+      .join('');
   if (!posts.length && q) html = `<div class="gs-empty">${t('common.noResults')}</div>`;
   pop.innerHTML = html;
   pop.classList.add('open');
@@ -397,9 +439,14 @@ function setupGlobalSearch() {
     renderGlobalSearch(v);
   }, 150);
   input.addEventListener('input', () => onQuery(input.value));
-  input.addEventListener('focus', () => { if (input.value) renderGlobalSearch(input.value); });
+  input.addEventListener('focus', () => {
+    if (input.value) renderGlobalSearch(input.value);
+  });
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { pop.classList.remove('open'); input.blur(); }
+    if (e.key === 'Escape') {
+      pop.classList.remove('open');
+      input.blur();
+    }
     if (e.key === 'Enter') {
       const first = pop.querySelector('.gs-item');
       if (first) first.click();
@@ -439,7 +486,10 @@ function setupGlobalSearch() {
 // ── Command palette ────────────────────────
 function openCommandPalette() {
   const existing = document.querySelector('.cmd-overlay');
-  if (existing) { closeCommandPalette(); return; }
+  if (existing) {
+    closeCommandPalette();
+    return;
+  }
   const overlay = document.createElement('div');
   overlay.className = 'cmd-overlay';
   overlay.setAttribute('role', 'dialog');
@@ -464,29 +514,62 @@ function openCommandPalette() {
     const list = overlay.querySelector('#cmd-list');
     const pageItems = Object.entries(pages)
       .filter(([name, p]) => name !== 'deploy' && p.label)
-      .map(([name, p]) => ({ icon: p.icon, title: p.label(), meta: '#', go: () => { location.hash = name; } }));
+      .map(([name, p]) => ({
+        icon: p.icon,
+        title: p.label(),
+        meta: '#',
+        go: () => {
+          location.hash = name;
+        },
+      }));
     const actions = [
-      { icon: 'ri-add-line', title: t('command.newPost'), meta: 'N', go: () => { location.hash = 'editor'; } },
+      {
+        icon: 'ri-add-line',
+        title: t('command.newPost'),
+        meta: 'N',
+        go: () => {
+          location.hash = 'editor';
+        },
+      },
       { icon: 'ri-play-fill', title: t('command.triggerBuild'), go: () => window.doTriggerBuild() },
-      { icon: 'ri-save-line', title: t('command.savePost'), meta: '⌘⏎', go: () => state.page === 'editor' && window.doSavePost && window.doSavePost() },
+      {
+        icon: 'ri-save-line',
+        title: t('command.savePost'),
+        meta: '⌘⏎',
+        go: () => state.page === 'editor' && window.doSavePost && window.doSavePost(),
+      },
       { icon: 'ri-contrast-2-line', title: t('command.toggleTheme'), go: () => cycleTheme() },
     ];
-    const postItems = state.posts.map((p) => ({ icon: 'ri-article-line', title: p.title || p.slug, meta: p.slug, go: () => { location.hash = 'editor&slug=' + encodeURIComponent(p.slug); } }));
+    const postItems = state.posts.map((p) => ({
+      icon: 'ri-article-line',
+      title: p.title || p.slug,
+      meta: p.slug,
+      go: () => {
+        location.hash = 'editor&slug=' + encodeURIComponent(p.slug);
+      },
+    }));
     const match = (item) => !q || item.title.toLowerCase().includes(q) || item.meta.toLowerCase().includes(q);
     const pagesMatch = pageItems.filter(match);
     const actionsMatch = actions.filter(match);
     const postsMatch = postItems.filter(match).slice(0, 6);
     let html = '';
-    if (pagesMatch.length) html += `<div class="cmd-group-label">${t('command.pages')}</div>` + pagesMatch.map((i) => cmdItem(i)).join('');
-    if (actionsMatch.length) html += `<div class="cmd-group-label">${t('command.actions')}</div>` + actionsMatch.map((i) => cmdItem(i)).join('');
-    if (postsMatch.length) html += `<div class="cmd-group-label">${t('nav.posts')}</div>` + postsMatch.map((i) => cmdItem(i)).join('');
+    if (pagesMatch.length)
+      html += `<div class="cmd-group-label">${t('command.pages')}</div>` + pagesMatch.map((i) => cmdItem(i)).join('');
+    if (actionsMatch.length)
+      html +=
+        `<div class="cmd-group-label">${t('command.actions')}</div>` + actionsMatch.map((i) => cmdItem(i)).join('');
+    if (postsMatch.length)
+      html += `<div class="cmd-group-label">${t('nav.posts')}</div>` + postsMatch.map((i) => cmdItem(i)).join('');
     if (!html) html = `<div class="cmd-empty">${t('command.noMatch')}</div>`;
     list.innerHTML = html;
-    list.querySelectorAll('.cmd-item').forEach((el, i) => {
+    list.querySelectorAll('.cmd-item').forEach((el) => {
       el.addEventListener('click', () => {
         const idx = Number(el.dataset.idx);
         const all = getAllItems();
-        if (all[idx]) { overlay.remove(); all[idx].go(); }
+        if (all[idx]) {
+          overlay.remove();
+          all[idx].go();
+        }
       });
     });
     list.querySelector('.cmd-item')?.classList.add('active');
@@ -498,16 +581,41 @@ function openCommandPalette() {
 
   function getAllItems() {
     const q = input.value;
-    const pageItems = Object.entries(pages).filter(([n, p]) => n !== 'deploy' && p.label)
-      .map(([n, p]) => ({ title: p.label(), meta: '#', go: () => { location.hash = n; } }));
+    const pageItems = Object.entries(pages)
+      .filter(([n, p]) => n !== 'deploy' && p.label)
+      .map(([n, p]) => ({
+        title: p.label(),
+        meta: '#',
+        go: () => {
+          location.hash = n;
+        },
+      }));
     const actions = [
-      { title: t('command.newPost'), meta: 'N', go: () => { location.hash = 'editor'; } },
+      {
+        title: t('command.newPost'),
+        meta: 'N',
+        go: () => {
+          location.hash = 'editor';
+        },
+      },
       { title: t('command.triggerBuild'), meta: '', go: () => window.doTriggerBuild() },
-      { title: t('command.savePost'), meta: '⌘⏎', go: () => state.page === 'editor' && window.doSavePost && window.doSavePost() },
+      {
+        title: t('command.savePost'),
+        meta: '⌘⏎',
+        go: () => state.page === 'editor' && window.doSavePost && window.doSavePost(),
+      },
       { title: t('command.toggleTheme'), meta: '', go: () => cycleTheme() },
     ];
-    const postsM = state.posts.map((p) => ({ title: p.title || p.slug, meta: p.slug, go: () => { location.hash = 'editor&slug=' + encodeURIComponent(p.slug); } }));
-    return [...pageItems, ...actions, ...postsM].filter((i) => !q || i.title.toLowerCase().includes(q) || i.meta.toLowerCase().includes(q));
+    const postsM = state.posts.map((p) => ({
+      title: p.title || p.slug,
+      meta: p.slug,
+      go: () => {
+        location.hash = 'editor&slug=' + encodeURIComponent(p.slug);
+      },
+    }));
+    return [...pageItems, ...actions, ...postsM].filter(
+      (i) => !q || i.title.toLowerCase().includes(q) || i.meta.toLowerCase().includes(q),
+    );
   }
 
   input.addEventListener('input', () => {
@@ -532,7 +640,9 @@ function openCommandPalette() {
       overlay.remove();
     }
   });
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
 }
 
 function closeCommandPalette() {
@@ -543,7 +653,11 @@ function closeCommandPalette() {
 function setupKeyboard() {
   document.addEventListener('keydown', (e) => {
     const target = e.target;
-    const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
+    const typing =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target.isContentEditable;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       openCommandPalette();
@@ -579,13 +693,20 @@ function setupTopbar() {
   const langSel = document.getElementById('topbar-lang');
   langSel.value = localStorage.getItem('mosaic_admin_lang') || 'zh-CN';
   langSel.addEventListener('change', () => setLang(langSel.value));
-  document.getElementById('topbar-build-btn').addEventListener('click', (e) => { e.stopPropagation(); window.doTriggerBuild(); });
+  document.getElementById('topbar-build-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.doTriggerBuild();
+  });
 }
 
 // ── i18n hooks ─────────────────────────────
 function applyStaticI18n() {
-  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
   const langSel = document.getElementById('topbar-lang');
   if (langSel) langSel.value = localStorage.getItem('mosaic_admin_lang') || 'zh-CN';
 }
@@ -599,7 +720,9 @@ onLangChange(() => {
 // ── Init ───────────────────────────────────
 async function init() {
   const loadingEl = document.getElementById('loading-screen');
-  const hideLoading = () => { if (loadingEl) loadingEl.style.display = 'none'; };
+  const hideLoading = () => {
+    if (loadingEl) loadingEl.style.display = 'none';
+  };
   applyStaticI18n();
   initTheme();
   setupTopbar();

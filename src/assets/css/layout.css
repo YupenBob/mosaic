@@ -67,7 +67,9 @@
   border-radius: var(--button-radius);
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .header-nav a:hover,
@@ -119,16 +121,24 @@
 }
 
 @media (min-width: 640px) {
-  .card-grid { column-count: 2; }
+  .card-grid {
+    column-count: 2;
+  }
 }
 
 @media (min-width: 1024px) {
-  .card-grid { column-count: 3; }
+  .card-grid {
+    column-count: 3;
+  }
 }
 
 @media (min-width: 1440px) {
-  .container { padding: 0 var(--space-8); }
-  .card-grid { column-count: 4; }
+  .container {
+    padding: 0 var(--space-8);
+  }
+  .card-grid {
+    column-count: 4;
+  }
 }
 
 /* Empty state */
