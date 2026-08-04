@@ -8,6 +8,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
 
 const ROOT = process.cwd();
 const FILE = path.join(ROOT, 'dist', 'build-progress.json');
@@ -41,5 +42,9 @@ try {
   fs.writeFileSync(FILE, JSON.stringify(data));
 } catch (e) {
   console.error(`[build-progress] write failed: ${e.message}`);
+}
+// Upload immediately (one-shot; the caller step provides R2 creds).
+if (process.env.R2_ACCESS_KEY && process.env.R2_BUCKET) {
+  execFile('rclone', ['copyto', FILE, `r2:${process.env.R2_BUCKET}/site-data/build-progress.json`, '--low-level-retries', '1'], { timeout: 15000 }, () => {});
 }
 console.log(`[build-progress] ${stage}${message ? ' — ' + message : ''}`);

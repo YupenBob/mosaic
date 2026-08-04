@@ -8,6 +8,19 @@ import { escHtml, formatTime, fmtDuration, getStatusDef, statusBadge, toast, cop
 
 // Chinese labels for the known pipeline steps (GitHub returns English names)
 const STEP_LABELS_ZH = {
+  'Set up job': '准备任务',
+  'Complete job': '完成任务',
+  'Run actions/checkout@v4': '检出代码',
+  'Run actions/setup-node@v4': '安装 Node.js',
+  'Post Run actions/checkout@v4': '清理检出缓存',
+  'Post Run actions/setup-node@v4': '清理 Node 环境',
+  'Post Restore media checksums cache': '清理媒体校验缓存',
+  'Start build progress reporter': '启动构建进度上报',
+  'Progress — generate site': '阶段：生成站点',
+  'Progress — tests': '阶段：运行测试',
+  'Progress — upload': '阶段：上传媒体',
+  'Progress — deploy': '阶段：部署',
+  'Finish build progress': '结束构建进度上报',
   'Checkout': '检出代码',
   'Setup Node': '安装 Node.js',
   'Install tools': '安装工具（ffmpeg / rclone / exiftool）',
@@ -32,6 +45,8 @@ function stepLabel(name) {
 }
 
 let stepsDetailOpen = false;
+let lastSteps = [];
+let tipStep = null;
 
 export default async function renderBuild(signal) {
   let statusData = null, historyData = { runs: [] };
@@ -101,6 +116,11 @@ export default async function renderBuild(signal) {
           const sec = Math.floor((Date.now() - new Date(stepEl.dataset.start).getTime()) / 1000);
           stepEl.textContent = t('build.elapsedShort', { t: fmtDuration(sec) });
         }
+        const tipDur = document.querySelector('#pipeline-tip .tip-dur[data-start]');
+        if (tipDur) {
+          const sec = Math.floor((Date.now() - new Date(tipDur.dataset.start).getTime()) / 1000);
+          tipDur.textContent = t('build.elapsedShort', { t: fmtDuration(sec) });
+        }
         const upd = document.getElementById('build-updated');
         if (upd) upd.textContent = t('build.updatedAgo', { s: Math.max(1, Math.round((Date.now() - lastPollAt) / 1000)) });
       };
@@ -130,6 +150,8 @@ export default async function renderBuild(signal) {
           if (card && s && s.status !== 'unknown') {
             const wasRunning = prevStatus === 'in_progress' || prevStatus === 'queued';
             card.innerHTML = renderStatusCard(s);
+            hidePipelineTip();
+            clearStepHighlight();
             if (wasRunning && !running) {
               if (s.conclusion === 'success') {
                 toast(t('build.terminalSuccess', { n: s.runNumber }), 'success', 6000);
@@ -163,6 +185,13 @@ export default async function renderBuild(signal) {
       if (initialRunning) schedule(5000);
       if (initialRunning) updateLive();
 
+      const statusCard = document.getElementById('build-status-card');
+      if (statusCard) {
+        statusCard.addEventListener('mouseover', onSegEnter);
+        statusCard.addEventListener('mouseout', onSegLeave);
+        statusCard.addEventListener('click', onSegClick);
+      }
+
       const onVis = () => {
         if (document.hidden) {
           clearTimeout(pollTimer);
@@ -180,6 +209,8 @@ export default async function renderBuild(signal) {
         clearInterval(durTicker);
         document.removeEventListener('visibilitychange', onVis);
         window.setBuildTriggerStates && window.setBuildTriggerStates(false);
+        hidePipelineTip();
+        clearStepHighlight();
       };
       window.addEventListener('hashchange', cleanup, { once: true });
     },
@@ -218,8 +249,21 @@ function progressText(pr) {
   return escHtml(pr.message || t('build.stages.' + pr.stage) || pr.stage);
 }
 
+function stepStatusInfo(s) {
+  if (s.status === 'completed') {
+    if (s.conclusion === 'success') return { cls: 'ok', label: t('build.stepSuccess') };
+    if (s.conclusion === 'failure') return { cls: 'bad', label: t('build.stepFailedShort') };
+    if (s.conclusion === 'skipped') return { cls: 'muted', label: t('build.stepSkipped') };
+    if (s.conclusion === 'cancelled') return { cls: 'muted', label: t('build.stepCancelled') };
+    return { cls: 'muted', label: s.conclusion || s.status };
+  }
+  if (s.status === 'in_progress') return { cls: 'busy', label: t('build.stepRunning') };
+  return { cls: 'muted', label: t('build.stepQueued') };
+}
+
 function renderPipeline(run) {
   const steps = run.steps || [];
+  lastSteps = steps;
   if (!steps.length) {
     return `<div class="build-pipeline"><span class="muted">${t('build.noSteps')}</span></div>`;
   }
@@ -271,7 +315,7 @@ function renderPipeline(run) {
     // flex-grow weights the segment by its real duration; gaps share the
     // remaining space so the bar never overflows its container.
     const g = weights[i] || 1;
-    return `<span class="pipeline-seg ${cls}" style="flex-grow:${g.toFixed(1)}" title="${escHtml(stepLabel(s.name))} (#${s.number}) · ${fmtDuration(Math.round(weights[i] / 1000))}"></span>`;
+    return `<span class="pipeline-seg ${cls}" data-step="${s.number}" style="flex-grow:${g.toFixed(1)}" aria-label="${escHtml(stepLabel(s.name))} (#${s.number}) · ${fmtDuration(Math.round(weights[i] / 1000))}"></span>`;
   }).join('');
 
   // ETA: rate-based estimate from elapsed time + progress ratio
@@ -285,18 +329,7 @@ function renderPipeline(run) {
   }
 
   const detailRows = steps.map((s) => {
-    let cls, statusLabel;
-    if (s.status === 'completed') {
-      if (s.conclusion === 'success') { cls = 'ok'; statusLabel = t('build.stepSuccess'); }
-      else if (s.conclusion === 'failure') { cls = 'bad'; statusLabel = t('build.stepFailedShort'); }
-      else if (s.conclusion === 'skipped') { cls = 'muted'; statusLabel = t('build.stepSkipped'); }
-      else if (s.conclusion === 'cancelled') { cls = 'muted'; statusLabel = t('build.stepCancelled'); }
-      else { cls = 'muted'; statusLabel = s.conclusion || s.status; }
-    } else if (s.status === 'in_progress') {
-      cls = 'busy'; statusLabel = t('build.stepRunning');
-    } else {
-      cls = 'muted'; statusLabel = t('build.stepQueued');
-    }
+    const { cls, label: statusLabel } = stepStatusInfo(s);
     let d = '';
     if (s.status === 'completed' && s.startedAt && s.completedAt) {
       d = fmtDuration(Math.round((new Date(s.completedAt) - new Date(s.startedAt)) / 1000));
@@ -304,7 +337,7 @@ function renderPipeline(run) {
       d = `<span id="step-elapsed" data-start="${s.startedAt}">${t('build.elapsedShort', { t: fmtDuration(Math.max(0, Math.round((now - new Date(s.startedAt)) / 1000))) })}</span>`;
     }
     return `
-      <div class="build-step-row">
+      <div class="build-step-row" data-step="${s.number}">
         <span class="step-num">#${s.number}</span>
         <span class="step-dot ${cls}"></span>
         <span class="step-name">${escHtml(stepLabel(s.name))}</span>
@@ -336,6 +369,112 @@ window.toggleBuildSteps = () => {
   stepsDetailOpen = !stepsDetailOpen;
   el.classList.toggle('hidden', !stepsDetailOpen);
 };
+
+// ── Pipeline segment hover / click ─────────
+function ensureTip() {
+  let tip = document.getElementById('pipeline-tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'pipeline-tip';
+    tip.className = 'pipeline-tip';
+    tip.setAttribute('role', 'tooltip');
+    document.body.appendChild(tip);
+  }
+  return tip;
+}
+
+function positionTip(tip, seg) {
+  const r = seg.getBoundingClientRect();
+  tip.style.left = '0px';
+  tip.style.top = '0px';
+  const w = tip.offsetWidth;
+  const h = tip.offsetHeight;
+  let left = r.left + r.width / 2 - w / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  let top = r.top - h - 8;
+  if (top < 8) top = r.bottom + 8;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+
+function showPipelineTip(seg, step) {
+  const tip = ensureTip();
+  const info = stepStatusInfo(step);
+  let durText;
+  if (step.status === 'completed' && step.startedAt && step.completedAt) {
+    durText = fmtDuration(Math.round((new Date(step.completedAt) - new Date(step.startedAt)) / 1000));
+  } else if (step.status === 'in_progress' && step.startedAt) {
+    durText = `<span class="tip-dur" data-start="${step.startedAt}">${t('build.elapsedShort', { t: fmtDuration(Math.max(0, Math.round((Date.now() - new Date(step.startedAt)) / 1000))) })}</span>`;
+  } else {
+    durText = '';
+  }
+  tip.innerHTML = `
+    <span class="tip-num">#${step.number}</span>
+    <span class="tip-name">${escHtml(stepLabel(step.name))}</span>
+    <span class="tip-status ${info.cls}">${escHtml(info.label)}</span>
+    ${durText}
+  `;
+  tip.classList.add('show');
+  positionTip(tip, seg);
+  tipStep = step.number;
+}
+
+function hidePipelineTip() {
+  const tip = document.getElementById('pipeline-tip');
+  if (tip) tip.classList.remove('show');
+  tipStep = null;
+}
+
+function highlightStepRow(n) {
+  const detail = document.getElementById('build-steps-detail');
+  if (!detail || detail.classList.contains('hidden')) return;
+  const row = detail.querySelector(`.build-step-row[data-step="${n}"]`);
+  if (!row) return;
+  row.classList.add('pipeline-row-active');
+  const r = row.getBoundingClientRect();
+  const d = detail.getBoundingClientRect();
+  if (r.top < d.top || r.bottom > d.bottom) {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    row.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
+  }
+}
+
+function clearStepHighlight() {
+  document.querySelectorAll('.build-step-row.pipeline-row-active').forEach((el) => el.classList.remove('pipeline-row-active'));
+}
+
+function onSegEnter(e) {
+  const seg = e.target.closest('.pipeline-seg');
+  if (!seg) return;
+  const n = Number(seg.dataset.step);
+  const step = lastSteps.find((s) => s.number === n);
+  if (!step) return;
+  showPipelineTip(seg, step);
+  highlightStepRow(n);
+}
+
+function onSegLeave(e) {
+  if (!e.target.closest('.pipeline-seg')) return;
+  hidePipelineTip();
+  clearStepHighlight();
+}
+
+function onSegClick(e) {
+  const seg = e.target.closest('.pipeline-seg');
+  if (!seg) return;
+  const n = Number(seg.dataset.step);
+  if (!n) return;
+  stepsDetailOpen = true;
+  const detail = document.getElementById('build-steps-detail');
+  if (detail) detail.classList.remove('hidden');
+  const row = detail && detail.querySelector(`.build-step-row[data-step="${n}"]`);
+  if (row) {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    row.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    row.classList.add('pipeline-row-flash');
+    setTimeout(() => row.classList.remove('pipeline-row-flash'), 1200);
+  }
+}
 
 function renderStatusCard(run) {
   const def = getStatusDef(run.status, run.conclusion);

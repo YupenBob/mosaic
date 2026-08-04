@@ -82,15 +82,13 @@ jobs:
           if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
           mkdir -p dist
           node scripts/build-progress.mjs media
-          (while true; do
-            rclone copyto dist/build-progress.json r2:${R2_BUCKET}/site-data/build-progress.json --low-level-retries 1 2>/dev/null || true
-            sleep 5
-          done) &
-          echo $! > dist/build-progress.pid
 
       - name: Compress media
         env:
           NODE_ENV: production
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: node scripts/compress.js
 
       - name: Save media checksums cache
@@ -100,6 +98,10 @@ jobs:
           key: media-checksums-${{ github.sha }}
 
       - name: Progress — generate site
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: node scripts/build-progress.mjs generate || true
 
       # ── 3. Generate site ──
@@ -109,6 +111,10 @@ jobs:
         run: node scripts/generate.js
 
       - name: Progress — tests
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: node scripts/build-progress.mjs test || true
 
       # ── 3b. Tests ──
@@ -119,6 +125,10 @@ jobs:
           node tests/worker-smoke.mjs
 
       - name: Progress — upload
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: node scripts/build-progress.mjs upload || true
 
       # ── 4. Upload processed to R2 ──
@@ -169,6 +179,10 @@ jobs:
           echo "Originals synced back (EXIF stripped)"
 
       - name: Progress — deploy
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: node scripts/build-progress.mjs deploy || true
 
       # ── 5. Strip media from dist (served from R2) ──
@@ -200,5 +214,3 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
           node scripts/build-progress.mjs done || true
-          if [ -f dist/build-progress.pid ]; then kill $(cat dist/build-progress.pid) 2>/dev/null || true; fi
-          if [ -n "$R2_ACCESS_KEY" ]; then rclone copyto dist/build-progress.json r2:${R2_BUCKET}/site-data/build-progress.json --low-level-retries 1 2>/dev/null || true; fi
