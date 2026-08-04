@@ -1,7 +1,6 @@
 <%
 /* Post detail page */
 const pageDataTitle = post.title + ' - ' + site.title;
-const ly = post.layout || 'default';
 
 function videoControlsHTML(multiSrc, showNext, total) {
   var h = '<div class="video-controls">';
@@ -98,6 +97,43 @@ function renderGallery(photos, threshold) {
   h += '</div></section>';
   return h;
 }
+
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderMusicBlock(tracks) {
+  var h = '<section class="music-section"><h2 class="section-title">' + t('music') + '</h2><div class="music-track-list">';
+  tracks.forEach(function(track, i) {
+    h += '<div class="music-track" data-index="' + i + '" role="button" tabindex="0">';
+    h += '<i class="ri-music-2-line"></i>';
+    h += '<span class="music-track-title">' + escHtml(track.title) + '</span>';
+    h += '<span class="music-track-artist">' + escHtml(track.artist) + '</span>';
+    h += '</div>';
+  });
+  h += '</div></section>';
+  return h;
+}
+
+function renderBlock(block) {
+  if (block.type === 'text') return '<div class="post-content">' + block.html + '</div>';
+  if (block.type === 'gallery') return renderGallery(block.photos, (site.gallerySingleThreshold || 5));
+  if (block.type === 'photo') return renderGallery([block.photo], (site.gallerySingleThreshold || 5));
+  if (block.type === 'videos') return renderVideos(block.videos, block.mode || 'stacked');
+  if (block.type === 'video') {
+    var v = block.video;
+    return '<section class="video-section"><div class="video-container" data-video-index="0" data-total="1">' +
+      videoElementHTML(v) + videoControlsHTML(!!v.sources, false, 1) +
+      '</div></section>';
+  }
+  if (block.type === 'music') return renderMusicBlock(block.tracks);
+  return '';
+}
 %>
 <!DOCTYPE html>
 <html lang="<%= site.language || 'zh-CN' %>">
@@ -184,35 +220,11 @@ function renderGallery(photos, threshold) {
       <% } %>
     </header>
 
-    <!-- Layout: video-first -->
-    <% if (ly === 'video-first') { %>
-      <%- renderVideos(post.videos, post.videoMode || 'stacked') %>
-      <div class="post-content"><%- post.bodyHTML %></div>
-      <%- renderGallery(post.photos, (site.gallerySingleThreshold || 5)) %>
-    <% } else if (ly === 'gallery-first') { %>
-      <%- renderGallery(post.photos, (site.gallerySingleThreshold || 5)) %>
-      <div class="post-content"><%- post.bodyHTML %></div>
-      <%- renderVideos(post.videos, post.videoMode || 'stacked') %>
-    <% } else { %>
-      <!-- Default: body -> gallery -> videos -->
-      <div class="post-content"><%- post.bodyHTML %></div>
-      <%- renderGallery(post.photos, (site.gallerySingleThreshold || 5)) %>
-      <%- renderVideos(post.videos, post.videoMode || 'stacked') %>
-    <% } %>
-
+    <!-- Content blocks (ordered: text / gallery / videos / music) -->
+    <% (post.blocks || []).forEach(function(block) { %>
+      <%- renderBlock(block) %>
+    <% }); %>
     <% if (post.music && post.music.length) { %>
-    <section class="music-section">
-      <h2 class="section-title"><%= t('music') %></h2>
-      <div class="music-track-list">
-        <% post.music.forEach(function(track, i) { %>
-        <div class="music-track" data-index="<%= i %>" role="button" tabindex="0">
-          <i class="ri-music-2-line"></i>
-          <span class="music-track-title"><%= track.title %></span>
-          <span class="music-track-artist"><%= track.artist %></span>
-        </div>
-        <% }); %>
-      </div>
-    </section>
     <script>window.__MUSIC_TRACKS=<%- JSON.stringify(post.music).replace(/</g, '\\u003c') %>;</script>
     <% } %>
 

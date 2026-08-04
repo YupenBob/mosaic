@@ -6,9 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
-import { marked } from 'marked';
 import ejs from 'ejs';
 import { videoBase } from './media-names.mjs';
+import { buildBlocks } from './blocks.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -69,8 +69,6 @@ for (const dir of postDirs) {
       .trim();
   const layout = data.layout || 'default';
   const videoMode = data.video_mode || 'stacked';
-  const bodyHTML = marked.parse(content, { breaks: false, gfm: true });
-
   // ── Photos ──
   const photos = [];
   const photosDir = path.join(postPath, 'photos');
@@ -240,6 +238,16 @@ for (const dir of postDirs) {
     if (!t.cover && cover) t.cover = cover;
   }
 
+  // ── Content blocks ──
+  const { blocks, bodyHTML } = buildBlocks({
+    body: content,
+    photos,
+    videos,
+    music,
+    layout,
+    videoMode,
+  });
+
   const stats = { views: data.views || 0, likes: data.likes || 0, dwell_time: data.dwell_time || 0 };
   if (coverAspect > 1.5) coverAspect = 1.5;
   if (coverAspect < (SITE.coverAspectMin || 0.5625)) coverAspect = SITE.coverAspectMin || 0.5625;
@@ -256,6 +264,7 @@ for (const dir of postDirs) {
     coverAspect,
     coverSrcset,
     bodyHTML,
+    blocks,
     photos,
     videos,
     music,
