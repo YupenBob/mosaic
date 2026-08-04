@@ -125,7 +125,7 @@ date: 2026-05-01            # 必填
 category: travel            # 默认 uncategorized，支持 photography/nature 多级
 tags: [landscape, travel]   # 标签数组
 description: "摘要"          # 缺省从正文截取
-cover: cover.jpg            # 封面文件名；留空自动检测（视频截帧 > 首张照片）
+cover: cover.jpg            # 封面文件名，或 video:N / photo:N（媒体索引），留空自动检测（视频截帧 > 首张照片）
 layout: default             # default | video-first | gallery-first
 video_mode: stacked         # stacked | playlist
 ---

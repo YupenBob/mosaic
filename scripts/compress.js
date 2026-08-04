@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { execSync, execFile, spawn } from 'child_process';
 import sharp from 'sharp';
+import { videoBase } from './media-names.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -257,12 +258,8 @@ const ALL_RES = [
   { name: '240p', height: 240, bw: 250000, label: '426x240' },
 ];
 
-async function compressVideo(file, postDir, slug) {
-  const baseName =
-    path
-      .parse(file)
-      .name.replace(/[^a-zA-Z0-9_-]/g, '')
-      .slice(0, 60) || 'video';
+async function compressVideo(file, postDir, slug, seen) {
+  const baseName = videoBase(file, seen);
   const srcPath = path.join(postDir, 'videos', file);
   const outDir = path.join(DIST, 'posts', slug, 'media', 'videos');
   fs.mkdirSync(outDir, { recursive: true });
@@ -455,7 +452,8 @@ for (const slug of POSTS) {
   await compressCover(postDir, slug);
   const videosDir = path.join(postDir, 'videos');
   if (fs.existsSync(videosDir)) {
-    for (const f of fs.readdirSync(videosDir)) {
+    const seenVideos = new Set();
+    for (const f of fs.readdirSync(videosDir).sort()) {
       if (/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) {
         const src = path.join(videosDir, f);
         if (!forceReprocess && !changed(src)) {
@@ -464,7 +462,7 @@ for (const slug of POSTS) {
           continue;
         }
         reportCurrent(`${slug}/videos/${f}`);
-        await compressVideo(f, postDir, slug);
+        await compressVideo(f, postDir, slug, seenVideos);
         tick(`${slug}/videos/${f}`);
       }
     }

@@ -119,7 +119,7 @@ date: 2026-05-01
 category: photography/nature
 tags: [风光, 旅行]
 description: "一场影像之旅。"
-cover: cover.jpg            # 文件名，或留空自动检测（视频截帧 > 首张照片）
+cover: cover.jpg            # 文件名，或 video:N / photo:N（媒体索引），留空自动检测（视频截帧 > 首张照片）
 layout: default             # default | video-first | gallery-first
 video_mode: stacked         # stacked | playlist
 ---

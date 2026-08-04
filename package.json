@@ -7,7 +7,7 @@
     "compress": "node scripts/compress.js",
     "build": "node scripts/generate.js && node scripts/generate-brand-assets.js && node scripts/minify.mjs",
     "serve": "npx serve dist",
-    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs scripts/sync-proxy.mjs scripts/minify.mjs scripts/validate-config.mjs shared/pages-proxy.mjs && node scripts/sync-proxy.mjs --check && node scripts/validate-config.mjs && node tests/worker-smoke.mjs && node tests/build-smoke.mjs",
+    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs scripts/sync-proxy.mjs scripts/minify.mjs scripts/validate-config.mjs scripts/media-names.mjs shared/pages-proxy.mjs && node scripts/sync-proxy.mjs --check && node scripts/validate-config.mjs && node tests/worker-smoke.mjs && node tests/build-smoke.mjs",
     "validate": "node scripts/validate-config.mjs",
     "minify": "node scripts/minify.mjs",
     "test:e2e:local": "node tests/local-e2e.mjs",

@@ -126,11 +126,11 @@ function renderGallery(photos, threshold) {
     <% var postUrl = (site.url || '') + '/posts/' + post.slug + '/'; %>
   <meta property="og:type" content="article" />
   <meta property="og:url" content="<%= postUrl %>" />
-  <% if (post.cover) { %><meta property="og:image" content="<%= (site.url || '') + '/posts/' + post.slug + '/' + post.cover %>" /><% } else { %><meta property="og:image" content="<%= (site.url || '') %>/assets/og-card.png" /><% } %>
+  <% if (post.cover) { %><meta property="og:image" content="<%= post.cover %>" /><% } else { %><meta property="og:image" content="<%= (site.url || '') %>/assets/og-card.png" /><% } %>
   <meta property="og:site_name" content="<%= site.title %>" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="<%= pageDataTitle %>" />
-  <% if (post.cover) { %><meta name="twitter:image" content="<%= (site.url || '') + '/posts/' + post.slug + '/' + post.cover %>" /><% } %>
+  <% if (post.cover) { %><meta name="twitter:image" content="<%= post.cover %>" /><% } %>
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"BlogPosting","headline":"<%= post.title %>","description":"<%= post.description %>","datePublished":"<%= post.date %>","url":"<%= postUrl %>"}
   </script>

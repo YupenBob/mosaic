@@ -63,7 +63,8 @@ MP4（推荐）、MOV、AVI、MKV、WebM。
 ## 封面
 
 1. 显式指定：`cover: cover.jpg`（或 `cover.png`/`cover.webp`）
-2. 自动检测：视频海报帧 → 首张照片
+2. 引用媒体：`cover: video:0`（第 1 个视频的海报帧）或 `cover: photo:0`（第 1 张照片的 480p 档）
+3. 自动检测：视频海报帧 → 首张照片
 
 封面尊重原图宽高比（`coverAspectMin/Max` 约束），卡片展示时超过 1.5 会统一裁切为 1.5。
 

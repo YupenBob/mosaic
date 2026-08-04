@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
 import { marked } from 'marked';
 import ejs from 'ejs';
+import { videoBase } from './media-names.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -93,10 +94,10 @@ for (const dir of postDirs) {
   const videos = [];
   const videosDir = path.join(postPath, 'videos');
   if (fs.existsSync(videosDir)) {
+    const seenVideos = new Set();
     for (const f of fs.readdirSync(videosDir).sort()) {
       if (!/\.(mp4|mov|avi|mkv|webm)$/i.test(f)) continue;
-      const rawBase = path.parse(f).name;
-      const base = rawBase.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'video';
+      const base = videoBase(f, seenVideos);
       const poster = pUrl(slug, 'videos', base + '-poster.jpg');
 
       // Compressed tier list: prefer the compress manifest (works on cache-hit
@@ -179,20 +180,37 @@ for (const dir of postDirs) {
   let coverSrcset = null;
   let coverAspect = 1.778;
 
+  // Media-index cover syntax written by the admin editor: video:N / photo:N.
+  const photoAspectOf = (base) => {
+    try {
+      return JSON.parse(
+        fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'photos', `${base}-meta.json`), 'utf-8'),
+      ).aspect;
+    } catch {
+      const a = parseFloat(mediaChecksums[`__photo-meta__/${slug}/${base}`]);
+      return Number.isFinite(a) ? a : null;
+    }
+  };
+  const videoIdx = /^video:(\d+)$/.exec(cover);
+  const photoIdx = /^photo:(\d+)$/.exec(cover);
+  if (videoIdx) {
+    cover = videos[Number(videoIdx[1])]?.poster || '';
+  } else if (photoIdx) {
+    const photo = photos[Number(photoIdx[1])];
+    if (photo) {
+      cover = photo.src480;
+      coverAspect = photoAspectOf(photo.base) || coverAspect;
+    } else {
+      cover = '';
+    }
+  }
+
   // Auto-detect cover
   if (!cover) {
     if (videos.length && videos[0].poster) cover = videos[0].poster;
     else if (photos.length) {
       cover = photos[0].src480;
-      try {
-        const meta = JSON.parse(
-          fs.readFileSync(path.join(DIST, 'posts', slug, 'media', 'photos', `${photos[0].base}-meta.json`), 'utf-8'),
-        );
-        coverAspect = meta.aspect || 1.5;
-      } catch {
-        const a = parseFloat(mediaChecksums[`__photo-meta__/${slug}/${photos[0].base}`]);
-        if (Number.isFinite(a)) coverAspect = a;
-      }
+      coverAspect = photoAspectOf(photos[0].base) || 1.5;
     }
   }
   // Check if compressed cover exists (manual cover, not auto-detected from media)
@@ -224,6 +242,7 @@ for (const dir of postDirs) {
 
   const stats = { views: data.views || 0, likes: data.likes || 0, dwell_time: data.dwell_time || 0 };
   if (coverAspect > 1.5) coverAspect = 1.5;
+  if (coverAspect < (SITE.coverAspectMin || 0.5625)) coverAspect = SITE.coverAspectMin || 0.5625;
   posts.push({
     slug,
     title,
