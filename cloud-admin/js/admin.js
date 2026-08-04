@@ -50,6 +50,7 @@ let _dirtyPollTimer = null;
 let _buildPollTimer = null;
 let _buildRunning = false;
 let _currentBuildRun = null;
+let _prevBuildRunning = false;
 let _lastHash = '';
 
 // ── Router ─────────────────────────────────
@@ -301,6 +302,12 @@ async function pollBuildStatus() {
     const running = !!(s && (s.status === 'in_progress' || s.status === 'queued'));
     _buildRunning = running;
     _currentBuildRun = running ? s : null;
+    // Build finished while the admin was on any page — report completion so
+    // the dirty flag (and banner) reflects the real deploy state.
+    if (_prevBuildRunning && !running && s && (s.conclusion === 'success' || s.conclusion === 'failure')) {
+      build.done({ success: s.conclusion === 'success' }).catch(() => {});
+    }
+    _prevBuildRunning = running;
     if (running) showBuildingBanner(s);
     else if (window.checkDirty) window.checkDirty();
     if (!s || !s.status || s.status === 'unknown') {
