@@ -163,10 +163,13 @@ export default async function renderBuild(signal) {
               if (s.conclusion === 'success') {
                 toast(t('build.terminalSuccess', { n: s.runNumber }), 'success', 6000);
                 document.title = t('build.terminalSuccess', { n: s.runNumber }) + ' — Mosaic Cloud Admin';
+                build.done({ success: true }).catch(() => {});
               } else if (s.conclusion === 'failure') {
                 toast(t('build.terminalFailed', { n: s.runNumber }), 'error', 9000);
                 document.title = t('build.terminalFailed', { n: s.runNumber }) + ' — Mosaic Cloud Admin';
+                build.done({ success: false }).catch(() => {});
               }
+              window.checkDirty && window.checkDirty();
             }
             prevStatus = s.status;
           }

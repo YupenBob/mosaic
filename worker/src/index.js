@@ -4,7 +4,7 @@
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { loginHandler, authMiddleware, clientIp } from './auth.js';
+import { loginHandler, authMiddleware, clientIp, verifyToken } from './auth.js';
 import {
   listPosts,
   getPost,
@@ -461,6 +461,27 @@ app.get('/api/build/history', async (c) => {
     });
   } catch (e) {
     return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502);
+  }
+});
+
+// Build completion hook — clears the dirty flag on success, re-marks it on
+// failure, so the admin banner reflects "changes not yet deployed" correctly.
+// Authenticated with an admin JWT (the pipeline may later pass a shared secret).
+app.post('/api/build/done', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '');
+    const auth = await verifyToken(c, token);
+    if (!auth.ok) return c.json({ error: 'Unauthorized', code: 'AUTH_REQUIRED' }, auth.status || 401);
+    const body = await c.req.json().catch(() => ({}));
+    if (body.success === false) {
+      await markDirty(c.env);
+      return c.json({ ok: true, dirty: true });
+    }
+    await clearDirty(c.env);
+    return c.json({ ok: true, dirty: false });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'BUILD_DONE_ERROR' }, 502);
   }
 });
 

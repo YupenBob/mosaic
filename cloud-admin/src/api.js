@@ -123,6 +123,9 @@ export const upload = {
 export const build = {
   status: () => apiFetch('/build/status'),
 
+  /** Report build completion: {success: true} clears the dirty flag, false re-marks it. */
+  done: (body = {}) => apiFetch('/build/done', { method: 'POST', body: JSON.stringify(body) }),
+
   history: () => apiFetch('/build/history'),
 
   trigger: () => apiFetch('/build', { method: 'POST' }),

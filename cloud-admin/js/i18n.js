@@ -28,7 +28,12 @@ export const I18N = {
       groupData: '数据',
       home: '首页',
     },
-    dirty: { goBuild: '前往构建', text: '{count} 项未构建的更改{ago}。点击此处触发构建', ago: '（最后修改 {time}）' },
+    dirty: {
+      goBuild: '前往构建',
+      text: '{count} 项未构建的更改{ago}。点击此处触发构建',
+      ago: '（最后修改 {time}）',
+      building: '正在构建…',
+    },
     common: {
       error: '错误',
       delete: '删除',
@@ -464,6 +469,7 @@ export const I18N = {
       goBuild: 'Go to Build',
       text: '{count} unbuilt changes{ago}. Click to build',
       ago: ' (last modified {time})',
+      building: 'Building…',
     },
     common: {
       error: 'Error',

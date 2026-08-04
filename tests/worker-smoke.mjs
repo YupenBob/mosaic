@@ -427,7 +427,26 @@ await record('usage snapshot (disk rebuilds, uploads/deletes adjust)', async () 
   assert.ok(afterDelete.size <= afterUpload.size, 'size decreased after delete');
 });
 
+// ── 14. Build done hook (dirty lifecycle) ──
+await record('build done hook (auth, clear on success, re-mark on failure)', async () => {
+  const unauth = await call('/api/build/done', { method: 'POST', body: { success: true } });
+  assert.equal(unauth.status, 401);
+
+  const before = await (await call('/api/dirty', { token: TOKEN })).json();
+  assert.ok(before.count >= 1, 'dirty is set (uploads earlier)');
+
+  const ok = await call('/api/build/done', { method: 'POST', token: TOKEN, body: { success: true } });
+  assert.equal(ok.status, 200);
+  const after = await (await call('/api/dirty', { token: TOKEN })).json();
+  assert.equal(after.count, 0, 'dirty cleared after successful build');
+
+  const fail = await call('/api/build/done', { method: 'POST', token: TOKEN, body: { success: false } });
+  assert.equal(fail.status, 200);
+  const reMarked = await (await call('/api/dirty', { token: TOKEN })).json();
+  assert.ok(reMarked.count >= 1, 'dirty re-marked after failed build');
+});
+
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 19) process.exit(1);
+if (passed < 20) process.exit(1);

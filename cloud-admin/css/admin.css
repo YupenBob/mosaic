@@ -239,8 +239,28 @@ textarea {
   flex-shrink: 0;
   animation: slideDown 200ms ease;
 }
-.dirty-banner i:first-child {
+.dirty-banner .dirty-banner-icon {
   font-size: 15px;
+}
+.dirty-banner.is-building {
+  background: #4361ee;
+}
+.dirty-banner-spinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: dirty-spin 0.8s linear infinite;
+}
+@keyframes dirty-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dirty-banner.is-building .dirty-banner-icon {
+  display: none;
 }
 .dirty-banner-cta {
   color: #fff;

@@ -48,6 +48,8 @@ const pages = {
 
 let _dirtyPollTimer = null;
 let _buildPollTimer = null;
+let _buildRunning = false;
+let _currentBuildRun = null;
 let _lastHash = '';
 
 // ── Router ─────────────────────────────────
@@ -193,6 +195,9 @@ window.toggleLoginPassword = () => {
 function showDirtyBanner(count, last) {
   const b = document.getElementById('dirty-banner');
   if (!b) return;
+  b.classList.remove('is-building');
+  const spinner = document.getElementById('dirty-banner-spinner');
+  if (spinner) spinner.hidden = true;
   const ago = last ? t('dirty.ago', { time: formatTime(last) }) : '';
   document.getElementById('dirty-banner-text').textContent = t('dirty.text', { count, ago });
   b.style.display = 'flex';
@@ -205,7 +210,25 @@ function showDirtyBanner(count, last) {
 
 function hideDirtyBanner() {
   const b = document.getElementById('dirty-banner');
-  if (b) b.style.display = 'none';
+  if (b) {
+    b.style.display = 'none';
+    b.classList.remove('is-building');
+    const spinner = document.getElementById('dirty-banner-spinner');
+    if (spinner) spinner.hidden = true;
+  }
+  const badge = document.getElementById('nav-build-badge');
+  if (badge) badge.style.display = 'none';
+}
+
+function showBuildingBanner(run) {
+  const b = document.getElementById('dirty-banner');
+  if (!b) return;
+  b.classList.add('is-building');
+  const spinner = document.getElementById('dirty-banner-spinner');
+  if (spinner) spinner.hidden = false;
+  const runLabel = run && run.runNumber ? ' #' + run.runNumber : '';
+  document.getElementById('dirty-banner-text').textContent = t('dirty.building') + runLabel;
+  b.style.display = 'flex';
   const badge = document.getElementById('nav-build-badge');
   if (badge) badge.style.display = 'none';
 }
@@ -218,6 +241,10 @@ window.checkDirty = async () => {
     const resp = await fetch(API + '/dirty', { headers: { Authorization: 'Bearer ' + token } });
     if (resp.ok) {
       const dirty = await resp.json();
+      if (_buildRunning) {
+        showBuildingBanner(_currentBuildRun);
+        return;
+      }
       if (dirty.count > 0) showDirtyBanner(dirty.count, dirty.last);
       else hideDirtyBanner();
     }
@@ -271,6 +298,11 @@ async function pollBuildStatus() {
   if (!dot) return;
   try {
     const s = await build.status().catch(() => null);
+    const running = !!(s && (s.status === 'in_progress' || s.status === 'queued'));
+    _buildRunning = running;
+    _currentBuildRun = running ? s : null;
+    if (running) showBuildingBanner(s);
+    else if (window.checkDirty) window.checkDirty();
     if (!s || !s.status || s.status === 'unknown') {
       dot.className = 'status-dot';
       dot.title = '';

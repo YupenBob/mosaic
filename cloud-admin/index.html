@@ -73,7 +73,8 @@
     <div id="app" style="display: none; flex-direction: column">
       <!-- Dirty banner — full width above topbar -->
       <div id="dirty-banner" class="dirty-banner" style="display: none" role="status">
-        <i class="ri-error-warning-line"></i>
+        <span id="dirty-banner-spinner" class="dirty-banner-spinner" hidden></span>
+        <i id="dirty-banner-icon" class="ri-error-warning-line dirty-banner-icon"></i>
         <span id="dirty-banner-text"></span>
         <button class="btn btn-secondary btn-sm dirty-banner-cta" onclick="location.hash = 'build'">
           <i class="ri-tools-line"></i> <span data-i18n="dirty.goBuild">前往构建</span>

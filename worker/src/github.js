@@ -44,14 +44,25 @@ export async function markDirty(env) {
   } else _dirtyState = { count: 1, last: now };
   try {
     await env.MEDIA.put(DIRTY_KEY, JSON.stringify(_dirtyState), { httpMetadata: { contentType: 'application/json' } });
-  } catch {}
+  } catch (e) {
+    console.error('markDirty: R2 write failed (memory state kept for this session)', e.message);
+  }
 }
 
 export async function clearDirty(env) {
   _dirtyState = null;
   try {
     await env.MEDIA.delete(DIRTY_KEY);
-  } catch {}
+  } catch (e) {
+    // If the delete fails, the next isDirty() read would resurrect the stale
+    // R2 flag — retry once and surface the error instead of swallowing it.
+    console.error('clearDirty: R2 delete failed, retrying', e.message);
+    try {
+      await env.MEDIA.delete(DIRTY_KEY);
+    } catch (e2) {
+      console.error('clearDirty: retry failed — banner may persist until next build', e2.message);
+    }
+  }
 }
 
 // ====== Contents API ======
