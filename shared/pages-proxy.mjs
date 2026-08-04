@@ -1,8 +1,4 @@
 /**
- * AUTO-GENERATED — do not edit directly.
- * Source: shared/pages-proxy.mjs — run `node scripts/sync-proxy.mjs`.
- */
-/**
  * Canonical Pages Function proxy for Mosaic.
  *
  * Deployed copies (regenerate with `node scripts/sync-proxy.mjs`):

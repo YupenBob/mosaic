@@ -19,8 +19,29 @@ function defer(c, fn) {
   fn();
 }
 
-// CORS for cloud-admin
-app.use('*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
+// ── CORS ──
+// Public read/track endpoints stay wide open (*); everything else (admin
+// auth/config/posts/upload/build) only reflects an Origin that is explicitly
+// allowlisted (ALLOWED_ORIGINS, comma-separated; default: admin domain).
+const PUBLIC_CORS_PREFIXES = ['/api/health', '/api/stats/', '/api/track/', '/api/media/'];
+const DEFAULT_ALLOWED_ORIGINS = 'https://mosaic-admin.xsanye.cn';
+
+function isPublicPath(path) {
+  return PUBLIC_CORS_PREFIXES.some((p) => path.startsWith(p));
+}
+
+app.use('*', cors({
+  origin: (origin, c) => {
+    if (isPublicPath(new URL(c.req.url).pathname)) return '*';
+    const allowed = (c.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return origin && allowed.includes(origin) ? origin : null;
+  },
+  allowHeaders: ['Authorization', 'Content-Type'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+}));
 
 // ====== Auth (no middleware) ======
 app.post('/api/auth/login', loginHandler);
@@ -103,7 +124,7 @@ app.post('/api/track/view/:slug', async (c) => {
   try {
     const resp = await statsFetch(c, '/view', slug, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Real-IP': clientIp(c) },
+      headers: { 'Content-Type': 'application/json', 'X-Real-IP': await clientIp(c) },
       body: '{}',
     });
     return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });

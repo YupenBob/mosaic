@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import app from '../worker/src/index.js';
 import { StatsDurableObject } from '../worker/src/stats-do.js';
+import { clientIp } from '../worker/src/auth.js';
 
 // ── Mock R2 ──
 const store = new Map();
@@ -255,7 +256,88 @@ await record('login rate limit (429 after 5 failures)', async () => {
   assert.equal(last, 429);
 });
 
+// ── 11. HMAC client IP verification ──
+const signHmac = async (secret, message) => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+
+const hmacIp = (headers) => {
+  const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+  return clientIp({
+    env: { PROXY_SECRET: 'proxy-secret-1' },
+    req: { header: (n) => lower[n.toLowerCase()] || '' },
+  });
+};
+
+await record('HMAC client IP (valid signature passes)', async () => {
+  const bucket = Math.floor(Date.now() / 60000);
+  const ip = '203.0.113.7';
+  const sig = await signHmac('proxy-secret-1', `${ip}:${bucket}`);
+  assert.equal(await hmacIp({
+    'X-Mosaic-Proxy-IP': ip,
+    'X-Mosaic-Proxy-Time': String(bucket),
+    'X-Mosaic-Proxy-Sig': sig,
+  }), ip);
+});
+
+await record('HMAC client IP (forged signature rejected)', async () => {
+  const bucket = Math.floor(Date.now() / 60000);
+  const sig = await signHmac('wrong-secret', `203.0.113.7:${bucket}`);
+  const got = await hmacIp({
+    'X-Mosaic-Proxy-IP': '203.0.113.7',
+    'X-Mosaic-Proxy-Time': String(bucket),
+    'X-Mosaic-Proxy-Sig': sig,
+    'CF-Connecting-IP': '198.51.100.9',
+  });
+  assert.equal(got, '198.51.100.9');
+});
+
+await record('HMAC client IP (expired window rejected)', async () => {
+  const oldBucket = Math.floor(Date.now() / 60000) - 10;
+  const ip = '203.0.113.7';
+  const sig = await signHmac('proxy-secret-1', `${ip}:${oldBucket}`);
+  const got = await hmacIp({
+    'X-Mosaic-Proxy-IP': ip,
+    'X-Mosaic-Proxy-Time': String(oldBucket),
+    'X-Mosaic-Proxy-Sig': sig,
+    'CF-Connecting-IP': '198.51.100.10',
+  });
+  assert.equal(got, '198.51.100.10');
+});
+
+await record('HMAC client IP (legacy static header accepted)', async () => {
+  const got = await hmacIp({
+    'X-Mosaic-Proxy': 'proxy-secret-1',
+    'X-Real-IP': '203.0.113.8',
+  });
+  assert.equal(got, '203.0.113.8');
+});
+
+// ── 12. CORS allowlist ──
+await record('CORS allowlist (admin allowed, others blocked, public open)', async () => {
+  const allowed = await call('/api/config', { token: TOKEN, headers: { Origin: 'https://mosaic-admin.xsanye.cn' } });
+  assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://mosaic-admin.xsanye.cn');
+  const blocked = await call('/api/config', { token: TOKEN, headers: { Origin: 'https://evil.example' } });
+  assert.equal(blocked.headers.get('access-control-allow-origin'), null);
+  const custom = await call('/api/config', {
+    token: TOKEN,
+    headers: { Origin: 'https://admin2.example' },
+    bindings: env({ ALLOWED_ORIGINS: 'https://admin2.example' }),
+  });
+  assert.equal(custom.headers.get('access-control-allow-origin'), 'https://admin2.example');
+  const pub = await call('/api/health', { headers: { Origin: 'https://evil.example' } });
+  assert.equal(pub.headers.get('access-control-allow-origin'), '*');
+});
+
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 13) process.exit(1);
+if (passed < 18) process.exit(1);

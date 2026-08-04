@@ -59,7 +59,9 @@ npx wrangler secret put <NAME>      # 设置：ADMIN_PASSWORD/JWT_SECRET/GITHUB_
 
 - 预签名直传：浏览器 → R2，单文件最大 5GB，1 小时有效期
 - Worker 直传兜底：≤100MB（平台请求体上限）
-- `PROXY_SECRET` 缺失时，Worker 回退使用 `CF-Connecting-IP`（本地开发场景）
+- 访客 IP 信任：Pages 代理用 `PROXY_SECRET` 对 `IP:分钟桶` 做 HMAC-SHA256 签名（请求头 `X-Mosaic-Proxy-IP / X-Mosaic-Proxy-Time / X-Mosaic-Proxy-Sig`），Worker 校验签名（±2 分钟窗口），失败回退 `CF-Connecting-IP`；旧静态头方案（`X-Mosaic-Proxy` + `X-Real-IP`）兼容一个发布周期后移除。两份代理文件由 `node scripts/sync-proxy.mjs` 从 `shared/pages-proxy.mjs` 同步，勿手改 `functions/api/[[path]].js` 与 `cloud-admin/functions/api/[[path]].js`
+- 管理端点 CORS 白名单：`ALLOWED_ORIGINS`（逗号分隔，默认 `https://mosaic-admin.xsanye.cn`）；`/api/health*`、`/api/stats/*`、`/api/track/*`、`/api/media/*` 保持 `*` 开放
+- 登录限流（5 次/5 分钟）与浏览去重（10 分钟/IP）为 per-isolate 内存实现，多隔离部署下属 best-effort，不保证全局精确
 
 ## 生产巡检
 

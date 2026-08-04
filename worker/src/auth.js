@@ -28,20 +28,59 @@ export function secretFor(c) {
 
 /**
  * Resolve the real client IP.
- * - The Pages Functions proxy forwards the visitor's CF-Connecting-IP as
- *   X-Real-IP and signs it with X-Mosaic-Proxy (shared PROXY_SECRET), so the
- *   Worker can trust it without letting direct callers spoof it.
+ * - The Pages Functions proxy signs the visitor's CF-Connecting-IP with an
+ *   HMAC-SHA256 (X-Mosaic-Proxy-IP + X-Mosaic-Proxy-Time + X-Mosaic-Proxy-Sig),
+ *   so the Worker can trust it without letting direct callers spoof it.
+ * - Legacy transition: the previous static-header scheme (X-Mosaic-Proxy ===
+ *   secret with X-Real-IP) is still accepted for one release cycle.
  * - When PROXY_SECRET is not configured (local dev), fall back to X-Real-IP /
  *   CF-Connecting-IP as-is.
  */
-export function clientIp(c) {
+export async function clientIp(c) {
   const proxySecret = c.env.PROXY_SECRET;
-  const viaProxy = c.req.header('X-Mosaic-Proxy') || '';
-  const realIp = c.req.header('X-Real-IP') || '';
   if (proxySecret) {
-    return viaProxy === proxySecret && realIp ? realIp : (c.req.header('CF-Connecting-IP') || 'unknown');
+    const signedIp = c.req.header('X-Mosaic-Proxy-IP') || '';
+    const sig = c.req.header('X-Mosaic-Proxy-Sig') || '';
+    const time = c.req.header('X-Mosaic-Proxy-Time') || '';
+    if (signedIp && sig && /^\d+$/.test(time) && (await verifyHmac(proxySecret, `${signedIp}:${time}`, sig))) {
+      return signedIp;
+    }
+    const legacy = c.req.header('X-Mosaic-Proxy') || '';
+    const legacyIp = c.req.header('X-Real-IP') || '';
+    if (legacy === proxySecret && legacyIp) return legacyIp;
+    return c.req.header('CF-Connecting-IP') || 'unknown';
   }
-  return realIp || c.req.header('CF-Connecting-IP') || 'unknown';
+  return c.req.header('X-Real-IP') || c.req.header('CF-Connecting-IP') || 'unknown';
+}
+
+// Accepted clock skew between the Pages proxy and the Worker (minute buckets).
+const HMAC_WINDOW_BUCKETS = 2;
+
+async function hmacHex(secret, message) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function safeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function verifyHmac(secret, message, providedSig) {
+  const bucket = Number(message.slice(message.lastIndexOf(':') + 1));
+  const now = Math.floor(Date.now() / 60000);
+  if (!Number.isInteger(bucket) || Math.abs(now - bucket) > HMAC_WINDOW_BUCKETS) return false;
+  const expected = await hmacHex(secret, message);
+  return safeEqual(expected, String(providedSig).toLowerCase());
 }
 
 // ── Login rate limiting (in-memory, per-isolate) ──
@@ -73,7 +112,7 @@ function resetFailures(ip) {
 
 export async function loginHandler(c) {
   const { password } = await c.req.json().catch(() => ({}));
-  const ip = clientIp(c);
+  const ip = await clientIp(c);
   const adminPw = c.env.ADMIN_PASSWORD || '';
   const secret = secretFor(c);
 
