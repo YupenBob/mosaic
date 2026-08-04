@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: mosaic-pipeline
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '20'
   R2_BUCKET: mosaic-media
@@ -12,7 +16,9 @@ env:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Media transcoding of large source videos dominates runtime (a ~900MB 4K
+    # drone clip takes ~26min for 5 tiers); give the job real headroom.
+    timeout-minutes: 90
     permissions:
       contents: read
       pages: write
@@ -98,7 +104,11 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: dist/.media-checksums.json
-          key: media-checksums-${{ github.sha }}
+          # Unique per run so concurrent same-SHA runs (push + manual dispatch)
+          # don't collide on the same key and drop the cache (which would force
+          # every build to re-transcode all media). Restore still matches via
+          # the `media-checksums-` prefix in restore-keys.
+          key: media-checksums-${{ github.sha }}-${{ github.run_id }}
 
       - name: Progress — generate site
         env:
