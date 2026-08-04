@@ -168,6 +168,9 @@ export default async function renderBuild(signal) {
                 toast(t('build.terminalFailed', { n: s.runNumber }), 'error', 9000);
                 document.title = t('build.terminalFailed', { n: s.runNumber }) + ' — Mosaic Cloud Admin';
                 build.done({ success: false }).catch(() => {});
+              } else if (s.conclusion === 'cancelled') {
+                toast(t('build.cancelled'), 'info', 6000);
+                build.done({ success: false }).catch(() => {});
               }
               window.checkDirty && window.checkDirty();
             }

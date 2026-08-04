@@ -304,7 +304,12 @@ async function pollBuildStatus() {
     _currentBuildRun = running ? s : null;
     // Build finished while the admin was on any page — report completion so
     // the dirty flag (and banner) reflects the real deploy state.
-    if (_prevBuildRunning && !running && s && (s.conclusion === 'success' || s.conclusion === 'failure')) {
+    if (
+      _prevBuildRunning &&
+      !running &&
+      s &&
+      (s.conclusion === 'success' || s.conclusion === 'failure' || s.conclusion === 'cancelled')
+    ) {
       build.done({ success: s.conclusion === 'success' }).catch(() => {});
     }
     _prevBuildRunning = running;
