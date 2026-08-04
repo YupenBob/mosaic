@@ -160,7 +160,7 @@ function renderBlock(block) {
   <meta property="og:title" content="<%= pageDataTitle %>" />
   <meta property="og:description" content="<%= post.description %>" />
     <% var postUrl = (site.url || '') + '/posts/' + post.slug + '/'; %>
-  <meta property="og:type" content="article" />
+  <% if (post.type === 'video') { %><meta property="og:type" content="video.movie" /><% } else { %><meta property="og:type" content="article" /><% } %>
   <meta property="og:url" content="<%= postUrl %>" />
   <% if (post.cover) { %><meta property="og:image" content="<%= post.cover %>" /><% } else { %><meta property="og:image" content="<%= (site.url || '') %>/assets/og-card.png" /><% } %>
   <meta property="og:site_name" content="<%= site.title %>" />
@@ -174,7 +174,7 @@ function renderBlock(block) {
   <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
   <% } %>
 </head>
-<body data-page="post" data-slug="<%= post.slug %>" data-category="<%= post.category || '' %>" data-tags="<%= (post.tags || []).join(',') %>">
+<body data-page="post" data-slug="<%= post.slug %>" data-category="<%= post.category || '' %>" data-tags="<%= (post.tags || []).join(',') %>" data-post-type="<%= post.type || 'text' %>">
 
 <header class="header">
   <div class="container">

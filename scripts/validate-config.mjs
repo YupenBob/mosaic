@@ -64,8 +64,11 @@ if (fs.existsSync(CONTENT)) {
     const indexMd = path.join(postPath, 'index.md');
     if (!fs.statSync(postPath).isDirectory() || !fs.existsSync(indexMd)) continue;
     let data;
+    let content;
     try {
-      data = matter(fs.readFileSync(indexMd, 'utf8')).data;
+      const parsed = matter(fs.readFileSync(indexMd, 'utf8'));
+      data = parsed.data;
+      content = parsed.content;
     } catch (e) {
       fail(`${dir}/index.md frontmatter parse error: ${e.message}`);
       continue;
@@ -85,6 +88,46 @@ if (fs.existsSync(CONTENT)) {
         warn(`${dir}: cover "${data.cover}" not found under ${dir}/ (will be resolved by the pipeline)`);
       }
     }
+    if (data.blocks !== undefined) {
+      const allowed = ['text', 'gallery', 'videos', 'music', 'photo', 'video'];
+      if (!Array.isArray(data.blocks) || data.blocks.some((b) => typeof b !== 'string' || !allowed.includes(b))) {
+        warn(`${dir}: blocks must be an array of ${allowed.join('/')} (ignored)`);
+      }
+    }
+    // Content-block placeholders (valid positions only: alone on a line,
+    // surrounded by blank lines). Media may not be synced at validate time in
+    // CI, so range checks run only when the local media directory exists.
+    const photosCount = fs.existsSync(path.join(postPath, 'photos'))
+      ? fs.readdirSync(path.join(postPath, 'photos')).length
+      : 0;
+    const videosCount = fs.existsSync(path.join(postPath, 'videos'))
+      ? fs.readdirSync(path.join(postPath, 'videos')).length
+      : 0;
+    const knownKinds = ['gallery', 'videos', 'music', 'video', 'photo'];
+    const lines = String(content || '').split(/\r?\n/);
+    lines.forEach((line, i) => {
+      const m = /^\s*\{\{([a-zA-Z0-9:_-]+)\}\}\s*$/.exec(line);
+      if (!m) return;
+      const prevBlank = i === 0 || lines[i - 1].trim() === '';
+      const nextBlank = i === lines.length - 1 || lines[i + 1].trim() === '';
+      if (!prevBlank || !nextBlank) return;
+      const token = m[1];
+      const [kind, idxRaw] = token.split(':');
+      if (!knownKinds.includes(kind)) {
+        warn(`${dir}: unknown placeholder "{{${token}}}" (ignored)`);
+        return;
+      }
+      if (kind === 'video' || kind === 'photo') {
+        const idx = Number(idxRaw);
+        if (idxRaw === undefined || !Number.isInteger(idx) || idx < 0) {
+          warn(`${dir}: placeholder "{{${token}}}" has invalid index (ignored)`);
+        } else if (kind === 'video' && videosCount > 0 && idx >= videosCount) {
+          warn(`${dir}: {{video:${idx}}} out of range (${videosCount} video(s))`);
+        } else if (kind === 'photo' && photosCount > 0 && idx >= photosCount) {
+          warn(`${dir}: {{photo:${idx}}} out of range (${photosCount} photo(s))`);
+        }
+      }
+    });
   }
 }
 

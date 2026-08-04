@@ -122,6 +122,7 @@ description: "一场影像之旅。"
 cover: cover.jpg            # 文件名，或 video:N / photo:N（媒体索引），留空自动检测（视频截帧 > 首张照片）
 layout: default             # default | video-first | gallery-first
 video_mode: stacked         # stacked | playlist
+blocks: []                  # 可选：显式块顺序（正文含占位符时以占位符为准）
 ---
 ```
 

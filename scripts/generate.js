@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
 import ejs from 'ejs';
 import { videoBase } from './media-names.mjs';
-import { buildBlocks } from './blocks.mjs';
+import { buildBlocks, deriveType } from './blocks.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -246,7 +246,9 @@ for (const dir of postDirs) {
     music,
     layout,
     videoMode,
+    blocksOrder: Array.isArray(data.blocks) ? data.blocks : null,
   });
+  const type = deriveType(blocks);
 
   const stats = { views: data.views || 0, likes: data.likes || 0, dwell_time: data.dwell_time || 0 };
   if (coverAspect > 1.5) coverAspect = 1.5;
@@ -265,6 +267,7 @@ for (const dir of postDirs) {
     coverSrcset,
     bodyHTML,
     blocks,
+    type,
     photos,
     videos,
     music,

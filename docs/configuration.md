@@ -128,6 +128,7 @@ description: "摘要"          # 缺省从正文截取
 cover: cover.jpg            # 封面文件名，或 video:N / photo:N（媒体索引），留空自动检测（视频截帧 > 首张照片）
 layout: default             # default | video-first | gallery-first
 video_mode: stacked         # stacked | playlist
+blocks: []                  # 可选：显式块顺序 [text, gallery, videos, music]（正文含占位符时以占位符为准）
 ---
 ```
 

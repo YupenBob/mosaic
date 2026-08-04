@@ -23,6 +23,41 @@ content/posts/{slug}/
 └── music/            # 可选：音频（见 music-guide.md）
 ```
 
+## 内容编排（blocks）
+
+文章正文与媒体按**内容块**顺序渲染：
+
+- 默认顺序：`正文 → 画廊 → 视频 → 音乐`
+- `layout: gallery-first` / `video-first` 把对应媒体块移到最前（旧写法，兼容保留）
+
+正文中可用占位符自由混排（占位符必须**单独成行**，前后空行）：
+
+```markdown
+开头文字……
+
+{{gallery}}
+
+接着写正文，中间插入单张图：
+
+{{photo:0}}
+
+再放第一个视频：
+
+{{video:0}}
+
+结尾放全部视频与音乐：
+
+{{videos}}
+{{music}}
+```
+
+- `{{gallery}}`：画廊全部图片；`{{videos}}`：全部视频（stacked/playlist 由 `video_mode` 决定）；`{{music}}`：音乐列表
+- `{{photo:N}}` / `{{video:N}}`：渲染第 N 张图 / 第 N 个视频（从 0 计数）为单块
+- 未被占位符引用的媒体类型自动追加到末尾（不丢失、不重复）；越界引用（如 `{{video:9}}`）保持原样显示，便于发现
+- 有占位符时以占位符顺序为准；无占位符时也可用 frontmatter `blocks: [music, text, gallery, videos]` 显式排序
+
+文章类型 `post.type`（`text / gallery / video / music / mixed`）由内容块自动推导，用于 SEO 与数据。
+
 ## 图片
 
 ### 支持格式

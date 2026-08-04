@@ -4,7 +4,7 @@
  * Run: node tests/blocks-smoke.mjs
  */
 import assert from 'node:assert/strict';
-import { buildBlocks } from '../scripts/blocks.mjs';
+import { buildBlocks, deriveType } from '../scripts/blocks.mjs';
 
 let passed = 0;
 const results = [];
@@ -60,6 +60,92 @@ await record('videos block carries playlist mode', () => {
   assert.equal(blocks.find((b) => b.type === 'videos').mode, 'playlist');
 });
 
+await record('blocksOrder explicit ordering (no placeholders)', () => {
+  const { blocks } = buildBlocks({
+    body: 'Hello',
+    photos,
+    videos,
+    music,
+    blocksOrder: ['music', 'text', 'gallery'],
+  });
+  assert.deepEqual(
+    blocks.map((b) => b.type),
+    ['music', 'text', 'gallery'],
+  );
+});
+
+// ── Phase C: placeholder composition ──
+await record('placeholders interleave text and media', () => {
+  const body = 'Intro\n\n{{gallery}}\n\nMid\n\n{{video:0}}\n\nOut';
+  const { blocks } = buildBlocks({ body, photos, videos, music });
+  assert.deepEqual(
+    blocks.map((b) => b.type),
+    ['text', 'gallery', 'text', 'video', 'text', 'videos', 'music'],
+  );
+  assert.match(blocks[0].html, /Intro/);
+  assert.match(blocks[2].html, /Mid/);
+  assert.match(blocks[4].html, /Out/);
+  assert.equal(blocks[3].video.base, 'v1');
+});
+
+await record('unreferenced media appended once, no duplicates', () => {
+  const body = 'Hello\n\n{{gallery}}\n\nWorld';
+  const { blocks } = buildBlocks({ body, photos, videos, music });
+  const types = blocks.map((b) => b.type);
+  assert.deepEqual(types, ['text', 'gallery', 'text', 'videos', 'music']);
+  assert.equal(types.filter((t) => t === 'gallery').length, 1);
+  assert.equal(types.filter((t) => t === 'videos').length, 1);
+});
+
+await record('out-of-range video:N stays literal', () => {
+  const body = 'Hello\n\n{{video:9}}\n\nWorld';
+  const { blocks } = buildBlocks({ body, photos, videos, music });
+  assert.deepEqual(
+    blocks.map((b) => b.type),
+    ['text', 'gallery', 'videos', 'music'],
+  );
+  assert.match(blocks[0].html, /\{\{video:9\}\}/);
+});
+
+await record('placeholder not alone on a line stays literal', () => {
+  const body = 'See {{gallery}} here';
+  const { blocks } = buildBlocks({ body, photos, videos, music });
+  assert.deepEqual(
+    blocks.map((b) => b.type),
+    ['text', 'gallery', 'videos', 'music'],
+  );
+  assert.match(blocks[0].html, /\{\{gallery\}\}/);
+});
+
+await record('placeholder inside a code fence stays literal', () => {
+  const body = '```\n{{gallery}}\n```';
+  const { blocks } = buildBlocks({ body, photos, videos, music });
+  assert.deepEqual(
+    blocks.map((b) => b.type),
+    ['text', 'gallery', 'videos', 'music'],
+  );
+  assert.match(blocks[0].html, /\{\{gallery\}\}/);
+});
+
+await record('{{gallery}} with no photos renders nothing and appends others', () => {
+  const body = 'Hi\n\n{{gallery}}\n\nBye';
+  const { blocks } = buildBlocks({ body, photos: [], videos, music });
+  assert.deepEqual(
+    blocks.map((b) => b.type),
+    ['text', 'text', 'videos', 'music'],
+  );
+  assert.match(blocks[1].html, /Bye/);
+});
+
+await record('deriveType: text/gallery/video/music/mixed', () => {
+  assert.equal(deriveType([{ type: 'text' }]), 'text');
+  assert.equal(deriveType([{ type: 'text' }, { type: 'gallery' }]), 'gallery');
+  assert.equal(deriveType([{ type: 'text' }, { type: 'videos' }]), 'video');
+  assert.equal(deriveType([{ type: 'music' }]), 'music');
+  assert.equal(deriveType([{ type: 'gallery' }, { type: 'videos' }]), 'mixed');
+  assert.equal(deriveType([{ type: 'photo' }]), 'gallery');
+});
+
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nblocks-smoke: ${passed} groups passed`);
-if (passed < 5) process.exit(1);
+if (passed < 13) process.exit(1);
