@@ -2,6 +2,9 @@ node_modules/
 dist/
 .cache-manifest.json
 test-results/
+__pycache__/
+.playwright-cli/
+.claude/
 .DS_Store
 Thumbs.db
 *.log
