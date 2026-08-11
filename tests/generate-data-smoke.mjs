@@ -75,8 +75,10 @@ for (const p of posts) {
 
   for (const v of p.videos || []) {
     check(`${tag} video ${v.base} has poster`, isUrl(v.poster));
-    const kinds = [!!v.hls, !!v.sources && Object.keys(v.sources).length > 0, !!v.src].filter(Boolean).length;
-    check(`${tag} video ${v.base} exactly one source kind`, kinds === 1, `kinds=${kinds}`);
+    // HLS and multi-res sources coexist by design; raw `src` is the
+    // no-compression fallback and must not appear alongside them.
+    const hasCompressed = !!v.hls || (!!v.sources && Object.keys(v.sources).length > 0);
+    check(`${tag} video ${v.base} src exclusive with compressed sources`, !(v.src && hasCompressed));
     if (v.sources) {
       const keys = Object.keys(v.sources);
       check(`${tag} video ${v.base} res keys valid`, keys.every((k) => RES_KEYS.includes(k)), keys.join(','));
