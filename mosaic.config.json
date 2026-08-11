@@ -1,6 +1,5 @@
 {
   "_comment": "Mosaic Configuration — see README for full documentation",
-
   "title": "Mosaic",
   "subtitle": "你的个人B站",
   "description": "A pure static multimedia site generator.",
@@ -8,61 +7,87 @@
   "apiBase": "https://mosaic-api.xsanye.cn/api",
   "mediaBase": "https://mosaic-media.xsanye.cn",
   "language": "zh-CN",
-
   "author": {
     "name": "Mosaic",
     "email": "hello@example.com"
   },
-
   "dateFormat": "YYYY-MM-DD",
   "pageSize": 50,
   "gallerySingleThreshold": 5,
   "favicon": "/assets/logo.svg",
   "coverAspectMin": 0.5625,
   "coverAspectMax": 999,
-
   "build": {
     "timeoutMinutes": 90
   },
-
   "theme": "auto",
   "headerNav": [],
   "footerText": "",
-
   "searchMinChars": 2,
-
-  "imageQuality": { "480p": 75, "720p": 80, "1080p": 85 },
-  "videoQuality": { "crf": 23, "preset": "veryfast", "maxHeight": 1080, "uploadAfterTiers": 1 },
-
+  "imageQuality": {
+    "480p": 75,
+    "720p": 80,
+    "1080p": 85
+  },
+  "videoQuality": {
+    "crf": 23,
+    "preset": "veryfast",
+    "maxHeight": 1080,
+    "uploadAfterTiers": 1
+  },
   "cardShowTags": true,
   "cardShowStats": true,
-
   "enableBusuanzi": true,
   "enableVideoCompression": true,
-
   "mediaSource": {
     "type": "r2",
     "bucket": "mosaic-media",
     "endpoint": "",
     "description": "Source videos stored in Cloudflare R2. Set R2_ACCESS_KEY, R2_SECRET_KEY, R2_ENDPOINT in GitHub Secrets."
   },
-
   "plugins": {
-    "compress-images": { "enabled": true },
-    "compress-videos": { "enabled": true },
-    "generate-feed": { "enabled": true },
-    "generate-sitemap": { "enabled": true }
+    "compress-images": {
+      "enabled": true
+    },
+    "compress-videos": {
+      "enabled": true
+    },
+    "generate-feed": {
+      "enabled": true
+    },
+    "generate-sitemap": {
+      "enabled": true
+    }
   },
-
   "components": {
-    "gallery": { "enabled": true, "zoom": true, "lazyLoad": true },
-    "video": { "enabled": true, "quality": ["480p", "720p", "1080p", "4K"] },
-    "comments": { "enabled": false, "provider": "giscus" },
-    "search": { "enabled": true },
-    "likes": { "enabled": true },
-    "stats": { "enabled": true }
+    "gallery": {
+      "enabled": true,
+      "zoom": true,
+      "lazyLoad": true
+    },
+    "video": {
+      "enabled": true,
+      "quality": [
+        "480p",
+        "720p",
+        "1080p",
+        "4K"
+      ]
+    },
+    "comments": {
+      "enabled": false,
+      "provider": "giscus"
+    },
+    "search": {
+      "enabled": true
+    },
+    "likes": {
+      "enabled": true
+    },
+    "stats": {
+      "enabled": true
+    }
   },
-
   "giscus": {
     "repo": "",
     "repoId": "",
