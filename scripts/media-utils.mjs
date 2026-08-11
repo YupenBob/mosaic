@@ -24,6 +24,30 @@ export function tierListFor(srcHeight, maxHeight = 1080) {
 }
 
 /**
+ * Compute normalized waveform peaks [0..1] for an audio track.
+ * Pure helper (no ffmpeg/fs deps) so the decision logic stays unit-testable.
+ *
+ * @param {Int16Array|number[]} samples - mono 16-bit PCM samples
+ * @param {number} [buckets] - number of output peaks (default 400)
+ * @returns {number[]} amplitude peaks in [0..1]
+ */
+export function computeWaveformPeaks(samples, buckets = 400) {
+  const peaks = new Array(buckets).fill(0);
+  if (!samples || !samples.length) return peaks;
+  const per = Math.max(1, Math.ceil(samples.length / buckets));
+  for (let i = 0; i < buckets; i++) {
+    let max = 0;
+    const end = Math.min(samples.length, (i + 1) * per);
+    for (let j = i * per; j < end; j++) {
+      const v = Math.abs(samples[j]);
+      if (v > max) max = v;
+    }
+    peaks[i] = Math.min(1, max / 32768);
+  }
+  return peaks;
+}
+
+/**
  * Streaming-upload batch boundary: true once `completed` tiers of `total`
  * new tiers are done AND it is either a multiple of `after` or the last tier
  * (so a final partial batch is always flushed).

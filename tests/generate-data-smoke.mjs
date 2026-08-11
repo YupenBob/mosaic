@@ -161,6 +161,10 @@ check(
   'search-index has same post set',
   search.length === posts.length && search.every((s) => actualSlugs.includes(s.slug)),
 );
+check(
+  'music waveform field is array-or-null',
+  posts.every((p) => (p.music || []).every((t) => t.waveform === null || Array.isArray(t.waveform))),
+);
 
 console.log(`\ngenerate-data-smoke: ${failures === 0 ? 'OK' : failures + ' failure(s)'}`);
 process.exit(failures === 0 ? 0 : 1);

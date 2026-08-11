@@ -8,7 +8,14 @@ import { fileURLToPath } from 'url';
 import { execSync, execFile, execFileSync, spawn } from 'child_process';
 import sharp from 'sharp';
 import { videoBase } from './media-names.mjs';
-import { ALL_RES, tierListFor, uploadAfterN, budgetExceeded, manifestComplete } from './media-utils.mjs';
+import {
+  ALL_RES,
+  tierListFor,
+  uploadAfterN,
+  budgetExceeded,
+  manifestComplete,
+  computeWaveformPeaks,
+} from './media-utils.mjs';
 import { canUpload, uploadFile, headObject } from '../worker/scripts/r2-upload.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -555,6 +562,31 @@ async function compressVideo(file, postDir, slug, seen) {
 }
 
 // ── Music compression: 128k/320k MP3 ──
+const WAVEFORM_BUCKETS = 400;
+
+async function extractWaveformPeaks(src) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', ['-i', src, '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', '-'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const chunks = [];
+    let err = '';
+    proc.stdout.on('data', (c) => chunks.push(c));
+    proc.stderr.on('data', (c) => (err += c));
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`ffmpeg waveform exit ${code}: ${err.slice(-300)}`));
+      try {
+        const buf = Buffer.concat(chunks);
+        const samples = new Int16Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 2));
+        resolve(computeWaveformPeaks(samples, WAVEFORM_BUCKETS));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
 async function compressMusic(postDir, slug) {
   const musicDir = path.join(postDir, 'music');
   if (!fs.existsSync(musicDir)) return;
@@ -592,6 +624,14 @@ async function compressMusic(postDir, slug) {
       } catch (e) {
         console.error(`  MUSIC FAIL ${f} ${label}: ${e.message}`);
       }
+    }
+    try {
+      const peaks = await extractWaveformPeaks(src);
+      fs.writeFileSync(path.join(outDir, `${base}-waveform.json`), JSON.stringify(peaks));
+      checksums[`music-waveform:${slug}:${base}`] = peaks;
+      console.log(`  ${f} -> waveform (${peaks.length} peaks)`);
+    } catch (e) {
+      console.error(`  MUSIC WAVEFORM FAIL ${f}: ${e.message}`);
     }
     tick(`${slug}/${f}`);
   }

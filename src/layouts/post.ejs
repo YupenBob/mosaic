@@ -108,7 +108,12 @@ function escHtml(s) {
 }
 
 function renderMusicBlock(tracks) {
-  var h = '<section class="music-section"><h2 class="section-title">' + t('music') + '</h2><div class="music-track-list">';
+  var h = '<section class="music-section"><h2 class="section-title">' + t('music') + '</h2>';
+  var hasWaveform = tracks.some(function(t) { return t.waveform && t.waveform.length; });
+  if (hasWaveform) {
+    h += '<div class="waveform-container" id="music-waveform" style="display:none"><canvas height="80"></canvas></div>';
+  }
+  h += '<div class="music-track-list">';
   tracks.forEach(function(track, i) {
     h += '<div class="music-track" data-index="' + i + '" role="button" tabindex="0">';
     h += '<i class="ri-music-2-line"></i>';

@@ -12,6 +12,7 @@
  */
 
 import { $, $$ } from './utils.js';
+import { createWaveform } from './waveform.js';
 
 const STORAGE_KEY = 'mosaic_music';
 
@@ -119,6 +120,7 @@ function loadTrack(index) {
   if (!track) return;
 
   playerState.currentIndex = index;
+  setupWaveform();
 
   // Pick best source
   const src = track.sources['320k'] || track.sources['128k'] || Object.values(track.sources)[0];
@@ -128,6 +130,26 @@ function loadTrack(index) {
   audio.load();
   audio.play().catch(() => {});
   saveState();
+}
+
+/** Render (or hide) the waveform for the current track. */
+function setupWaveform() {
+  _waveformInstance = null;
+  const track = playerState.queue[playerState.currentIndex];
+  const container = $('#music-waveform');
+  if (!container) return;
+  const canvas = container.querySelector('canvas');
+  if (!canvas || !track || !Array.isArray(track.waveform) || !track.waveform.length) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+  _waveformInstance = createWaveform(canvas, track.waveform, {
+    onSeek: (pct) => {
+      const audio = getAudio();
+      if (audio.duration) audio.currentTime = pct * audio.duration;
+    },
+  });
 }
 
 /** Handle track end */
@@ -380,6 +402,7 @@ export function initMusicPlayer() {
   // Restore playback if there was an active track
   if (playerState.queue.length > 0 && playerState.currentIndex >= 0) {
     const track = playerState.queue[playerState.currentIndex];
+    setupWaveform();
     const src = track.sources?.['320k'] || track.sources?.['128k'] || Object.values(track.sources || {})[0];
     if (src) {
       const audio = getAudio();

@@ -161,6 +161,17 @@ for (const dir of postDirs) {
         sources['128k'] = oUrl(slug, 'music', f);
         sources['320k'] = oUrl(slug, 'music', f);
       }
+      // Waveform peaks come from the compress manifest (restored in CI via the
+      // media checksums cache); fall back to the local pipeline output.
+      let waveform = Array.isArray(mediaChecksums[`music-waveform:${slug}:${base}`])
+        ? mediaChecksums[`music-waveform:${slug}:${base}`]
+        : null;
+      if (!waveform && fs.existsSync(path.join(musicOutDir, `${base}-waveform.json`))) {
+        try {
+          const local = JSON.parse(fs.readFileSync(path.join(musicOutDir, `${base}-waveform.json`), 'utf-8'));
+          if (Array.isArray(local)) waveform = local;
+        } catch {}
+      }
       music.push({
         file: f,
         title: base,
@@ -168,7 +179,7 @@ for (const dir of postDirs) {
         cover: '',
         sources,
         duration: 0,
-        waveform: null,
+        waveform,
       });
     }
   }

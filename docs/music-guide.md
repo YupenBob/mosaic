@@ -34,7 +34,9 @@ content/posts/my-mix/
 - **320kbps** — 高音质
 - **128kbps** — 省流量
 
-产物存于 `processed/{slug}/music/`，页面引用压缩版、缺失时回退原始文件。
+同时用 ffmpeg 解码生成 **400 个归一化波形峰值**（存于 `processed/{slug}/music/{base}-waveform.json`，
+并随媒体 checksums 清单缓存，缓存命中的构建也能直接使用）。产物存于 `processed/{slug}/music/`，
+页面引用压缩版、缺失时回退原始文件。
 
 ## 播放器功能
 
@@ -43,8 +45,7 @@ content/posts/my-mix/
 - 音量记忆、播放进度记忆（刷新后恢复）
 - Media Session（锁屏/系统媒体控制）
 - 底部 mini 播放器，跨页面保持播放状态
-
-> 波形可视化（waveform）为路线图功能，暂未上线。
+- **波形可视化**：文章音乐区块顶部显示当前曲目的 400 点波形，随播放进度着色，点击波形可跳转播放位置
 
 ## 嵌入文章
 
@@ -52,4 +53,4 @@ content/posts/my-mix/
 
 ## 配置
 
-音乐默认启用，无需额外配置。若需改变转码档位或未来新增波形数据，改动发生在管线 `compress.js` 内。
+音乐默认启用，无需额外配置。波形峰值的桶数（默认 400）与转码档位在管线 `compress.js` / `media-utils.mjs` 内调整。
