@@ -92,7 +92,9 @@ functions/            (前台 Pages Functions)
 | 方法 | 路径 | 功能 |
 |------|------|------|
 | POST | `/api/auth/login` | 登录获取 JWT |
-| GET | `/api/health` | 健康检查 |
+| GET | `/api/health` | 健康检查（含版本号） |
+| GET | `/api/health/github` | GitHub 真实连通性探测（latency/httpStatus） |
+| GET | `/api/health/r2` | R2 真实连通性探测（latency） |
 | GET | `/api/stats/traffic` | 流量统计（读取 R2 stats.json） |
 | POST | `/api/track/view/:slug` | 浏览计数+1（IP 去重 10min） |
 | GET | `/api/stats/:slug` | 单篇实时统计（views/likes/dwell） |
@@ -382,5 +384,5 @@ npx wrangler pages deploy . --project-name mosaic-admin --branch main
 - [ ] 构建页面合并 options/status/history 为一个视图
 
 ### 部署
-- [ ] `mosaic-admin.xsanye.cn` 自定义域名绑定到 Pages 项目
+- [x] `mosaic-admin.xsanye.cn` 自定义域名绑定到 Pages 项目（admin-smoke 实测可登录）
 - [x] R2 CORS 已配置（允许 * GET/PUT），确认无误

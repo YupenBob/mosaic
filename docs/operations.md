@@ -17,7 +17,7 @@
 
 ### 构建超时与视频转码
 
-- `build.timeoutMinutes`（设置 → 构建）控制单次构建超时，默认 90 分钟（范围 10–360）。后台触发的构建经 `workflow_dispatch` input 传入该值；push 自动构建无 inputs，固定 90 分钟
+- `build.timeoutMinutes`（设置 → 构建）控制单次构建超时，默认 90 分钟（范围 10–360）。后台触发的构建经 `workflow_dispatch` input 传入该值（管线内 `fromJSON` 转整数，字符串会导致 job 无法启动）；push 自动构建无 inputs，固定 90 分钟
 - 视频按档位**升序**（240p→4K）转码并**边转边传**：`videoQuality.uploadAfterTiers`（默认 1 = 每档即传）控制每完成 n 档上传一批（该档 mp4/m3u8/ts 随档即传，poster/master 最后上传）
 - **时间预算保护**：已用时长达到超时值的 85%（默认 90 分钟 → 约 76 分钟）后跳过剩余高档位，用已完成档位生成 master 并继续构建部署；缺失档位由下一次构建续传补齐（续传前对 R2 做 HEAD 校验，缺失即补转）
 - 最终 `worker/scripts/upload-videos.mjs` 为 **reconcile**：对每个本地文件先 HEAD，R2 已存在即跳过、缺失才上传（幂等兜底）

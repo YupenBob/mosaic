@@ -35,12 +35,12 @@ jobs:
       deployments: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Record job start
         run: echo "BUILD_STARTED_AT=$(date +%s)" >> $GITHUB_ENV
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
 
       - name: Install tools
@@ -75,7 +75,7 @@ jobs:
 
       - name: Restore media checksums cache
         id: checksums-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: dist/.media-checksums.json
           key: media-checksums-${{ github.sha }}
@@ -133,7 +133,7 @@ jobs:
         run: node scripts/compress.js
 
       - name: Save media checksums cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: dist/.media-checksums.json
           # Unique per run so concurrent same-SHA runs (push + manual dispatch)

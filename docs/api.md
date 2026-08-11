@@ -28,8 +28,8 @@ Base URL：`https://mosaic-api.xsanye.cn`（前台与后台经 Pages Functions �
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/health` | 健康检查 |
-| GET | `/api/health/github` | GitHub 连通性（延迟占位） |
-| GET | `/api/health/r2` | R2 连通性（延迟占位） |
+| GET | `/api/health/github` | GitHub 真实探测（rate_limit，返回 latency/httpStatus） |
+| GET | `/api/health/r2` | R2 真实探测（head 探测，返回 latency） |
 | POST | `/api/track/view/:slug` | 浏览计数 +1（IP 去重 10 分钟） |
 | POST | `/api/track/like/:slug` | 点赞/取消点赞，body `{"action":"like"\|"unlike"}` |
 | POST | `/api/track/dwell/:slug` | 停留时长上报，body `{"seconds":N}`（上限 7200） |
