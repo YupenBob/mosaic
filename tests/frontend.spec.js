@@ -165,12 +165,17 @@ async function assertMobileHls(page) {
   );
 }
 
-for (const vp of MOBILE_VIEWPORTS) {
-  test(`mobile viewport (${vp.name}): video post loads with HLS source`, async ({ page }) => {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await assertMobileHls(page);
-  });
-}
+test.describe('mobile HLS matrix', () => {
+  // Page + hls.js (415KB) over slow connections can exceed the 30s default
+  // test timeout; CI runners are fast, but local/slow links need headroom.
+  test.describe.configure({ timeout: 90000 });
+  for (const vp of MOBILE_VIEWPORTS) {
+    test(`mobile viewport (${vp.name}): video post loads with HLS source`, async ({ page }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await assertMobileHls(page);
+    });
+  }
+});
 
 test('admin login page loads', async ({ page }) => {
   test.skip(SKIP_ADMIN, 'ADMIN unset');
