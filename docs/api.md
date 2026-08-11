@@ -68,6 +68,8 @@ Base URL：`https://mosaic-api.xsanye.cn`（前台与后台经 Pages Functions �
 | GET | `/api/build/status` | 最近一次运行状态（含步骤明细） |
 | GET | `/api/build/history` | 最近 10 次运行 |
 | GET | `/api/build/progress` | 管线实时进度（R2 `site-data/build-progress.json`） |
+| POST | `/api/build/done` | 构建完成回执：body `{success:true}` 清除脏标记，`false` 重新标记 |
+| POST | `/api/build/cancel` | 取消进行中的构建（需 token 有 actions:write） |
 
 ### 媒体
 
