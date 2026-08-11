@@ -51,7 +51,9 @@ async function apiFetch(path, options = {}) {
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));
-    throw new Error(body.error || `HTTP ${resp.status}`);
+    const err = new Error(body.error || `HTTP ${resp.status}`);
+    err.status = resp.status;
+    throw err;
   }
 
   // Surface dirty state from the response header so the banner updates instantly

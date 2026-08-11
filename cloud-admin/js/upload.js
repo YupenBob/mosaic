@@ -298,11 +298,12 @@ async function uploadFileMultipart(item) {
   try {
     started = await upload.multipartStart(slug, filename, file.size, file.type, stored?.uploadId);
   } catch (e) {
-    if (stored && stored.uploadId) {
-      // Stale uploadId (aborted/expired server-side) — start a fresh upload.
+    if (stored && stored.uploadId && e.status === 404) {
+      // The upload no longer exists server-side — start a fresh one.
       mpClear(slug, filename);
       started = await upload.multipartStart(slug, filename, file.size, file.type);
     } else {
+      // Transient errors keep the resume state so retry continues the parts.
       throw e;
     }
   }
