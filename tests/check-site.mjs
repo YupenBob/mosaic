@@ -148,25 +148,26 @@ async function main() {
       }
     }
 
-    // 4c. Sitemap URLs resolve (production sample)
+    // 4c. Sitemap URLs resolve (production; verify all while the site is
+    // small, auto-sample once it grows past 50 URLs)
     if (!LOCAL) {
       try {
         const sm = await fetch(`${SITE}/sitemap.xml`, { signal: AbortSignal.timeout(15000) });
         const xml = await sm.text();
         const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
         const candidates = locs.filter((u) => !u.includes('404.html'));
-        // Spread the sample across the whole list (home, categories, tags,
-        // posts) instead of only the first entries.
-        const step = Math.max(1, Math.floor(candidates.length / 8));
-        const sample = candidates.filter((_, i) => i % step === 0).slice(0, 8);
+        const targets =
+          candidates.length > 50
+            ? candidates.filter((_, i) => i % Math.ceil(candidates.length / 50) === 0)
+            : candidates;
         let okUrls = 0;
-        for (const u of sample) {
+        for (const u of targets) {
           const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
           if (r.ok) okUrls++;
         }
-        check('sitemap URLs resolve (sample)', okUrls === sample.length, `${okUrls}/${sample.length}`);
+        check('sitemap URLs resolve', okUrls === targets.length, `${okUrls}/${targets.length}`);
       } catch (e) {
-        check('sitemap URLs resolve (sample)', false, e.message);
+        check('sitemap URLs resolve', false, e.message);
       }
     }
 
