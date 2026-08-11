@@ -98,15 +98,7 @@ const ghFetch = async (url, opts = {}) => {
       }
       if (method === 'DELETE') {
         mpAborted.add(uploadId);
-        // R2 returns 204; Node's fetch-http-handler deserializer trips on an
-        // empty 204 body ("stream.pipe is not a function"), so the mock uses a
-        // 200 XML body. Real behavior is verified live against R2.
-        return new Response(
-          '<?xml version="1.0"?><AbortMultipartUploadResult><UploadId>' +
-            uploadId +
-            '</UploadId></AbortMultipartUploadResult>',
-          { status: 200, headers: { 'Content-Type': 'application/xml' } },
-        );
+        return new Response(null, { status: 204 });
       }
       return new Response(
         '<?xml version="1.0"?><ListPartsResult><Bucket>b</Bucket><Key>k</Key><UploadId>' +

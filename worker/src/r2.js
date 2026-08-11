@@ -18,7 +18,6 @@ import {
   AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { FetchHttpHandler } from '@smithy/fetch-http-handler';
 import { verifyToken } from './auth.js';
 import { adjustUsage } from './usage.js';
 import { markDirty } from './github.js';
@@ -42,22 +41,60 @@ function s3Client(c) {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
     forcePathStyle: true,
-    // Fetch-based transport: same semantics in Workers, and lets Node tests
-    // route S3 calls through the mocked global fetch.
-    requestHandler: new FetchHttpHandler(),
   });
 }
 
+// The AWS SDK's XML *deserializer* uses DOMParser, which doesn't exist in the
+// Workers runtime. Multipart flows therefore never call client.send(): they
+// sign requests with getSignedUrl (no parsing) and talk to the S3 endpoint
+// directly via fetch, parsing the small XML payloads with regex.
+function xmlTag(xml, tag) {
+  const m = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+  return m ? m[1] : '';
+}
+
+function xmlDecode(s) {
+  return String(s)
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+async function signedFetch(signedUrl, method, body, extraHeaders = {}) {
+  const resp = await fetch(signedUrl, {
+    method,
+    body,
+    headers: body ? { 'Content-Type': 'application/xml', ...extraHeaders } : extraHeaders,
+  });
+  if (!resp.ok && resp.status !== 204) {
+    const text = await resp.text().catch(() => '');
+    const err = new Error(`R2 S3 ${method} failed: ${resp.status} ${text.slice(0, 200)}`);
+    err.status = resp.status;
+    throw err;
+  }
+  return resp;
+}
+
 async function listUploadedParts(client, bucket, key, uploadId) {
+  const url = await getSignedUrl(client, new ListPartsCommand({ Bucket: bucket, Key: key, UploadId: uploadId }), {
+    expiresIn: 3600,
+  });
+  const resp = await signedFetch(url, 'GET');
+  const xml = await resp.text();
   const parts = [];
-  let marker;
-  do {
-    const res = await client.send(
-      new ListPartsCommand({ Bucket: bucket, Key: key, UploadId: uploadId, PartNumberMarker: marker }),
-    );
-    for (const p of res.Parts || []) parts.push({ partNumber: p.PartNumber, size: p.Size, etag: p.ETag });
-    marker = res.IsTruncated ? res.NextPartNumberMarker : null;
-  } while (marker);
+  const partRe = /<Part>([\s\S]*?)<\/Part>/g;
+  let m;
+  while ((m = partRe.exec(xml))) {
+    parts.push({
+      partNumber: parseInt(xmlDecode(xmlTag(m[1], 'PartNumber'))) || 0,
+      size: parseInt(xmlDecode(xmlTag(m[1], 'Size'))) || 0,
+      // R2 returns the ETag pre-escaped (e.g. &quot;hash&quot;); decode so the
+      // complete body re-encodes it exactly once.
+      etag: xmlDecode(xmlTag(m[1], 'ETag')),
+    });
+  }
   return parts;
 }
 
@@ -303,32 +340,43 @@ export async function startMultipartUpload(c) {
   const totalSize = Math.max(1, parseInt(size) || 0);
   const partCount = Math.min(MAX_PARTS, Math.max(1, Math.ceil(totalSize / partBytes)));
 
-  let id = uploadId || '';
-  if (!id) {
-    const created = await client.send(
-      new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType || undefined }),
-    );
-    if (!created.UploadId) return c.json({ error: 'Multipart upload creation failed', code: 'R2_ERROR' }, 500);
-    id = created.UploadId;
-  } else {
-    // Resume: verify the upload still exists before handing out part URLs.
-    try {
-      await listUploadedParts(client, bucket, key, id);
-    } catch {
-      return c.json({ error: 'Upload not found', code: 'NOT_FOUND' }, 404);
+  try {
+    let id = uploadId || '';
+    if (!id) {
+      // Sign a create-multipart request (no SDK send → no XML deserialization)
+      // and POST it directly to the S3 endpoint.
+      const url = await getSignedUrl(
+        client,
+        new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType || undefined }),
+        { expiresIn: 3600 },
+      );
+      const resp = await signedFetch(url, 'POST', undefined, contentType ? { 'Content-Type': contentType } : {});
+      const xml = await resp.text();
+      id = xmlTag(xml, 'UploadId');
+      if (!id) throw new Error('Multipart upload creation failed: ' + xml.slice(0, 200));
+    } else {
+      // Resume: verify the upload still exists before handing out part URLs.
+      try {
+        await listUploadedParts(client, bucket, key, id);
+      } catch (e) {
+        if (e.status === 404) return c.json({ error: 'Upload not found', code: 'NOT_FOUND' }, 404);
+        throw e;
+      }
     }
-  }
 
-  const parts = [];
-  for (let i = 1; i <= partCount; i++) {
-    const url = await getSignedUrl(
-      client,
-      new UploadPartCommand({ Bucket: bucket, Key: key, UploadId: id, PartNumber: i }),
-      { expiresIn: 3600 },
-    );
-    parts.push({ partNumber: i, url });
+    const parts = [];
+    for (let i = 1; i <= partCount; i++) {
+      const url = await getSignedUrl(
+        client,
+        new UploadPartCommand({ Bucket: bucket, Key: key, UploadId: id, PartNumber: i }),
+        { expiresIn: 3600 },
+      );
+      parts.push({ partNumber: i, url });
+    }
+    return c.json({ ok: true, uploadId: id, key, partSize: partBytes, partCount, parts, expires: 3600 });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
   }
-  return c.json({ ok: true, uploadId: id, key, partSize: partBytes, partCount, parts, expires: 3600 });
 }
 
 // List already-uploaded parts (client uses this to skip them on resume).
@@ -362,14 +410,29 @@ export async function completeMultipartUpload(c) {
   try {
     const parts = await listUploadedParts(client, bucket, key, uploadId);
     if (!parts.length) return c.json({ error: 'No parts uploaded', code: 'INVALID_PARTS' }, 400);
-    await client.send(
+    const url = await getSignedUrl(
+      client,
       new CompleteMultipartUploadCommand({
         Bucket: bucket,
         Key: key,
         UploadId: uploadId,
         MultipartUpload: { Parts: parts.map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })) },
       }),
+      // The presigned URL pins content-length to the SDK's own serialization;
+      // xmlBody above is byte-identical, so the signature holds.
+      { expiresIn: 3600 },
     );
+    // Byte-identical to the SDK's own serialization: the presigned URL pins
+    // content-length, so a hand-built body must match exactly (XML declaration,
+    // xmlns, escaped ETag, ETag-before-PartNumber member order).
+    const esc = (s) =>
+      String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const xmlBody =
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<CompleteMultipartUpload xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
+      parts.map((p) => `<Part><ETag>${esc(p.etag)}</ETag><PartNumber>${p.partNumber}</PartNumber></Part>`).join('') +
+      '</CompleteMultipartUpload>';
+    await signedFetch(url, 'POST', xmlBody);
     const obj = await c.env.MEDIA.head(key).catch(() => null);
     await markDirty(c.env);
     await adjustUsage(c.env, obj?.size || 0, 1);
@@ -390,7 +453,12 @@ export async function abortMultipartUpload(c) {
   const bucket = c.env.R2_BUCKET || 'mosaic-media';
   const key = mediaKey(slug, filename);
   try {
-    await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
+    const url = await getSignedUrl(
+      client,
+      new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }),
+      { expiresIn: 3600 },
+    );
+    await signedFetch(url, 'DELETE');
     return c.json({ ok: true });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
