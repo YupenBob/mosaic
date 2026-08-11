@@ -33,7 +33,10 @@ test('images use R2 media domain, not local media/ paths', async ({ page }) => {
   const firstPostLink = page.locator('a[href*="posts/"]').first();
   if (await firstPostLink.isVisible({ timeout: 5000 }).catch(() => false)) {
     await firstPostLink.click();
-    await page.waitForLoadState('networkidle');
+    // networkidle never settles on video posts (hls.js keeps fetching);
+    // domcontentloaded + a short settle is enough to read the img src attrs.
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
     const imgs = page.locator('img[src]');
     const count = await imgs.count();
     let bad = 0;
@@ -68,6 +71,30 @@ test('category page stylesheet loads (relative path regression)', async ({ page 
   } else {
     console.log('No category links — skipping');
   }
+});
+
+test('gallery: open post gallery and switch quality', async ({ page }) => {
+  const posts = await fetch(`${SITE}/data/posts.json`)
+    .then((r) => r.json())
+    .catch(() => []);
+  const galleryPost = (posts || []).find((p) => (p.photos || []).length > 0);
+  test.skip(!galleryPost, 'no gallery post in this build');
+  const resp = await page.goto(`${SITE}/posts/${galleryPost.slug}/`, {
+    timeout: 60000,
+    waitUntil: 'domcontentloaded',
+  });
+  expect(resp.status()).toBe(200);
+  const firstItem = page.locator('.gallery-item img, .gallery-single-item img').first();
+  await firstItem.waitFor({ state: 'visible', timeout: 15000 });
+  // gallery.js is dynamically imported; its item click listeners are wired
+  // before createOverlay() runs, so an attached overlay means init is done.
+  await page.locator('#gallery-overlay').waitFor({ state: 'attached', timeout: 15000 });
+  await firstItem.click();
+  await page.locator('#gallery-current-img').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('.gq-pill[data-res="720p"]').click();
+  const src = await page.locator('#gallery-current-img').getAttribute('src');
+  expect(src).toContain('-720p');
+  console.log(`Gallery quality switch: src=${src}`);
 });
 
 test('search filters posts (query -> dropdown + grid)', async ({ page }) => {
