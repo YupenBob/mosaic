@@ -148,6 +148,36 @@ async function main() {
       }
     }
 
+    // 4c. Sitemap URLs resolve (production sample)
+    if (!LOCAL) {
+      try {
+        const sm = await fetch(`${SITE}/sitemap.xml`, { signal: AbortSignal.timeout(15000) });
+        const xml = await sm.text();
+        const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+        const candidates = locs.filter((u) => !u.includes('404.html')).slice(0, 5);
+        let okUrls = 0;
+        for (const u of candidates) {
+          const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
+          if (r.ok) okUrls++;
+        }
+        check('sitemap URLs resolve (sample)', okUrls === candidates.length, `${okUrls}/${candidates.length}`);
+      } catch (e) {
+        check('sitemap URLs resolve (sample)', false, e.message);
+      }
+    }
+
+    // 4d. 404 page renders (marker assertion only against the real site; the
+    // local static server serves its own generic 404 page).
+    try {
+      const resp = await fetch(`${SITE}/definitely-missing-page-${Date.now()}/`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      const body = await resp.text();
+      check('404 page', resp.status === 404 && (LOCAL || body.includes('data-page="404"')), `status=${resp.status}`);
+    } catch (e) {
+      check('404 page', false, e.message);
+    }
+
     // ── 5. Admin loads ──
     if (ADMIN) {
       console.log('\nAdmin Panel');
