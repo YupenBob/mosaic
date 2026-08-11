@@ -230,7 +230,8 @@ video_mode: stacked           # stacked | playlist
 - [ ] 媒体域 Transform Rule：恢复边缘缓存的同时保证 CORS（视频播放延迟进一步下降）
 - [ ] 音乐播放器波形可视化（waveform 数据管线）
 - [ ] 移动端真机 HLS 兼容矩阵（iOS Safari / Android Chrome）
-- [ ] 管理后台构建页视图进一步合并与打磨
+- [x] 管理后台构建页合并为单视图（概览/状态/历史同屏、实时轮询、失败定位）
+- [ ] 构建页持续打磨（交互细节与可访问性）
 - [ ] 上传器并发提升与断点续传
 
 ## 协议

@@ -510,7 +510,7 @@ function renderStatusCard(run) {
   const durLabel =
     run.status === 'in_progress' || run.status === 'queued' ? t('build.durationRunning') : t('build.durationDone');
   return `
-    <div class="card build-status-card">
+  <div class="card build-status-card" role="status" aria-live="polite">
       <div class="build-status-head">
         <span class="status-dot ${def.dot}" style="width:12px;height:12px"></span>
         <span class="build-run-no">#${run.runNumber || '—'}${run.displayTitle ? ' — ' + escHtml(run.displayTitle) : ''}</span>

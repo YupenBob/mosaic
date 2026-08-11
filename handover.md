@@ -385,7 +385,7 @@ npx wrangler pages deploy . --project-name mosaic-admin --branch main
 - [x] 统计并发：Stats Durable Object（R2 stats.json 自动迁移）
 - [x] Admin 资源自托管（remixicon.css + woff2 随 cloud-admin 同源部署，无 CDN）
 - [x] Admin 前端拆分（v0.9 起 ES 模块化：入口 + i18n/theme/state/ui/upload + 每页模块）
-- [ ] 构建页面合并 options/status/history 为一个视图
+- [x] 构建页面合并 options/status/history 为一个视图（概览/状态/历史同屏 + 实时轮询；admin-smoke 覆盖）
 
 ### 部署
 - [x] `mosaic-admin.xsanye.cn` 自定义域名绑定到 Pages 项目（admin-smoke 实测可登录）

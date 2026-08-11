@@ -55,6 +55,23 @@ try {
     .count();
   const hasTable = await page.locator('#main-content table, #main-content .post-list').count();
   console.log(`Posts page loaded — table/list present=${hasTable > 0}, rows-or-cards=${postRows}`);
+
+  // Navigate to the build page (merged single view) and confirm it renders
+  await page.evaluate(() => {
+    location.hash = 'build';
+  });
+  await page.waitForTimeout(6000);
+  const summaryCards = await page.locator('.build-summary .dash-big-card').count();
+  const statusCard = await page.locator('#build-status-card .build-status-card').count();
+  const historyRows = await page.locator('.build-history-row').count();
+  const githubLink = await page.locator('#build-history a[href*="actions/workflows"]').count();
+  console.log(
+    `Build page loaded — summary=${summaryCards}, statusCard=${statusCard}, history=${historyRows}, githubLink=${githubLink}`,
+  );
+  if (summaryCards < 1 || statusCard < 1 || historyRows < 1 || githubLink < 1) {
+    console.error('Build page smoke failed: expected summary + status card + history + GitHub link');
+    process.exitCode = 1;
+  }
   await page.close();
 } finally {
   await browser.close();
