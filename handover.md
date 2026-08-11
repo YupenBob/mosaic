@@ -59,7 +59,7 @@ Admin 浏览器 → /api/* (同源) → Pages Functions 代理 → Worker API (m
 ```
 cloud-admin/          (Admin SPA — CF Pages 独立项目)
   functions/api/[[path]].js   (Pages Functions 代理到 Worker)
-  index.html + js/admin.js    (Vanilla JS SPA，无框架)
+  index.html + js/（ES 模块 SPA，无框架）
   src/api.js                  (API 封装)
 
 worker/               (Cloudflare Worker — Hono 框架)
@@ -345,7 +345,7 @@ npx wrangler pages deploy . --project-name mosaic-admin --branch main
 │       └── stats-do.js         # Stats Durable Object
 ├── cloud-admin/
 │   ├── index.html              # SPA 入口
-│   ├── js/admin.js             # 全部前端逻辑
+│   ├── js/                       # ES 模块（admin.js 入口 + 每页模块）
 │   ├── css/admin.css           # 样式
 │   ├── src/api.js              # API 封装
 │   └── functions/api/[[path]].js  # Pages 代理（IP 透传）
@@ -377,14 +377,14 @@ npx wrangler pages deploy . --project-name mosaic-admin --branch main
 ### 功能
 - [x] EXIF 隐私抹除（pipeline 用 exiftool 剥离 originals）
 - [x] 图片放大切换清晰度后保留 zoom（gallery.js）
-- [ ] 移动端 HLS 兼容性测试
+- [x] 移动端 HLS 兼容性测试（Playwright 移动视口 + HLS 起播已入 CI；真机矩阵见 README 路线图）
 - [x] 音乐播放器（列表播放已接线，封面/波形待补）
 
 ### 优化
 - [x] Worker disk/cleanup 并行遍历 + disk 60s 缓存
 - [x] 统计并发：Stats Durable Object（R2 stats.json 自动迁移）
-- [ ] Admin 的 Remixicon 字体可自托管到 R2 加速
-- [ ] Admin.js 代码量太大（~1600行），可拆分模块
+- [x] Admin 资源自托管（remixicon.css + woff2 随 cloud-admin 同源部署，无 CDN）
+- [x] Admin 前端拆分（v0.9 起 ES 模块化：入口 + i18n/theme/state/ui/upload + 每页模块）
 - [ ] 构建页面合并 options/status/history 为一个视图
 
 ### 部署
