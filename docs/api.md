@@ -77,6 +77,10 @@ Base URL：`https://mosaic-api.xsanye.cn`（前台与后台经 Pages Functions �
 | DELETE | `/api/media/:slug/:file` | 删除单个媒体（originals + processed，分页遍历） |
 | POST | `/api/upload/presign` | 生成直传 URL，body `{slug, filename, contentType?}` → `{url, key, folder, expires}` |
 | POST | `/api/upload/complete/:slug/:filename` | 确认直传落地并标脏；对象不存在返回 404 |
+| POST | `/api/upload/multipart/start` | 大文件分片（可续传）：body `{slug, filename, size, contentType?, uploadId?}` → `{uploadId, partSize, partCount, parts[]}`；传 `uploadId` 表示续传同一上传 |
+| POST | `/api/upload/multipart/parts` | 查询已上传分片，body `{slug, filename, uploadId}` → `{parts:[{partNumber,size,etag}]}` |
+| POST | `/api/upload/multipart/complete` | 完成分片上传并标脏；无分片返回 400 |
+| POST | `/api/upload/multipart/abort` | 放弃并清理分片上传 |
 | POST | `/api/upload/direct/:slug/:filename` | Worker 直传兜底（≤100MB），body 为文件本体 |
 
 ### 分类标签

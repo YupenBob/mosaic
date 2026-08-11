@@ -6,6 +6,10 @@ import { getConfig, markDirty } from '../github.js';
 import {
   generatePresignedUrl,
   uploadComplete,
+  startMultipartUpload,
+  listMultipartParts,
+  completeMultipartUpload,
+  abortMultipartUpload,
   listMedia,
   serveMediaFile,
   uploadDirect,
@@ -35,6 +39,10 @@ export function registerMediaProtected(app) {
   // Upload
   app.post('/api/upload/presign', generatePresignedUrl);
   app.post('/api/upload/complete/:slug/:filename', uploadComplete);
+  app.post('/api/upload/multipart/start', startMultipartUpload);
+  app.post('/api/upload/multipart/parts', listMultipartParts);
+  app.post('/api/upload/multipart/complete', completeMultipartUpload);
+  app.post('/api/upload/multipart/abort', abortMultipartUpload);
 
   // Media list — from R2 (uses R2_PUBLIC_URL or falls back to config.mediaBase)
   app.get('/api/media/:slug/list', async (c) => {

@@ -114,6 +114,34 @@ export const upload = {
       body: JSON.stringify({ slug, filename, contentType: contentType || 'application/octet-stream' }),
     }),
 
+  /** Multipart (resumable) upload for large files */
+  multipartStart: (slug, filename, size, contentType, uploadId) =>
+    apiFetch('/upload/multipart/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        slug,
+        filename,
+        size,
+        contentType: contentType || 'application/octet-stream',
+        uploadId,
+      }),
+    }),
+  multipartParts: (slug, filename, uploadId) =>
+    apiFetch('/upload/multipart/parts', {
+      method: 'POST',
+      body: JSON.stringify({ slug, filename, uploadId }),
+    }),
+  multipartComplete: (slug, filename, uploadId) =>
+    apiFetch('/upload/multipart/complete', {
+      method: 'POST',
+      body: JSON.stringify({ slug, filename, uploadId }),
+    }),
+  multipartAbort: (slug, filename, uploadId) =>
+    apiFetch('/upload/multipart/abort', {
+      method: 'POST',
+      body: JSON.stringify({ slug, filename, uploadId }),
+    }),
+
   /** Confirm a presigned upload landed in R2 (marks the site dirty) */
   complete: (slug, filename) =>
     apiFetch(`/upload/complete/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`, { method: 'POST' }),

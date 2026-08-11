@@ -8,8 +8,17 @@
  *   uploads straight to the R2 S3 endpoint, bypassing the Worker body relay.
  *   uploadComplete() verifies the object landed and marks the site dirty.
  */
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  ListPartsCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { FetchHttpHandler } from '@smithy/fetch-http-handler';
 import { verifyToken } from './auth.js';
 import { adjustUsage } from './usage.js';
 import { markDirty } from './github.js';
@@ -17,6 +26,40 @@ import { markDirty } from './github.js';
 // Workers platform request-body limit (~100MB). Larger files must use the
 // presigned direct-to-R2 upload path.
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+// Multipart part size bounds (R2 allows up to 10,000 parts; 5MB..1GB per part).
+const MIN_PART_BYTES = 5 * 1024 * 1024;
+const MAX_PART_BYTES = 1024 * 1024 * 1024;
+const DEFAULT_PART_BYTES = 100 * 1024 * 1024;
+const MAX_PARTS = 10000;
+
+function s3Client(c) {
+  const accountId = c.env.CF_ACCOUNT_ID || '';
+  const accessKey = c.env.R2_ACCESS_KEY || '';
+  const secretKey = c.env.R2_SECRET_KEY || '';
+  if (!accessKey || !secretKey || !accountId) return null;
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
+    forcePathStyle: true,
+    // Fetch-based transport: same semantics in Workers, and lets Node tests
+    // route S3 calls through the mocked global fetch.
+    requestHandler: new FetchHttpHandler(),
+  });
+}
+
+async function listUploadedParts(client, bucket, key, uploadId) {
+  const parts = [];
+  let marker;
+  do {
+    const res = await client.send(
+      new ListPartsCommand({ Bucket: bucket, Key: key, UploadId: uploadId, PartNumberMarker: marker }),
+    );
+    for (const p of res.Parts || []) parts.push({ partNumber: p.PartNumber, size: p.Size, etag: p.ETag });
+    marker = res.IsTruncated ? res.NextPartNumberMarker : null;
+  } while (marker);
+  return parts;
+}
 
 const EXT_CONTENT_TYPE = {
   jpg: 'image/jpeg',
@@ -222,21 +265,13 @@ export async function generatePresignedUrl(c) {
   const { slug, filename, contentType } = await c.req.json().catch(() => ({}));
   if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
 
-  const accountId = c.env.CF_ACCOUNT_ID || '';
-  const accessKey = c.env.R2_ACCESS_KEY || '';
-  const secretKey = c.env.R2_SECRET_KEY || '';
-  const bucket = c.env.R2_BUCKET || 'mosaic-media';
-  if (!accessKey || !secretKey || !accountId) {
+  const client = s3Client(c);
+  if (!client) {
     return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
   }
 
+  const bucket = c.env.R2_BUCKET || 'mosaic-media';
   const key = mediaKey(slug, filename);
-  const client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
-    forcePathStyle: true,
-  });
   // ContentType intentionally NOT signed so the browser may send its own
   // Content-Type without breaking the SigV4 signature match.
   const url = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 3600 });
@@ -249,4 +284,115 @@ export async function generatePresignedUrl(c) {
     expires: 3600,
     contentType: contentType || EXT_CONTENT_TYPE[ext] || 'application/octet-stream',
   });
+}
+
+/**
+ * Start (or resume) a multipart upload for large files.
+ * Pass an existing uploadId to re-sign part URLs for that upload (resume);
+ * otherwise a new multipart upload is created.
+ */
+export async function startMultipartUpload(c) {
+  const { slug, filename, contentType, size, partSize, uploadId } = await c.req.json().catch(() => ({}));
+  if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
+  const client = s3Client(c);
+  if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
+
+  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const key = mediaKey(slug, filename);
+  const partBytes = Math.min(MAX_PART_BYTES, Math.max(MIN_PART_BYTES, parseInt(partSize) || DEFAULT_PART_BYTES));
+  const totalSize = Math.max(1, parseInt(size) || 0);
+  const partCount = Math.min(MAX_PARTS, Math.max(1, Math.ceil(totalSize / partBytes)));
+
+  let id = uploadId || '';
+  if (!id) {
+    const created = await client.send(
+      new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType || undefined }),
+    );
+    if (!created.UploadId) return c.json({ error: 'Multipart upload creation failed', code: 'R2_ERROR' }, 500);
+    id = created.UploadId;
+  } else {
+    // Resume: verify the upload still exists before handing out part URLs.
+    try {
+      await listUploadedParts(client, bucket, key, id);
+    } catch {
+      return c.json({ error: 'Upload not found', code: 'NOT_FOUND' }, 404);
+    }
+  }
+
+  const parts = [];
+  for (let i = 1; i <= partCount; i++) {
+    const url = await getSignedUrl(
+      client,
+      new UploadPartCommand({ Bucket: bucket, Key: key, UploadId: id, PartNumber: i }),
+      { expiresIn: 3600 },
+    );
+    parts.push({ partNumber: i, url });
+  }
+  return c.json({ ok: true, uploadId: id, key, partSize: partBytes, partCount, parts, expires: 3600 });
+}
+
+// List already-uploaded parts (client uses this to skip them on resume).
+export async function listMultipartParts(c) {
+  const { slug, filename, uploadId } = await c.req.json().catch(() => ({}));
+  if (!slug || !filename || !uploadId) {
+    return c.json({ error: 'slug, filename and uploadId required', code: 'INVALID_PARAMS' }, 400);
+  }
+  const client = s3Client(c);
+  if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
+  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const key = mediaKey(slug, filename);
+  try {
+    const parts = await listUploadedParts(client, bucket, key, uploadId);
+    return c.json({ ok: true, parts });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
+  }
+}
+
+// Complete a multipart upload (server assembles parts from R2) and mark dirty.
+export async function completeMultipartUpload(c) {
+  const { slug, filename, uploadId } = await c.req.json().catch(() => ({}));
+  if (!slug || !filename || !uploadId) {
+    return c.json({ error: 'slug, filename and uploadId required', code: 'INVALID_PARAMS' }, 400);
+  }
+  const client = s3Client(c);
+  if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
+  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const key = mediaKey(slug, filename);
+  try {
+    const parts = await listUploadedParts(client, bucket, key, uploadId);
+    if (!parts.length) return c.json({ error: 'No parts uploaded', code: 'INVALID_PARTS' }, 400);
+    await client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: { Parts: parts.map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })) },
+      }),
+    );
+    const obj = await c.env.MEDIA.head(key).catch(() => null);
+    await markDirty(c.env);
+    await adjustUsage(c.env, obj?.size || 0, 1);
+    return c.json({ ok: true, key, size: obj?.size || 0 });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
+  }
+}
+
+// Abort a multipart upload (cleanup when the client cancels).
+export async function abortMultipartUpload(c) {
+  const { slug, filename, uploadId } = await c.req.json().catch(() => ({}));
+  if (!slug || !filename || !uploadId) {
+    return c.json({ error: 'slug, filename and uploadId required', code: 'INVALID_PARAMS' }, 400);
+  }
+  const client = s3Client(c);
+  if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
+  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const key = mediaKey(slug, filename);
+  try {
+    await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
+    return c.json({ ok: true });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
+  }
 }

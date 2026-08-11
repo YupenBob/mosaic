@@ -7,7 +7,7 @@ Mosaic 把媒体与内容分离：Markdown 文本进 Git，二进制媒体进 Cl
 ## 媒体如何进入平台
 
 1. 在 Admin 编辑器打开文章，把文件拖入上传区
-2. 浏览器向 Worker 请求预签名 URL（`POST /api/upload/presign`），随后**直连 R2** 上传（单文件最大 5GB），完成后调 `POST /api/upload/complete` 标记待构建
+2. 浏览器向 Worker 请求预签名 URL（`POST /api/upload/presign`），随后**直连 R2** 上传（单文件最大 5GB），完成后调 `POST /api/upload/complete` 标记待构建；**超过 100MB 的大文件自动走分片上传**（`/api/upload/multipart/*`，默认每片 100MB、3 并发、每片重试 3 次），断线/刷新后重试会从已上传分片继续，无需从头传
 3. 在构建中心点击"构建并部署"，管线从 `originals/` 拉取并压缩
 
 > 禁止用 Playwright / curl / 脚本手动上传到 R2 绕过管线；管线故障应从根源修复。

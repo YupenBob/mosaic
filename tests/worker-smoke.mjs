@@ -71,9 +71,55 @@ const gh = new Map([
 let mockRunStatus = 'in_progress';
 let mockGithubDown = false;
 let lastDispatchBody = null;
+let mpSeq = 0;
+const mpUploads = new Set();
+const mpAborted = new Set();
 const ghFetch = async (url, opts = {}) => {
   const prefix = 'https://api.github.com/repos/test/repo/contents/';
-  const href = String(url);
+  const href = typeof url === 'string' ? url : String(url?.url || url);
+  const method = (opts?.method || url?.method || 'GET').toUpperCase();
+  if (href.includes('.r2.cloudflarestorage.com')) {
+    const u = new URL(href);
+    if (u.searchParams.get('uploads') !== null) {
+      const id = `test-mp-${++mpSeq}`;
+      mpUploads.add(id);
+      return new Response(
+        `<?xml version="1.0"?><InitiateMultipartUploadResult><Bucket>b</Bucket><Key>k</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`,
+        { status: 200, headers: { 'Content-Type': 'application/xml' } },
+      );
+    }
+    const uploadId = u.searchParams.get('uploadId');
+    if (uploadId) {
+      if (mpAborted.has(uploadId)) {
+        return new Response('<?xml version="1.0"?><Error><Code>NoSuchUpload</Code></Error>', {
+          status: 404,
+          headers: { 'Content-Type': 'application/xml' },
+        });
+      }
+      if (method === 'DELETE') {
+        mpAborted.add(uploadId);
+        // R2 returns 204; Node's fetch-http-handler deserializer trips on an
+        // empty 204 body ("stream.pipe is not a function"), so the mock uses a
+        // 200 XML body. Real behavior is verified live against R2.
+        return new Response(
+          '<?xml version="1.0"?><AbortMultipartUploadResult><UploadId>' +
+            uploadId +
+            '</UploadId></AbortMultipartUploadResult>',
+          { status: 200, headers: { 'Content-Type': 'application/xml' } },
+        );
+      }
+      return new Response(
+        '<?xml version="1.0"?><ListPartsResult><Bucket>b</Bucket><Key>k</Key><UploadId>' +
+          uploadId +
+          '</UploadId><IsTruncated>false</IsTruncated></ListPartsResult>',
+        { status: 200, headers: { 'Content-Type': 'application/xml' } },
+      );
+    }
+    return new Response('<?xml version="1.0"?><Error><Code>NoSuchUpload</Code></Error>', {
+      status: 404,
+      headers: { 'Content-Type': 'application/xml' },
+    });
+  }
   if (href.includes('/rate_limit')) {
     return new Response(
       JSON.stringify(mockGithubDown ? { message: 'down' } : { resources: { core: { limit: 5000, remaining: 4999 } } }),
@@ -374,6 +420,51 @@ await record('presign URL + complete (direct-to-R2 flow)', async () => {
   assert.equal((await done.json()).size, 1);
   const dirty = await (await call('/api/dirty', { token: TOKEN })).json();
   assert.ok((dirty.count || 0) >= 1, 'dirty marked after complete');
+});
+
+await record('multipart upload start/parts/complete/abort/resume', async () => {
+  const s = await (
+    await call('/api/upload/multipart/start', {
+      method: 'POST',
+      token: TOKEN,
+      body: { slug: 'a', filename: 'big.mp4', size: 350000000, contentType: 'video/mp4' },
+    })
+  ).json();
+  assert.ok(s.uploadId && s.partSize && s.partCount === 4 && s.parts.length === 4, JSON.stringify(s).slice(0, 200));
+  const resume = await (
+    await call('/api/upload/multipart/start', {
+      method: 'POST',
+      token: TOKEN,
+      body: { slug: 'a', filename: 'big.mp4', size: 350000000, uploadId: s.uploadId },
+    })
+  ).json();
+  assert.equal(resume.uploadId, s.uploadId, 'resume reuses the same uploadId');
+  const parts = await (
+    await call('/api/upload/multipart/parts', {
+      method: 'POST',
+      token: TOKEN,
+      body: { slug: 'a', filename: 'big.mp4', uploadId: s.uploadId },
+    })
+  ).json();
+  assert.equal(parts.parts.length, 0);
+  const emptyComplete = await call('/api/upload/multipart/complete', {
+    method: 'POST',
+    token: TOKEN,
+    body: { slug: 'a', filename: 'big.mp4', uploadId: s.uploadId },
+  });
+  assert.equal(emptyComplete.status, 400, 'complete without parts must fail');
+  const aborted = await call('/api/upload/multipart/abort', {
+    method: 'POST',
+    token: TOKEN,
+    body: { slug: 'a', filename: 'big.mp4', uploadId: s.uploadId },
+  });
+  assert.equal(aborted.status, 200);
+  const staleResume = await call('/api/upload/multipart/start', {
+    method: 'POST',
+    token: TOKEN,
+    body: { slug: 'a', filename: 'big.mp4', size: 350000000, uploadId: s.uploadId },
+  });
+  assert.equal(staleResume.status, 404, 'resume of an aborted upload must 404');
 });
 
 // ── 10. Login rate limiting ──
@@ -687,4 +778,4 @@ await record('GET /api/dirty (count state)', async () => {
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 36) process.exit(1);
+if (passed < 37) process.exit(1);

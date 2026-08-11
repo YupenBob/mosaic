@@ -6,7 +6,36 @@ import { upload, getToken } from '../src/api.js';
 import { t } from './i18n.js';
 import { escHtml } from './ui.js';
 
-const CONCURRENCY = 2;
+const CONCURRENCY = 3;
+// Files above this size use resumable multipart uploads (R2 part uploads).
+const MULTIPART_THRESHOLD = 100 * 1024 * 1024;
+const MP_CONCURRENCY = 3;
+const MP_PART_RETRIES = 3;
+const MP_STATE_PREFIX = 'mosaic_mp_';
+
+function mpStateKey(slug, filename) {
+  return MP_STATE_PREFIX + slug + '/' + filename;
+}
+
+function mpSave(slug, filename, state) {
+  try {
+    localStorage.setItem(mpStateKey(slug, filename), JSON.stringify(state));
+  } catch {}
+}
+
+function mpLoad(slug, filename, size) {
+  try {
+    const s = JSON.parse(localStorage.getItem(mpStateKey(slug, filename)) || 'null');
+    if (s && s.uploadId && s.size === size && s.partSize && s.partCount) return s;
+  } catch {}
+  return null;
+}
+
+function mpClear(slug, filename) {
+  try {
+    localStorage.removeItem(mpStateKey(slug, filename));
+  } catch {}
+}
 
 function currentSlug() {
   return document.getElementById('fm-slug')?.value || '';
@@ -167,7 +196,12 @@ function progressUI(item, pct) {
 
 function cancelItem(item) {
   item.status = 'cancelled';
-  if (item.controller) item.controller.abort();
+  if (item._xhrs && item._xhrs.size) {
+    for (const xhr of item._xhrs) xhr.abort();
+    item._xhrs.clear();
+  } else if (item.controller) {
+    item.controller.abort();
+  }
   item.el.classList.remove('upload-done', 'upload-error');
   setState(item, 'cancelled', '—');
 }
@@ -206,6 +240,9 @@ async function runSingle(item) {
 }
 
 async function uploadFilePresigned(item) {
+  // Large files: resumable multipart (parts upload straight to R2).
+  if (item.file.size > MULTIPART_THRESHOLD) return uploadFileMultipart(item);
+
   let presigned;
   try {
     presigned = await upload.presign(item.slug, item.file.name, item.file.type || 'application/octet-stream');
@@ -251,6 +288,120 @@ async function uploadFilePresigned(item) {
       resolve(false);
     });
     xhr.send(item.file);
+  });
+}
+
+async function uploadFileMultipart(item) {
+  const { slug, filename, file } = item;
+  const stored = mpLoad(slug, filename, file.size);
+  let started;
+  try {
+    started = await upload.multipartStart(slug, filename, file.size, file.type, stored?.uploadId);
+  } catch (e) {
+    if (stored && stored.uploadId) {
+      // Stale uploadId (aborted/expired server-side) — start a fresh upload.
+      mpClear(slug, filename);
+      started = await upload.multipartStart(slug, filename, file.size, file.type);
+    } else {
+      throw e;
+    }
+  }
+  const { uploadId, partSize, partCount, parts } = started;
+  mpSave(slug, filename, { uploadId, partSize, partCount, size: file.size });
+
+  let doneSet = new Set();
+  if (stored && stored.uploadId) {
+    const res = await upload.multipartParts(slug, filename, uploadId).catch(() => ({ parts: [] }));
+    doneSet = new Set((res.parts || []).map((p) => p.partNumber));
+  }
+  item._mpDoneBytes = doneSet.size * partSize;
+  progressUI(item, Math.min(99, Math.round((item._mpDoneBytes / file.size) * 100)));
+  const pending = parts.filter((p) => !doneSet.has(p.partNumber));
+
+  try {
+    await runParts(item, pending, partSize);
+  } catch (err) {
+    if (item.status === 'cancelled') {
+      upload.multipartAbort(slug, filename, uploadId).catch(() => {});
+      mpClear(slug, filename);
+    }
+    throw err;
+  }
+  await upload.multipartComplete(slug, filename, uploadId);
+  mpClear(slug, filename);
+  return true;
+}
+
+async function runParts(item, pending, partSize) {
+  let idx = 0;
+  const workers = [];
+  for (let i = 0; i < Math.min(MP_CONCURRENCY, pending.length); i++) workers.push(worker());
+  await Promise.all(workers);
+
+  async function worker() {
+    while (idx < pending.length) {
+      const part = pending[idx++];
+      if (item.status === 'cancelled') return;
+      await uploadPartWithRetry(item, part, partSize);
+    }
+  }
+}
+
+async function uploadPartWithRetry(item, part, partSize) {
+  let lastErr;
+  for (let attempt = 1; attempt <= MP_PART_RETRIES; attempt++) {
+    if (item.status === 'cancelled') throw new Error('Cancelled');
+    try {
+      await uploadPartXhr(item, part, partSize);
+      item._mpDoneBytes += partSize;
+      progressUI(item, Math.min(99, Math.round((item._mpDoneBytes / item.file.size) * 100)));
+      return;
+    } catch (e) {
+      if (e.message === 'Cancelled') throw e;
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+  throw lastErr || new Error('Part upload failed');
+}
+
+function uploadPartXhr(item, part, partSize) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    if (!item._xhrs) item._xhrs = new Set();
+    item._xhrs.add(xhr);
+    xhr.open('PUT', part.url);
+    xhr.setRequestHeader('Content-Type', item.file.type || 'application/octet-stream');
+    xhr.timeout = 600000;
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && item.status !== 'cancelled') {
+        progressUI(item, Math.min(99, Math.round(((item._mpDoneBytes + e.loaded) / item.file.size) * 100)));
+      }
+    });
+    const done = () => {
+      item._xhrs.delete(xhr);
+      item.controller = null;
+    };
+    xhr.addEventListener('load', () => {
+      done();
+      if (xhr.status >= 200 && xhr.status < 300) resolve(part.partNumber);
+      else reject(new Error('HTTP ' + xhr.status + ' (part ' + part.partNumber + ')'));
+    });
+    xhr.addEventListener('error', () => {
+      done();
+      reject(new Error('Network error (part ' + part.partNumber + ')'));
+    });
+    xhr.addEventListener('timeout', () => {
+      done();
+      reject(new Error('Timeout (part ' + part.partNumber + ')'));
+    });
+    xhr.addEventListener('abort', () => {
+      done();
+      reject(new Error('Cancelled'));
+    });
+    const start = (part.partNumber - 1) * partSize;
+    const end = Math.min(item.file.size, start + partSize);
+    xhr.send(item.file.slice(start, end));
   });
 }
 
