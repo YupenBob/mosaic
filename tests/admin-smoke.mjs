@@ -130,6 +130,18 @@ try {
     console.error('Taxonomy smoke failed: expected heading + category/tag count badges');
     process.exitCode = 1;
   }
+
+  // Cleanup page: orphan stats + scan UI render
+  await page.evaluate(() => {
+    location.hash = 'cleanup';
+  });
+  await page.waitForTimeout(4000);
+  const cleanupStatCards = await page.locator('.cleanup-stat-row .dash-big-card').count();
+  console.log(`Cleanup page loaded — statCards=${cleanupStatCards}`);
+  if (cleanupStatCards < 2) {
+    console.error('Cleanup smoke failed: expected orphan stats cards');
+    process.exitCode = 1;
+  }
   await page.close();
 } finally {
   await browser.close();
