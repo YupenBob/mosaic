@@ -29,7 +29,9 @@ try {
   // Chart.js/marked/purify are self-hosted in js/vendor; abort only slow or
   // slow/non-essential third parties.
   await page.route(/(busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
-  await page.goto(ADMIN_URL, { timeout: 30000, waitUntil: 'domcontentloaded' });
+  // Slow links (e.g. long-tail JS/CSS delivery) can delay DOMContentLoaded;
+  // CI runners are fast, but local machines need headroom.
+  await page.goto(ADMIN_URL, { timeout: 60000, waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#login-screen', { timeout: 15000 });
   await page.fill('#login-password', password);
   await page.click('#login-btn');
@@ -97,6 +99,35 @@ try {
   );
   if (!slugVisible || !titleVisible || !bodyVisible || mediaInput < 1) {
     console.error('Editor smoke failed: expected slug/title/body fields + media input');
+    process.exitCode = 1;
+  }
+
+  // Config page: section cards render
+  await page.evaluate(() => {
+    location.hash = 'config';
+  });
+  await page.waitForTimeout(4000);
+  const configSections = await page.locator('.config-section').count();
+  console.log(`Config page loaded — sections=${configSections}`);
+  if (configSections < 1) {
+    console.error('Config smoke failed: expected config section cards');
+    process.exitCode = 1;
+  }
+
+  // Taxonomy page: category/tag lists render
+  await page.evaluate(() => {
+    location.hash = 'taxonomy';
+  });
+  await page.waitForTimeout(4000);
+  const taxHeading = await page
+    .locator('#main-content h1')
+    .first()
+    .textContent()
+    .catch(() => '');
+  const badges = await page.locator('.badge').count();
+  console.log(`Taxonomy page loaded — heading=${taxHeading.trim() || '(empty)'}, badges=${badges}`);
+  if (!taxHeading.trim() || badges < 1) {
+    console.error('Taxonomy smoke failed: expected heading + category/tag count badges');
     process.exitCode = 1;
   }
   await page.close();
