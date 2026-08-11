@@ -78,12 +78,16 @@ test('Worker health endpoint responds', async ({ page }) => {
   console.log('Worker health:', JSON.stringify(json));
 });
 
-test('mobile viewport: video post loads with HLS source', async ({ page, browserName }) => {
-  test.skip(browserName !== 'chromium', 'mobile emulation only supported in chromium');
+const MOBILE_VIEWPORTS = [
+  { name: 'iPhone 13', width: 390, height: 844 },
+  { name: 'Pixel 7', width: 412, height: 915 },
+  { name: 'small phone', width: 320, height: 568 },
+];
+
+async function assertMobileHls(page) {
   // Let hls.js load for this test (the global beforeEach aborts jsdelivr)
   await page.unrouteAll();
   await page.route(/(busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
-  await page.setViewportSize({ width: 390, height: 844 });
   // Discover a video post from the generated data instead of hardcoding a slug
   // (posts may be renamed/removed; only skip when this build has no video).
   const posts = await fetch(`${SITE}/data/posts.json`)
@@ -107,7 +111,14 @@ test('mobile viewport: video post loads with HLS source', async ({ page, browser
   console.log(
     `Mobile HLS: source=${hlsUrl} status=${playlistResp.status()} acao=${playlistResp.headers()['access-control-allow-origin']} hls.js=${hlsLoaded}`,
   );
-});
+}
+
+for (const vp of MOBILE_VIEWPORTS) {
+  test(`mobile viewport (${vp.name}): video post loads with HLS source`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await assertMobileHls(page);
+  });
+}
 
 test('admin login page loads', async ({ page }) => {
   test.skip(SKIP_ADMIN, 'ADMIN unset');

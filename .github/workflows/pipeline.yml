@@ -184,6 +184,17 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
           exit $EXIT
 
+      - name: Mobile HLS matrix on WebKit (device viewports)
+        run: |
+          npx playwright install --with-deps webkit
+          npx serve dist -l 3001 >/dev/null 2>&1 &
+          SERVER_PID=$!
+          sleep 3
+          SITE=http://127.0.0.1:3001 ADMIN=skip npx playwright test tests/frontend.spec.js --grep "mobile viewport" --browser=webkit --reporter=list
+          EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          exit $EXIT
+
       - name: Progress — upload
         env:
           R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
