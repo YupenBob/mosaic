@@ -224,6 +224,23 @@ textarea {
 }
 
 /* Dirty banner */
+.build-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-secondary, #555);
+  background: color-mix(in srgb, var(--color-accent, #4361ee) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent, #4361ee) 24%, transparent);
+  border-radius: 10px;
+}
+.build-note i {
+  margin-top: 2px;
+  color: var(--color-accent, #4361ee);
+}
 .dirty-banner {
   display: flex;
   align-items: center;

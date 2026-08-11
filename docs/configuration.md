@@ -37,10 +37,19 @@
 | `videoQuality.crf` | number | `23` | FFmpeg CRF（越小画质越好体积越大） |
 | `videoQuality.preset` | string | `"veryfast"` | FFmpeg preset（越快耗时越短） |
 | `videoQuality.maxHeight` | number | `1080` | 转码顶格档位（2160=4K、1080=1080p…） |
+| `videoQuality.uploadAfterTiers` | number | `1` | 每转完 n 个清晰度上传一批（1=每档即传，5=全部完成再传） |
 | `enableVideoCompression` | boolean | `true` | 视频转码总开关 |
 | `enableBusuanzi` | boolean | `true` | 不蒜子第三方计数（与 Mosaic 实时统计并存显示） |
 
 音乐固定转码 MP3 128k/320k，无需额外配置。
+
+## 构建
+
+| 字段 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `build.timeoutMinutes` | number | `90` | 单次构建超时（10–360）。后台触发生效；push 自动构建固定 90 |
+
+视频转码按档位升序（240p→4K）边转边传，并带断点续传与时间预算保护（85% 超时后跳过剩余高档位，下次构建续传补齐），详见 [operations.md](operations.md)。
 
 ## 媒体源
 

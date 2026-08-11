@@ -25,6 +25,7 @@ export default async function renderConfig(signal) {
     ['author', 'ri-user-line', t('config.author'), authorSection(cfg)],
     ['theme', 'ri-palette-line', t('config.theme'), themeSection(cfg)],
     ['media', 'ri-image-line', t('config.media'), mediaSection(cfg)],
+    ['build', 'ri-rocket-line', t('config.build'), buildSection(cfg)],
     ['features', 'ri-toggle-line', t('config.features'), featuresSection(cfg)],
     ['giscus', 'ri-chat-3-line', t('config.giscus'), giscusSection(cfg)],
     ['plugins', 'ri-puzzle-line', t('config.plugins'), pluginsSection(cfg)],
@@ -281,6 +282,19 @@ function mediaSection(cfg) {
           )
           .join('')}</select></label>
       </div>
+    </div>
+  `;
+}
+
+function buildSection(cfg) {
+  return `
+    <div class="config-field">
+      <label class="config-label"><span>${t('config.buildTimeout')}</span><small>${t('config.buildTimeoutHint')}</small></label>
+      <input type="number" class="input" data-config="build.timeoutMinutes" data-type="number" value="${cfgGet(cfg, 'build.timeoutMinutes', 90)}" min="10" max="360" step="5" style="width:120px" />
+    </div>
+    <div class="config-field">
+      <label class="config-label"><span>${t('config.uploadAfterTiers')}</span><small>${t('config.uploadAfterTiersHint')}</small></label>
+      <input type="number" class="input" data-config="videoQuality.uploadAfterTiers" data-type="number" value="${cfgGet(cfg, 'videoQuality.uploadAfterTiers', 1)}" min="1" max="5" step="1" style="width:120px" />
     </div>
   `;
 }

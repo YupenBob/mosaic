@@ -79,6 +79,11 @@ export default async function renderBuild(signal) {
           </div>
         </div>
 
+        <div class="build-note">
+          <i class="ri-information-line"></i>
+          <span>${t('build.streamingNote')} ${t('build.timeoutNote')}</span>
+        </div>
+
         <div class="build-summary">
           <div class="dash-big-card build-summary-card"><span class="dash-big-num">${summary.successRate}</span><span class="dash-big-label">${t('build.successRate')}</span></div>
           <div class="dash-big-card build-summary-card"><span class="dash-big-num">${summary.avgDur}</span><span class="dash-big-label">${t('build.avgDuration')}</span></div>

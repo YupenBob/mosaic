@@ -6,6 +6,7 @@
 
 - 媒体 checksum 缓存：`dist/.media-checksums.json`，由 GitHub Actions `actions/cache` 存/取
 - v2 起缓存内包含**产物清单**（每视频档位、封面/照片宽高比），因此缓存命中时 `compress` 秒级跳过，`generate` 仍能正确输出 HLS 与封面
+- 构建期间 checksums 会逐档镜像到 R2 `site-data/media-checksums.json`：构建被取消/超时时，下一次构建从最后完成的档位**续传**，而不是整段视频重转
 - 缓存命中（内容未变）构建约 **3 分钟**；媒体变更时视转码量 10–20 分钟
 
 ### 何时会全量重建
@@ -14,11 +15,18 @@
 - 新增/修改/删除媒体文件
 - 缓存被 GitHub 清理（7 天无访问或超 10GB）
 
+### 构建超时与视频转码
+
+- `build.timeoutMinutes`（设置 → 构建）控制单次构建超时，默认 90 分钟（范围 10–360）。后台触发的构建经 `workflow_dispatch` input 传入该值；push 自动构建无 inputs，固定 90 分钟
+- 视频按档位**升序**（240p→4K）转码并**边转边传**：`videoQuality.uploadAfterTiers`（默认 1 = 每档即传）控制每完成 n 档上传一批（该档 mp4/m3u8/ts 随档即传，poster/master 最后上传）
+- **时间预算保护**：已用时长达到超时值的 85%（默认 90 分钟 → 约 76 分钟）后跳过剩余高档位，用已完成档位生成 master 并继续构建部署；缺失档位由下一次构建续传补齐（续传前对 R2 做 HEAD 校验，缺失即补转）
+- 最终 `worker/scripts/upload-videos.mjs` 为 **reconcile**：对每个本地文件先 HEAD，R2 已存在即跳过、缺失才上传（幂等兜底）
+
 ### 加速建议
 
 - 视频转码档位受 `videoQuality.maxHeight` 控制：默认 1080p，调低（720p）可显著缩短转码
 - `videoQuality.preset` 调快（如 `ultrafast`）进一步减少耗时，体积略增
-- 视频上传并发已为 4；如需可调整 `scripts/upload.js` / `worker/scripts/upload-videos.mjs`
+- 视频上传已并入转码流程（随档上传），无需单独等待；reconcile 步骤只补缺失对象
 
 ## 媒体分发
 

@@ -21,6 +21,10 @@
   "coverAspectMin": 0.5625,
   "coverAspectMax": 999,
 
+  "build": {
+    "timeoutMinutes": 90
+  },
+
   "theme": "auto",
   "headerNav": [],
   "footerText": "",
@@ -28,7 +32,7 @@
   "searchMinChars": 2,
 
   "imageQuality": { "480p": 75, "720p": 80, "1080p": 85 },
-  "videoQuality": { "crf": 23, "preset": "veryfast", "maxHeight": 1080 },
+  "videoQuality": { "crf": 23, "preset": "veryfast", "maxHeight": 1080, "uploadAfterTiers": 1 },
 
   "cardShowTags": true,
   "cardShowStats": true,

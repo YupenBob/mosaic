@@ -51,6 +51,21 @@ for (const q of ['imageQuality', 'videoQuality']) {
     fail(`config.${q} must be an object`);
   }
 }
+if (cfg.build !== undefined && (typeof cfg.build !== 'object' || cfg.build === null)) {
+  fail('config.build must be an object');
+}
+if (cfg.build?.timeoutMinutes !== undefined) {
+  const t = cfg.build.timeoutMinutes;
+  if (!Number.isInteger(t) || t < 10 || t > 360) {
+    fail('config.build.timeoutMinutes must be an integer between 10 and 360');
+  }
+}
+if (cfg.videoQuality?.uploadAfterTiers !== undefined) {
+  const n = cfg.videoQuality.uploadAfterTiers;
+  if (!Number.isInteger(n) || n < 1 || n > 5) {
+    fail('config.videoQuality.uploadAfterTiers must be an integer between 1 and 5');
+  }
+}
 for (const group of ['plugins', 'components']) {
   if (cfg[group] !== undefined && (typeof cfg[group] !== 'object' || cfg[group] === null)) {
     fail(`config.${group} must be an object`);
