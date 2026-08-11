@@ -69,10 +69,17 @@ const gh = new Map([
 ]);
 
 let mockRunStatus = 'in_progress';
+let mockGithubDown = false;
 let lastDispatchBody = null;
 const ghFetch = async (url, opts = {}) => {
   const prefix = 'https://api.github.com/repos/test/repo/contents/';
   const href = String(url);
+  if (href.includes('/rate_limit')) {
+    return new Response(
+      JSON.stringify(mockGithubDown ? { message: 'down' } : { resources: { core: { limit: 5000, remaining: 4999 } } }),
+      { status: mockGithubDown ? 500 : 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
   if (href.includes('/actions/workflows/pipeline.yml/dispatches')) {
     lastDispatchBody = JSON.parse(opts.body || '{}');
     return new Response(null, { status: 204 });
@@ -178,7 +185,36 @@ async function record(name, fn) {
 await record('GET /api/health', async () => {
   const r = await call('/api/health');
   assert.equal(r.status, 200);
-  assert.equal((await r.json()).status, 'ok');
+  const body = await r.json();
+  assert.equal(body.status, 'ok');
+  assert.equal(body.version, '1.0.0');
+});
+
+await record('GET /api/health/github (real probe, up/down)', async () => {
+  const ok = await (await call('/api/health/github')).json();
+  assert.equal(ok.status, 'ok');
+  assert.equal(ok.httpStatus, 200);
+  assert.ok(Number.isFinite(ok.latency));
+  mockGithubDown = true;
+  const down = await (await call('/api/health/github')).json();
+  assert.equal(down.status, 'error');
+  mockGithubDown = false;
+});
+
+await record('GET /api/health/r2 (real probe, up/down)', async () => {
+  const ok = await (await call('/api/health/r2')).json();
+  assert.equal(ok.status, 'ok');
+  assert.ok(Number.isFinite(ok.latency));
+  const broken = env({
+    MEDIA: {
+      ...media,
+      head: async () => {
+        throw new Error('boom');
+      },
+    },
+  });
+  const down = await (await call('/api/health/r2', { bindings: broken })).json();
+  assert.equal(down.status, 'error');
 });
 
 // ── 2. Login: wrong password → 401, correct → token ──
@@ -574,7 +610,9 @@ await record('taxonomy delete (tag + category removed from posts)', async () => 
   assert.ok(rt.affected >= 1);
   const md = gh.get('content/posts/a/index.md');
   assert.ok(!md.includes('"z"') && !md.includes('z,'));
-  const rc = await (await call('/api/taxonomy/category', { method: 'DELETE', token: TOKEN, body: { name: 'photography' } })).json();
+  const rc = await (
+    await call('/api/taxonomy/category', { method: 'DELETE', token: TOKEN, body: { name: 'photography' } })
+  ).json();
   assert.ok(rc.affected >= 1);
   assert.ok(!gh.get('content/posts/a/index.md').includes('photography'));
 });
@@ -610,4 +648,4 @@ await record('GET /api/dirty (count state)', async () => {
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 32) process.exit(1);
+if (passed < 34) process.exit(1);

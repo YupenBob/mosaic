@@ -3,7 +3,10 @@
  * Requires ADMIN_URL env (default production) and the admin password from
  * worker/.dev.vars (ADMIN_PASSWORD). Never prints the password.
  *
- * Usage: node tests/admin-smoke.mjs
+ * Usage: node tests/admin-smoke.mjs (or npm run test:admin)
+ * Wired into `npm run check`: skips cleanly when worker/.dev.vars has no
+ * ADMIN_PASSWORD (CI has no local secrets), so local checks get a real login
+ * while CI stays green without credentials.
  */
 import { chromium } from 'playwright';
 import fs from 'fs';
@@ -13,8 +16,8 @@ const devVars = fs.readFileSync(new URL('../worker/.dev.vars', import.meta.url),
 const password = (devVars.match(/^ADMIN_PASSWORD=(.*)$/m) || [])[1]?.trim() || '';
 
 if (!password) {
-  console.error('ADMIN_PASSWORD not found in worker/.dev.vars');
-  process.exit(1);
+  console.log('SKIP admin-smoke — ADMIN_PASSWORD not found in worker/.dev.vars (CI has no local secrets)');
+  process.exit(0);
 }
 
 const browser = await chromium.launch({ headless: true });

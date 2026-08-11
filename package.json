@@ -7,10 +7,11 @@
     "compress": "node scripts/compress.js",
     "build": "node scripts/generate.js && node scripts/generate-brand-assets.js && node scripts/minify.mjs",
     "serve": "npx serve dist",
-    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs scripts/sync-proxy.mjs scripts/minify.mjs scripts/validate-config.mjs scripts/media-names.mjs scripts/blocks.mjs scripts/media-utils.mjs shared/pages-proxy.mjs worker/scripts/r2-upload.mjs worker/scripts/upload-videos.mjs && node scripts/sync-proxy.mjs --check && node scripts/validate-config.mjs && node tests/blocks-smoke.mjs && node tests/upload-logic-smoke.mjs && node tests/generate-data-smoke.mjs && node tests/worker-smoke.mjs && node tests/build-smoke.mjs",
+    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs scripts/sync-proxy.mjs scripts/minify.mjs scripts/validate-config.mjs scripts/media-names.mjs scripts/blocks.mjs scripts/media-utils.mjs shared/pages-proxy.mjs worker/scripts/r2-upload.mjs worker/scripts/upload-videos.mjs && node scripts/sync-proxy.mjs --check && node scripts/validate-config.mjs && node tests/blocks-smoke.mjs && node tests/upload-logic-smoke.mjs && node tests/generate-data-smoke.mjs && node tests/worker-smoke.mjs && node tests/admin-smoke.mjs && node tests/build-smoke.mjs",
     "validate": "node scripts/validate-config.mjs",
     "minify": "node scripts/minify.mjs",
     "test:e2e:local": "node tests/local-e2e.mjs",
+    "test:admin": "node tests/admin-smoke.mjs",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

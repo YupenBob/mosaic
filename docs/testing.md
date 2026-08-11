@@ -40,10 +40,10 @@ SITE=http://localhost:3000 ADMIN=skip API=http://localhost:8787 node tests/check
 ### Admin 端到端（真实登录）
 
 ```bash
-node tests/admin-smoke.mjs
+node tests/admin-smoke.mjs   # 或 npm run test:admin
 ```
 
-读取 `worker/.dev.vars` 中的 `ADMIN_PASSWORD` 登录生产后台，验证仪表盘与文章列表渲染。需要网络与有效密码。
+已接入 `npm run check`：本地读取 `worker/.dev.vars` 中的 `ADMIN_PASSWORD` 登录后台，验证仪表盘与文章列表渲染；CI 无凭证时自动跳过。`ADMIN_URL` 环境变量可覆盖目标地址。需要网络与有效密码。
 
 ## CI 集成
 
@@ -52,7 +52,7 @@ node tests/admin-smoke.mjs
 每次构建自动执行：
 
 ```bash
-npm run check             # node --check 全部脚本 + proxy 同步校验 + config 校验 + worker-smoke + build-smoke
+npm run check             # node --check 全部脚本 + proxy 同步校验 + config 校验 + worker-smoke + admin-smoke + build-smoke
 npm run lint              # ESLint（0 警告）
 npm run format:check      # Prettier 格式校验
 npx playwright install --with-deps chromium

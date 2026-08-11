@@ -53,9 +53,17 @@ export default async function renderDashboard(signal) {
   activities.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
 
   const healthItems = [
-    { name: t('dashboard.healthWorker'), status: healthData.status === 'ok' ? 'ok' : 'down' },
-    { name: t('dashboard.healthGithub'), status: healthGithub.status === 'ok' ? 'ok' : 'down' },
-    { name: t('dashboard.healthR2'), status: healthR2.status === 'ok' ? 'ok' : 'down' },
+    {
+      name: t('dashboard.healthWorker'),
+      status: healthData.status === 'ok' ? 'ok' : 'down',
+      latency: healthData.latency,
+    },
+    {
+      name: t('dashboard.healthGithub'),
+      status: healthGithub.status === 'ok' ? 'ok' : 'down',
+      latency: healthGithub.latency,
+    },
+    { name: t('dashboard.healthR2'), status: healthR2.status === 'ok' ? 'ok' : 'down', latency: healthR2.latency },
     { name: t('dashboard.healthPages'), status: healthData.status === 'ok' ? 'ok' : 'down' },
   ];
   const allHealthy = healthItems.every((h) => h.status === 'ok');
@@ -106,7 +114,7 @@ export default async function renderDashboard(signal) {
             <div class="dash-health-item">
               <span class="dash-health-dot ${h.status === 'ok' ? 'healthy' : 'down'}"></span>
               <span class="dash-health-name">${h.name}</span>
-              <span class="dash-health-info">${h.status === 'ok' ? t('common.ok') : '—'}</span>
+              <span class="dash-health-info">${h.status === 'ok' ? t('common.ok') + (h.latency != null ? ` · ${h.latency}ms` : '') : '—'}</span>
             </div>`,
             )
             .join('')}

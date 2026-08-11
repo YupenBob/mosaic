@@ -7,7 +7,7 @@ function headers(c) {
   return {
     Authorization: `Bearer ${c.env.GITHUB_TOKEN}`,
     Accept: 'application/vnd.github+json',
-    'User-Agent': 'Mosaic-Worker/0.8',
+    'User-Agent': 'Mosaic-Worker/1.0',
   };
 }
 
