@@ -97,6 +97,32 @@ test('gallery: open post gallery and switch quality', async ({ page }) => {
   console.log(`Gallery quality switch: src=${src}`);
 });
 
+test('video player: custom controls render and quality menu opens', async ({ page }) => {
+  const posts = await fetch(`${SITE}/data/posts.json`)
+    .then((r) => r.json())
+    .catch(() => []);
+  const videoPost = (posts || []).find((p) => (p.videos || []).length > 0);
+  test.skip(!videoPost, 'no video post in this build');
+  const resp = await page.goto(`${SITE}/posts/${videoPost.slug}/`, {
+    timeout: 60000,
+    waitUntil: 'domcontentloaded',
+  });
+  expect(resp.status()).toBe(200);
+  await page.waitForSelector('.video-element[data-hls="true"]', { timeout: 15000 });
+  // Controls reveal on hover over the container.
+  await page.hover('.video-container');
+  await page.locator('.video-big-play').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('.vc-quality-btn').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('.vc-quality-btn').click();
+  // Quality options are populated once the HLS manifest parses.
+  await page.waitForFunction(() => document.querySelectorAll('.vc-quality-menu button').length > 0, null, {
+    timeout: 15000,
+  });
+  const opts = await page.locator('.vc-quality-menu button').count();
+  expect(opts).toBeGreaterThan(0);
+  console.log(`Video controls: quality options=${opts}`);
+});
+
 test('search filters posts (query -> dropdown + grid)', async ({ page }) => {
   await page.goto(SITE, { waitUntil: 'domcontentloaded' });
   // Discover a query that uniquely matches one post across title/description/
