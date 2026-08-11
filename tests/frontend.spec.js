@@ -94,7 +94,19 @@ test('search filters posts (query -> dropdown + grid)', async ({ page }) => {
   test.skip(!query, 'no uniquely-searchable post in this build');
   const input = page.locator('.search-input');
   await input.waitFor({ state: 'visible', timeout: 10000 });
-  await input.fill(query);
+  // initSearch wires the input listener only after posts.json loads + dynamic
+  // imports; wait for the grid to render (initFilter done), then fill — and
+  // re-fill if we still raced ahead of the listener.
+  await page.locator('.post-card').first().waitFor({ state: 'visible', timeout: 15000 });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await input.fill(query);
+    const items = await page
+      .locator('.search-result-item')
+      .count()
+      .catch(() => 0);
+    if (items > 0) break;
+    await page.waitForTimeout(1200);
+  }
   await page.locator('.search-result-item').first().waitFor({ state: 'visible', timeout: 8000 });
   const results = await page.locator('.search-result-item').count();
   expect(results).toBe(1);
