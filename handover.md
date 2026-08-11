@@ -288,6 +288,7 @@ Worker 内存缓存 Github API 响应：
 | `CF_ACCOUNT_ID` | Cloudflare 账户 ID | Worker Secrets |
 | `CLOUDFLARE_API_TOKEN` | CF API 令牌 | GitHub Secrets |
 | `PROXY_SECRET` | Pages Functions → Worker 的 IP 透传签名（Worker Secret + 两个 Pages 项目 Secret） | 部署时设置 |
+| `API_TARGET` | 代理转发的 Worker API 地址（可选，默认 `https://mosaic-api.xsanye.cn`；两个 Pages 项目 Secret） | 可选 |
 | `DEV_MODE` | 本地开发：未配置 ADMIN_PASSWORD 时显式允许无鉴权 | Worker（可选） |
 | `VIDEO_CACHE_CONTROL` | 视频上传器缓存头（默认 no-store；配 CORS Transform Rule 后改 max-age 恢复边缘缓存） | CI（可选） |
 

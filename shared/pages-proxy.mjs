@@ -5,9 +5,11 @@
  *   - functions/api/[[path]].js             (front site -> Worker)
  *   - cloud-admin/functions/api/[[path]].js (admin -> Worker)
  *
- * Forwards /api/* to the Worker API and signs the visitor's real IP with an
- * HMAC-SHA256 (PROXY_SECRET + per-minute bucket) so the Worker can trust
- * X-Mosaic-Proxy-IP without letting direct callers spoof it.
+ * Forwards /api/* to the Worker API (target overridable via the API_TARGET
+ * environment variable, defaulting to the standard mosaic-api domain) and
+ * signs the visitor's real IP with an HMAC-SHA256 (PROXY_SECRET + per-minute
+ * bucket) so the Worker can trust X-Mosaic-Proxy-IP without letting direct
+ * callers spoof it.
  */
 export async function onRequest(context) {
   const url = new URL(context.request.url);
@@ -20,7 +22,8 @@ export async function onRequest(context) {
     headers.set('X-Mosaic-Proxy-Time', String(minuteBucket));
     headers.set('X-Mosaic-Proxy-Sig', await hmacHex(secret, `${realIp}:${minuteBucket}`));
   }
-  return fetch(`https://mosaic-api.xsanye.cn${url.pathname}${url.search}`, new Request(context.request, { headers }));
+  const target = (context.env.API_TARGET || 'https://mosaic-api.xsanye.cn').replace(/\/+$/, '');
+  return fetch(`${target}${url.pathname}${url.search}`, new Request(context.request, { headers }));
 }
 
 async function hmacHex(secret, message) {

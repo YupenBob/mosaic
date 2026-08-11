@@ -175,6 +175,9 @@ npx wrangler pages deploy ./
 ```bash
 echo "$PROXY_SECRET" | npx wrangler pages secret put PROXY_SECRET --project-name mosaic
 echo "$PROXY_SECRET" | npx wrangler pages secret put PROXY_SECRET --project-name mosaic-admin
+
+> 可选：若 Worker API 域名不是默认的 `mosaic-api.xsanye.cn`，可给两个 Pages 项目设置
+> `API_TARGET`（如 `https://mosaic-api.example.com`），代理即转发到该地址。
 ```
 
 ### 6.2 媒体域 CORS（推荐）
