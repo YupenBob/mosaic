@@ -4,7 +4,7 @@
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { loginHandler, authMiddleware, clientIp, verifyToken } from './auth.js';
+import { loginHandler, authMiddleware, clientIp, verifyToken, trackRateLimit } from './auth.js';
 import {
   listPosts,
   getPost,
@@ -73,6 +73,9 @@ app.use(
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   }),
 );
+
+// ── Track endpoint rate limiting (public write paths) ──
+app.use('/api/track/*', trackRateLimit);
 
 // ====== Auth (no middleware) ======
 app.post('/api/auth/login', loginHandler);

@@ -26,7 +26,7 @@ if (!password) {
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
-  // Keep Chart.js (jsdelivr) reachable — the dashboard needs it; abort only
+  // Chart.js/marked/purify are self-hosted in js/vendor; abort only slow or
   // slow/non-essential third parties.
   await page.route(/(busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
   await page.goto(ADMIN_URL, { timeout: 30000, waitUntil: 'domcontentloaded' });

@@ -387,6 +387,24 @@ await record('login rate limit (429 after 5 failures)', async () => {
   assert.equal(last, 429);
 });
 
+await record('track rate limit (429 after burst, per-IP)', async () => {
+  const h = { 'X-Real-IP': '203.0.113.77' };
+  let limitedAt = null;
+  for (let i = 0; i < 65; i++) {
+    const r = await call('/api/track/view/ratelimit-probe', { method: 'POST', headers: h });
+    if (r.status === 429) {
+      limitedAt = i + 1;
+      break;
+    }
+  }
+  assert.equal(limitedAt, 61, `expected 429 on request 61, got ${limitedAt}`);
+  const other = await call('/api/track/view/ratelimit-probe', {
+    method: 'POST',
+    headers: { 'X-Real-IP': '198.51.100.9' },
+  });
+  assert.equal(other.status, 200, 'a different IP is not rate-limited');
+});
+
 // ── 11. HMAC client IP verification ──
 const signHmac = async (secret, message) => {
   const key = await crypto.subtle.importKey(
@@ -648,4 +666,4 @@ await record('GET /api/dirty (count state)', async () => {
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 34) process.exit(1);
+if (passed < 35) process.exit(1);

@@ -110,6 +110,41 @@ function resetFailures(ip) {
   _failures.delete(ip);
 }
 
+// ── Track endpoint rate limiting (public write paths: view/like/dwell) ──
+// Generous fixed-window guard against spam/hammering, keyed by client IP.
+// The map is bounded: stale entries are pruned once the size is exceeded.
+const TRACK_MAX = 60; // requests per minute per IP
+const TRACK_WINDOW_MS = 60 * 1000;
+const TRACK_MAP_MAX = 5000;
+const _trackCounts = new Map();
+
+function pruneTrackCounts() {
+  if (_trackCounts.size < TRACK_MAP_MAX) return;
+  const now = Date.now();
+  for (const [ip, entry] of _trackCounts) {
+    if (now - entry.start > TRACK_WINDOW_MS) _trackCounts.delete(ip);
+  }
+  while (_trackCounts.size > TRACK_MAP_MAX / 2) {
+    _trackCounts.delete(_trackCounts.keys().next().value);
+  }
+}
+
+export async function trackRateLimit(c, next) {
+  const ip = await clientIp(c);
+  const now = Date.now();
+  const entry = _trackCounts.get(ip);
+  if (!entry || now - entry.start > TRACK_WINDOW_MS) {
+    _trackCounts.set(ip, { start: now, count: 1 });
+    pruneTrackCounts();
+  } else {
+    entry.count += 1;
+    if (entry.count > TRACK_MAX) {
+      return c.json({ error: 'Too many requests, try again later', code: 'TRACK_RATE_LIMITED' }, 429);
+    }
+  }
+  await next();
+}
+
 export async function loginHandler(c) {
   const { password } = await c.req.json().catch(() => ({}));
   const ip = await clientIp(c);
