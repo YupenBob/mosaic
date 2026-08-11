@@ -379,7 +379,8 @@ npx wrangler pages deploy . --project-name mosaic-admin --branch main
 - [x] EXIF 隐私抹除（pipeline 用 exiftool 剥离 originals）
 - [x] 图片放大切换清晰度后保留 zoom（gallery.js）
 - [x] 移动端 HLS 兼容性测试（Playwright 移动视口 + HLS 起播已入 CI；真机矩阵见 README 路线图）
-- [x] 音乐播放器（列表播放已接线，封面/波形待补）
+- [x] 音乐播放器（列表播放 + MP3 128k/320k 转码 + 400 点波形可视化已接线，封面/元数据抽取待补）
+- [x] 可访问性回归（axe-core 双主题扫描已入 CI：前台代表性页面 light/dark，后台七页 light/dark）
 
 ### 优化
 - [x] Worker disk/cleanup 并行遍历 + disk 60s 缓存

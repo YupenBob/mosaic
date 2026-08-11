@@ -183,6 +183,16 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
           exit $EXIT
 
+      - name: Frontend a11y scan (axe, light + dark)
+        run: |
+          npx serve dist -l 3002 >/dev/null 2>&1 &
+          SERVER_PID=$!
+          sleep 3
+          SITE=http://127.0.0.1:3002 node tests/a11y-front.mjs
+          EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          exit $EXIT
+
       - name: Mobile HLS matrix on WebKit (device viewports)
         run: |
           npx playwright install --with-deps webkit

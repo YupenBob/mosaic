@@ -343,7 +343,7 @@
 
 .vc-speed-menu button.active,
 .vc-quality-menu button.active {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* Download & Next & Fullscreen */
@@ -435,7 +435,7 @@
 }
 .post-playlist-panel .pl-item.active {
   background: rgba(67, 97, 238, 0.08);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: 500;
 }
 

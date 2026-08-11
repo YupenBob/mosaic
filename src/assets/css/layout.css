@@ -99,7 +99,7 @@
 }
 
 .footer a:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .footer-tagline {

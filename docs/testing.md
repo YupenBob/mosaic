@@ -45,6 +45,25 @@ node tests/admin-smoke.mjs   # 或 npm run test:admin
 
 已接入 `npm run check`：本地读取 `worker/.dev.vars` 中的 `ADMIN_PASSWORD` 登录后台，验证仪表盘与文章列表渲染；CI 无凭证时自动跳过。`ADMIN_URL` 环境变量可覆盖目标地址。需要网络与有效密码。
 
+### 可访问性扫描（axe-core，WCAG 2.2 AA）
+
+前台代表性页面（首页、图文/视频/音乐/纯文本文章、分类页、标签页、404）在 light/dark 两种配色下扫描：
+
+```bash
+node tests/a11y-front.mjs    # 默认扫线上 https://mosaic.xsanye.cn
+SITE=http://127.0.0.1:3000 node tests/a11y-front.mjs   # 本地 dist（先 npm run build + serve）
+```
+
+前台阈值：critical/serious 违规即失败（文章内容由用户编写，moderate 仅告警）。CI 在本地静态预览上执行。
+
+后台七页（dashboard/posts/editor/build/config/taxonomy/cleanup）双主题全量扫描，任何违规都失败（后台全部为自有代码）：
+
+```bash
+node tests/a11y-admin.mjs    # 或 npm run a11y:admin
+```
+
+与 `admin-smoke` 一样本地读取 `worker/.dev.vars` 密码并自动跳过 CI；已接入 `npm run check`。
+
 ## CI 集成
 
 ### 构建管线（pipeline.yml）
@@ -52,12 +71,13 @@ node tests/admin-smoke.mjs   # 或 npm run test:admin
 每次构建自动执行：
 
 ```bash
-npm run check             # node --check 全部脚本 + proxy 同步校验 + config 校验 + worker-smoke + admin-smoke + build-smoke
+npm run check             # node --check 全部脚本 + proxy 同步校验 + config 校验 + worker-smoke + admin-smoke + a11y-admin + build-smoke
 npm run lint              # ESLint（0 警告）
 npm run format:check      # Prettier 格式校验
 npx playwright install --with-deps chromium
 SITE=http://127.0.0.1:3000 ADMIN=skip npx playwright test tests/frontend.spec.js \
   --grep-invert "Worker health|mobile viewport|admin login"   # CI 含移动端 HLS；本地无媒体清单时跳过
+SITE=http://127.0.0.1:3002 node tests/a11y-front.mjs   # 前端 axe 双主题扫描（本地静态预览）
 
 > 说明：移动端 HLS 用例在管线内执行（CI 会从 R2 同步媒体并恢复清单，dist 含 HLS 引用）；
 > 本地 `npm run test:e2e:local` 因没有本地媒体文件而排除该用例。

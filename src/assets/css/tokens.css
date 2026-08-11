@@ -9,6 +9,8 @@
   --color-text-tertiary: #707070; /* >= 4.5:1 on --color-surface AND --color-bg (WCAG AA) */
   --color-accent: #4361ee;
   --color-accent-hover: #3651d4;
+  --color-accent-text: #3651d4; /* >= 4.5:1 on light surfaces & tag-bg (WCAG AA) */
+  --color-accent-text-hover: #2e46b8;
   --color-border: #d2d2d7;
   --color-border-light: #e5e5ea;
   --color-overlay: rgba(0, 0, 0, 0.88);
@@ -98,13 +100,15 @@
     --color-surface-hover: #3a3a3c;
     --color-text-primary: #f5f5f7;
     --color-text-secondary: #98989d;
-    --color-text-tertiary: #8e8e93; /* >= 4.5:1 on dark surface (WCAG AA) */
+    --color-text-tertiary: #98989d; /* >= 4.5:1 on dark surface (WCAG AA) */
     --color-border: #48484a;
     --color-border-light: #38383a;
     --color-tag-bg: #3a3a3c;
     --color-tag-text: #d1d1d6;
     --color-card-shadow: rgba(0, 0, 0, 0.3);
     --color-overlay: rgba(0, 0, 0, 0.92);
+    --color-accent-text: #8fa3ff; /* >= 4.5:1 on dark surfaces (WCAG AA) */
+    --color-accent-text-hover: #a8b8ff;
     --shadow-card: 0 2px 12px var(--color-card-shadow);
   }
 }
