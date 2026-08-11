@@ -147,7 +147,7 @@ function renderBlock(block) {
   <link rel="icon" type="image/svg+xml" sizes="any" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
   <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/vendor/highlight-github.min.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
@@ -325,8 +325,8 @@ function renderBlock(block) {
 import { initI18n } from '<%= rp %>assets/js/data.js';
 initI18n(<%- JSON.stringify(i18n || {}) %>, '<%= lang || 'zh-CN' %>');
 </script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="<%= rp %>assets/vendor/hls.min.js"></script>
+  <script src="<%= rp %>assets/vendor/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 <script type="module" src="<%= rp %>assets/js/app.js"></script>
 </body>

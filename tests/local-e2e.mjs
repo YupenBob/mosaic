@@ -67,6 +67,8 @@ async function main() {
 
     const cmd = [
       'npx playwright test tests/frontend.spec.js',
+      // mobile viewport needs an R2-synced media manifest (CI has it; a local
+      // checkout doesn't), so it runs in the pipeline but not in local mode.
       '--grep-invert "Worker health|mobile viewport|admin login"',
       '--reporter=list',
     ].join(' ');

@@ -57,7 +57,10 @@ npm run lint              # ESLint（0 警告）
 npm run format:check      # Prettier 格式校验
 npx playwright install --with-deps chromium
 SITE=http://127.0.0.1:3000 ADMIN=skip npx playwright test tests/frontend.spec.js \
-  --grep-invert "Worker health|mobile viewport|admin login"   # 本地静态预览 E2E
+  --grep-invert "Worker health|mobile viewport|admin login"   # CI 含移动端 HLS；本地无媒体清单时跳过
+
+> 说明：移动端 HLS 用例在管线内执行（CI 会从 R2 同步媒体并恢复清单，dist 含 HLS 引用）；
+> 本地 `npm run test:e2e:local` 因没有本地媒体文件而排除该用例。
 ```
 
 任何失败都会中断构建，阻止部署。本地等价命令：`npm run check`、`npm run validate`、`npm run lint`、`npm run format:check`、`npm run test:e2e:local`（先 `npm run build`）。
