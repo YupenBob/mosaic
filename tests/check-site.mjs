@@ -51,6 +51,24 @@ async function main() {
       check('Health endpoint', false, e.message);
     }
 
+    // 1b. Dependency probes (real upstream checks — GitHub/R2 reachability)
+    for (const [name, probePath] of [
+      ['GitHub', '/api/health/github'],
+      ['R2', '/api/health/r2'],
+    ]) {
+      try {
+        const resp = await fetch(`${API}${probePath}`, { signal: AbortSignal.timeout(15000) });
+        const body = await resp.json();
+        check(
+          `${name} health probe`,
+          resp.ok && body?.status === 'ok' && Number.isFinite(body?.latency),
+          `${resp.status} ${JSON.stringify(body)}`,
+        );
+      } catch (e) {
+        check(`${name} health probe`, false, e.message);
+      }
+    }
+
     // ── 2. Site loads ──
     console.log('\nHomepage');
     const page = await context.newPage();
