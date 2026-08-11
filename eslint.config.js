@@ -11,6 +11,7 @@ export default [
       'test-results/**',
       '.playwright-cli/**',
       '__pycache__/**',
+      'video/**',
     ],
   },
   js.configs.recommended,

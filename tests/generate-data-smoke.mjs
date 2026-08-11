@@ -29,13 +29,20 @@ const check = (name, ok, detail = '') => {
 };
 
 console.log('\n== generate ==');
-const g = spawnSync(process.execPath, ['scripts/generate.js'], { cwd: ROOT, encoding: 'utf8', timeout: 10 * 60 * 1000 });
+const g = spawnSync(process.execPath, ['scripts/generate.js'], {
+  cwd: ROOT,
+  encoding: 'utf8',
+  timeout: 10 * 60 * 1000,
+});
 check('generate exits 0', g.status === 0, `status=${g.status}`);
 if (g.status !== 0) console.error(g.stderr.slice(0, 2000));
 
 const read = (f) => {
-  try { return JSON.parse(fs.readFileSync(path.join(DIST, 'data', f), 'utf8')); }
-  catch (e) { return { __error: e.message }; }
+  try {
+    return JSON.parse(fs.readFileSync(path.join(DIST, 'data', f), 'utf8'));
+  } catch (e) {
+    return { __error: e.message };
+  }
 };
 const posts = read('posts.json');
 const categories = read('categories.json');
@@ -46,14 +53,22 @@ check('posts.json is an array', Array.isArray(posts));
 check('categories.json is an array', Array.isArray(categories));
 check('tags.json is an array', Array.isArray(tags));
 check('search-index.json is an array', Array.isArray(search));
-if (!Array.isArray(posts)) { console.log('\ngenerate-data-smoke: FAIL (no posts.json)'); process.exit(1); }
+if (!Array.isArray(posts)) {
+  console.log('\ngenerate-data-smoke: FAIL (no posts.json)');
+  process.exit(1);
+}
 
 // ── Every post on disk (with index.md) must appear in posts.json ──
 const contentRoot = path.join(ROOT, 'content', 'posts');
 const expectedSlugs = fs.existsSync(contentRoot)
   ? fs.readdirSync(contentRoot).filter((d) => {
-      try { return fs.statSync(path.join(contentRoot, d)).isDirectory() && fs.existsSync(path.join(contentRoot, d, 'index.md')); }
-      catch { return false; }
+      try {
+        return (
+          fs.statSync(path.join(contentRoot, d)).isDirectory() && fs.existsSync(path.join(contentRoot, d, 'index.md'))
+        );
+      } catch {
+        return false;
+      }
     })
   : [];
 const actualSlugs = posts.map((p) => p.slug);
@@ -63,14 +78,33 @@ check('all content posts appear in posts.json', missing.length === 0, missing.jo
 // ── Per-post invariants ──
 for (const p of posts) {
   const tag = `[${p.slug}]`;
-  check(`${tag} has string fields`, typeof p.title === 'string' && typeof p.date === 'string' && typeof p.category === 'string' && typeof p.description === 'string' && typeof p.bodyHTML === 'string');
+  check(
+    `${tag} has string fields`,
+    typeof p.title === 'string' &&
+      typeof p.date === 'string' &&
+      typeof p.category === 'string' &&
+      typeof p.description === 'string' &&
+      typeof p.bodyHTML === 'string',
+  );
   check(`${tag} tags is string array`, Array.isArray(p.tags) && p.tags.every((t) => typeof t === 'string'));
   check(`${tag} layout/videoMode valid`, LAYOUTS.includes(p.layout) && VIDEO_MODES.includes(p.videoMode));
   check(`${tag} coverAspect finite`, Number.isFinite(p.coverAspect) && p.coverAspect > 0);
-  check(`${tag} stats numeric`, p.stats && Number.isFinite(p.stats.views) && Number.isFinite(p.stats.likes) && Number.isFinite(p.stats.dwell_time));
+  check(
+    `${tag} stats numeric`,
+    p.stats && Number.isFinite(p.stats.views) && Number.isFinite(p.stats.likes) && Number.isFinite(p.stats.dwell_time),
+  );
 
   for (const ph of p.photos || []) {
-    check(`${tag} photo ${ph.base} variants`, isUrl(ph.src10p) && isUrl(ph.src480) && isUrl(ph.src720) && isUrl(ph.src1080) && isUrl(ph.srcOrig) && isUrl(ph.thumb), 'all srcs present');
+    check(
+      `${tag} photo ${ph.base} variants`,
+      isUrl(ph.src10p) &&
+        isUrl(ph.src480) &&
+        isUrl(ph.src720) &&
+        isUrl(ph.src1080) &&
+        isUrl(ph.srcOrig) &&
+        isUrl(ph.thumb),
+      'all srcs present',
+    );
   }
 
   for (const v of p.videos || []) {
@@ -81,8 +115,15 @@ for (const p of posts) {
     check(`${tag} video ${v.base} src exclusive with compressed sources`, !(v.src && hasCompressed));
     if (v.sources) {
       const keys = Object.keys(v.sources);
-      check(`${tag} video ${v.base} res keys valid`, keys.every((k) => RES_KEYS.includes(k)), keys.join(','));
-      check(`${tag} video ${v.base} source urls valid`, keys.every((k) => isUrl(v.sources[k])));
+      check(
+        `${tag} video ${v.base} res keys valid`,
+        keys.every((k) => RES_KEYS.includes(k)),
+        keys.join(','),
+      );
+      check(
+        `${tag} video ${v.base} source urls valid`,
+        keys.every((k) => isUrl(v.sources[k])),
+      );
     }
     if (v.hls) check(`${tag} video ${v.base} hls url valid`, isUrl(v.hls));
     if (v.src) check(`${tag} video ${v.base} src url valid`, isUrl(v.src));
@@ -94,7 +135,10 @@ for (const p of posts) {
 
   if (p.cover) check(`${tag} cover is URL`, isUrl(p.cover));
   if (p.coverSrcset) {
-    check(`${tag} coverSrcset variants`, isUrl(p.coverSrcset['480']) && isUrl(p.coverSrcset['720']) && isUrl(p.coverSrcset['1080']));
+    check(
+      `${tag} coverSrcset variants`,
+      isUrl(p.coverSrcset['480']) && isUrl(p.coverSrcset['720']) && isUrl(p.coverSrcset['1080']),
+    );
   }
 }
 
@@ -113,7 +157,10 @@ for (const t of tags) {
 }
 
 // ── Search index mirrors posts ──
-check('search-index has same post set', search.length === posts.length && search.every((s) => actualSlugs.includes(s.slug)));
+check(
+  'search-index has same post set',
+  search.length === posts.length && search.every((s) => actualSlugs.includes(s.slug)),
+);
 
 console.log(`\ngenerate-data-smoke: ${failures === 0 ? 'OK' : failures + ' failure(s)'}`);
 process.exit(failures === 0 ? 0 : 1);
