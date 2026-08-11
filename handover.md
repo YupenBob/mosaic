@@ -64,9 +64,11 @@ cloud-admin/          (Admin SPA — CF Pages 独立项目)
 
 worker/               (Cloudflare Worker — Hono 框架)
   src/index.js                (路由入口)
+  src/shared.js               (共享常量/CORS/StatsDO 客户端/并行 R2 遍历工具)
+  src/routes/                 (按域拆分：health/stats/media/posts/build/config/taxonomy/admin)
   src/github.js               (GitHub API + 内存缓存 + 脏标记)
   src/r2.js                   (R2 上传/列表/文件服务)
-  src/auth.js                 (JWT 认证 + 登录限流 + PROXY_SECRET IP 校验)
+  src/auth.js                 (JWT 认证 + 登录/track 限流 + PROXY_SECRET IP 校验)
   src/stats-do.js             (Stats Durable Object — 视图/点赞/停留计数，串行化写入)
 
 scripts/              (构建脚本，在 GitHub Actions 内运行)
@@ -337,7 +339,9 @@ npx wrangler pages deploy . --project-name mosaic-admin --branch main
 │       ├── index.js            # Hono 路由
 │       ├── github.js           # GitHub API + 缓存 + 脏标记
 │       ├── r2.js               # R2 操作
-│       ├── auth.js             # JWT 认证 + 登录限流 + IP 校验
+│       ├── shared.js           # 常量/CORS/StatsDO/R2 遍历工具
+│       ├── routes/             # health/stats/media/posts/build/config/taxonomy/admin
+│       ├── auth.js             # JWT 认证 + 登录/track 限流 + IP 校验
 │       └── stats-do.js         # Stats Durable Object
 ├── cloud-admin/
 │   ├── index.html              # SPA 入口
