@@ -9,7 +9,7 @@ Mosaic 提供一等公民的音乐支持：把音频放进文章的 `music/` 目
 ```
 content/posts/my-mix/
 ├── index.md
-├── cover.jpg              # 可选：作为曲目封面
+├── cover.jpg              # 可选：文章封面（与音乐无关）
 └── music/
     ├── track-01.flac
     ├── track-02.wav
@@ -17,6 +17,7 @@ content/posts/my-mix/
 ```
 
 文章 frontmatter 无需额外配置，音频自动出现在正文后的"音乐"区块。
+曲目封面使用音频文件内嵌的专辑图（见下文"元数据与封面"），无需单独放置图片。
 
 ## 支持格式
 
