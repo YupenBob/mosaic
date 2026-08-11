@@ -83,6 +83,9 @@ function createOverlay() {
   const ov = document.createElement('div');
   ov.className = 'gallery-overlay';
   ov.id = 'gallery-overlay';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-label', 'Photo viewer');
   ov.innerHTML = `
     <div class="gallery-toolbar">
       <button class="gallery-done-btn" id="gallery-done"><i class="ri-close-line"></i> Done</button>
@@ -93,14 +96,14 @@ function createOverlay() {
       <a class="gallery-dl-btn" id="gallery-download" href="#" download title="Download"><i class="ri-download-line"></i></a>
     </div>
     <div class="gallery-main-area">
-      <button class="gallery-nav-btn gallery-nav-prev" id="gallery-prev"><i class="ri-arrow-left-s-line"></i></button>
+      <button class="gallery-nav-btn gallery-nav-prev" id="gallery-prev" aria-label="Previous photo"><i class="ri-arrow-left-s-line"></i></button>
       <img class="gallery-current-image" id="gallery-current-img" alt="" />
-      <button class="gallery-nav-btn gallery-nav-next" id="gallery-next"><i class="ri-arrow-right-s-line"></i></button>
+      <button class="gallery-nav-btn gallery-nav-next" id="gallery-next" aria-label="Next photo"><i class="ri-arrow-right-s-line"></i></button>
     </div>
     <div class="gallery-filmstrip" id="gallery-filmstrip">
-      <button class="filmstrip-scroll filmstrip-scroll-left" id="filmstrip-left"><i class="ri-arrow-left-s-line"></i></button>
+      <button class="filmstrip-scroll filmstrip-scroll-left" id="filmstrip-left" aria-label="Scroll filmstrip left"><i class="ri-arrow-left-s-line"></i></button>
       <div class="filmstrip-track" id="filmstrip-track"></div>
-      <button class="filmstrip-scroll filmstrip-scroll-right" id="filmstrip-right"><i class="ri-arrow-right-s-line"></i></button>
+      <button class="filmstrip-scroll filmstrip-scroll-right" id="filmstrip-right" aria-label="Scroll filmstrip right"><i class="ri-arrow-right-s-line"></i></button>
     </div>
   `;
   document.body.appendChild(ov);

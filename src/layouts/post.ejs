@@ -5,7 +5,7 @@ const pageDataTitle = post.title + ' - ' + site.title;
 function videoControlsHTML(multiSrc, showNext, total) {
   var h = '<div class="video-controls">';
   h += '<button class="vc-play" aria-label="Play/Pause"><i class="ri-play-fill"></i></button>';
-  h += '<div class="vc-volume"><button class="vc-volume-btn" aria-label="Volume"><i class="ri-volume-up-line"></i></button><div class="vc-volume-slider"><input type="range" class="vc-volume-range" min="0" max="100" value="100" /></div></div>';
+  h += '<div class="vc-volume"><button class="vc-volume-btn" aria-label="Volume"><i class="ri-volume-up-line"></i></button><div class="vc-volume-slider"><input type="range" class="vc-volume-range" min="0" max="100" value="100" aria-label="Volume" /></div></div>';
   h += '<span class="vc-time-current">0:00</span>';
   h += '<div class="vc-progress"><div class="vc-progress-hover" id="vc-time-tooltip">0:00</div><div class="vc-progress-track"><div class="vc-progress-buffer"></div><div class="vc-progress-fill"></div><div class="vc-progress-thumb"></div></div></div>';
   h += '<span class="vc-time-duration">0:00</span>';
@@ -192,7 +192,7 @@ function renderBlock(block) {
 <header class="header">
   <div class="container">
     <a href="<%= rp %>index.html" class="header-logo"><img src="<%= rp %>assets/logo.svg" alt="" class="header-logo-icon" width="28" height="28" /><%= site.title %></a>
-    <nav class="header-nav">
+<nav class="header-nav" aria-label="Primary">
       <a href="<%= rp %>index.html"><%= t('home') %></a>
       <% if (categories && categories.length) { %>
         <% categories.slice(0, 5).forEach(function(cat) { %>
@@ -207,7 +207,7 @@ function renderBlock(block) {
   <<%= post.videoMode === 'playlist' && post.videos && post.videos.length > 1 ? 'div class="post-page-wrapper"' : 'div' %>>
   <article class="post-page">
     <!-- Breadcrumb -->
-    <nav class="post-breadcrumb">
+  <nav class="post-breadcrumb" aria-label="Breadcrumb">
       <a href="<%= rp %>index.html"><%= t('home') %></a>
       <i class="ri-arrow-right-s-line"></i>
       <a href="<%= rp %>categories/<%= post.category.toLowerCase().replace(/\s+/g, '-') %>/"><%= post.category %></a>
@@ -267,7 +267,7 @@ function renderBlock(block) {
     </footer>
 
     <% if (prev || next) { %>
-    <nav class="post-navigation">
+  <nav class="post-navigation" aria-label="Post navigation">
       <% if (prev) { %><a href="<%= rp %>posts/<%= prev.slug %>/" class="post-nav-link post-nav-prev"><i class="ri-arrow-left-line"></i> <%= prev.title %></a><% } %>
       <% if (next) { %><a href="<%= rp %>posts/<%= next.slug %>/" class="post-nav-link post-nav-next"><%= next.title %> <i class="ri-arrow-right-line"></i></a><% } %>
     </nav>

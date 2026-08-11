@@ -148,9 +148,9 @@ export function renderCards(posts) {
         '<span class="post-card-category">' +
         escapeHTML(post.category || '') +
         '</span>' +
-        '<h3 class="post-card-title">' +
+        '<h2 class="post-card-title">' +
         escapeHTML(post.title || '') +
-        '</h3>' +
+        '</h2>' +
         '<p class="post-card-desc">' +
         escapeHTML(post.description || '') +
         '</p>' +
