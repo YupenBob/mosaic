@@ -72,6 +72,33 @@ try {
     console.error('Build page smoke failed: expected summary + status card + history + GitHub link');
     process.exitCode = 1;
   }
+
+  // Editor page: new-post form renders with its core fields (render-only, so
+  // we don't trip draft autosave or the leave-interception guard).
+  await page.evaluate(() => {
+    location.hash = 'editor';
+  });
+  await page.waitForTimeout(4000);
+  const slugVisible = await page
+    .locator('#fm-slug')
+    .isVisible()
+    .catch(() => false);
+  const titleVisible = await page
+    .locator('#fm-title')
+    .isVisible()
+    .catch(() => false);
+  const bodyVisible = await page
+    .locator('#fm-body')
+    .isVisible()
+    .catch(() => false);
+  const mediaInput = await page.locator('#editor-media-input').count();
+  console.log(
+    `Editor page loaded — slug=${slugVisible}, title=${titleVisible}, body=${bodyVisible}, mediaInput=${mediaInput}`,
+  );
+  if (!slugVisible || !titleVisible || !bodyVisible || mediaInput < 1) {
+    console.error('Editor smoke failed: expected slug/title/body fields + media input');
+    process.exitCode = 1;
+  }
   await page.close();
 } finally {
   await browser.close();
