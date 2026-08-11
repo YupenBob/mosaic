@@ -277,10 +277,13 @@ jobs:
           fi
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Pin the CLI to the version the pipeline has been using; only the
+          # action runtime changes (Node 20 -> 24, clears the deprecation note).
+          wranglerVersion: '3.114.17'
           command: pages deploy dist/ --project-name mosaic --branch main --commit-dirty=true
 
       - name: Finish build progress
