@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A pure static multimedia content sharing site — like Hexo but for photo & video posts",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "compress": "node scripts/compress.js",
     "build": "node scripts/generate.js && node scripts/generate-brand-assets.js && node scripts/minify.mjs",

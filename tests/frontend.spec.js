@@ -80,11 +80,18 @@ test('Worker health endpoint responds', async ({ page }) => {
 
 test('mobile viewport: video post loads with HLS source', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'mobile emulation only supported in chromium');
-  // Let hls.js load from the CDN for this test (the global beforeEach aborts it)
+  // Let hls.js load for this test (the global beforeEach aborts jsdelivr)
   await page.unrouteAll();
   await page.route(/(busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
   await page.setViewportSize({ width: 390, height: 844 });
-  const resp = await page.goto(`${SITE}/posts/20260711222352/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+  // Discover a video post from the generated data instead of hardcoding a slug
+  // (posts may be renamed/removed; only skip when this build has no video).
+  const posts = await fetch(`${SITE}/data/posts.json`)
+    .then((r) => (r.ok ? r.json() : []))
+    .catch(() => []);
+  const videoPost = Array.isArray(posts) ? posts.find((p) => (p.videos || []).length > 0) : undefined;
+  test.skip(!videoPost, 'no video post found in this build');
+  const resp = await page.goto(`${SITE}/posts/${videoPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
   expect(resp.status()).toBe(200);
   await page.waitForSelector('video.video-element', { timeout: 15000 });
   const hlsSource = await page.locator('source[type="application/x-mpegURL"]').first().getAttribute('src');

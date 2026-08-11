@@ -1,7 +1,7 @@
 /**
  * Build lifecycle: trigger, status/history/progress, done, cancel.
  */
-import { dispatchBuild, getLatestRun, cancelRun, clearDirty, markDirty } from '../github.js';
+import { dispatchBuild, getLatestRun, getRunHistory, cancelRun, clearDirty, markDirty } from '../github.js';
 import { verifyToken } from '../auth.js';
 import { defer } from '../shared.js';
 
@@ -27,37 +27,8 @@ export function registerBuild(app) {
 
   app.get('/api/build/history', async (c) => {
     try {
-      const resp = await fetch(
-        `https://api.github.com/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=10`,
-        {
-          headers: {
-            Authorization: `Bearer ${c.env.GITHUB_TOKEN}`,
-            Accept: 'application/vnd.github+json',
-            'User-Agent': 'Mosaic/0.8',
-          },
-        },
-      );
-      if (!resp.ok) return c.json({ runs: [] });
-      const data = await resp.json();
-      const repo = c.env.GITHUB_REPO;
-      return c.json({
-        runs: (data.workflow_runs || []).map((r) => ({
-          id: r.id,
-          runNumber: r.run_number,
-          status: r.status,
-          conclusion: r.conclusion,
-          displayTitle: r.display_title,
-          headBranch: r.head_branch,
-          headSha: r.head_sha?.slice(0, 7),
-          headShaFull: r.head_sha || '',
-          commitUrl: r.head_sha ? `https://github.com/${repo}/commit/${r.head_sha}` : '',
-          commitMessage: r.head_commit?.message?.split('\n')[0] || '',
-          htmlUrl: r.html_url,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at,
-          event: r.event,
-        })),
-      });
+      const runs = await getRunHistory(c);
+      return c.json({ runs });
     } catch (e) {
       return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502);
     }
