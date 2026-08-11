@@ -2461,6 +2461,10 @@ body.sidebar-collapsed .nav-badge {
 .pipeline-seg:hover {
   filter: brightness(1.12);
 }
+.pipeline-seg:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
 .pipeline-seg.done {
   background: var(--color-success);
   border-color: transparent;

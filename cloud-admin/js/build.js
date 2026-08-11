@@ -208,6 +208,13 @@ export default async function renderBuild(signal) {
         statusCard.addEventListener('mouseover', onSegEnter);
         statusCard.addEventListener('mouseout', onSegLeave);
         statusCard.addEventListener('click', onSegClick);
+        statusCard.addEventListener('keydown', onSegKeydown);
+        statusCard.addEventListener('focusout', (e) => {
+          if (e.target.closest('.pipeline-seg') && !e.relatedTarget?.closest?.('.pipeline-seg')) {
+            hidePipelineTip();
+            clearStepHighlight();
+          }
+        });
       }
 
       const onVis = () => {
@@ -339,7 +346,7 @@ function renderPipeline(run) {
       // flex-grow weights the segment by its real duration; gaps share the
       // remaining space so the bar never overflows its container.
       const g = weights[i] || 1;
-      return `<span class="pipeline-seg ${cls}" data-step="${s.number}" style="flex-grow:${g.toFixed(1)}" aria-label="${escHtml(stepLabel(s.name))} (#${s.number}) · ${fmtDuration(Math.round(weights[i] / 1000))}"></span>`;
+      return `<span class="pipeline-seg ${cls}" data-step="${s.number}" role="button" tabindex="0" style="flex-grow:${g.toFixed(1)}" aria-label="${escHtml(stepLabel(s.name))} (#${s.number}) · ${fmtDuration(Math.round(weights[i] / 1000))}"></span>`;
     })
     .join('');
 
@@ -501,6 +508,16 @@ function onSegClick(e) {
     row.classList.add('pipeline-row-flash');
     setTimeout(() => row.classList.remove('pipeline-row-flash'), 1200);
   }
+}
+
+function onSegKeydown(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const seg = e.target.closest('.pipeline-seg');
+  if (!seg) return;
+  e.preventDefault();
+  e.stopPropagation();
+  onSegEnter(e);
+  onSegClick(e);
 }
 
 function renderStatusCard(run) {
