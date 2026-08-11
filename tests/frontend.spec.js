@@ -95,12 +95,18 @@ async function assertMobileHls(page) {
     .catch(() => []);
   const videoPost = Array.isArray(posts) ? posts.find((p) => (p.videos || []).length > 0) : undefined;
   test.skip(!videoPost, 'no video post found in this build');
-  const resp = await page.goto(`${SITE}/posts/${videoPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+  const postUrl = `${SITE}/posts/${videoPost.slug}/`;
+  const resp = await page.goto(postUrl, { timeout: 60000, waitUntil: 'domcontentloaded' });
   expect(resp.status()).toBe(200);
-  await page.waitForSelector('video.video-element', { timeout: 15000 });
-  const hlsSource = await page.locator('source[type="application/x-mpegURL"]').first().getAttribute('src');
-  expect(hlsSource).toBeTruthy();
-  const hlsUrl = hlsSource.startsWith('http') ? hlsSource : new URL(hlsSource, SITE).href;
+  // hls.js removes <source> children when it falls back to native HLS (e.g. on
+  // WebKit), so read the HLS URL from the server-rendered HTML instead.
+  await page.waitForSelector('video.video-element[data-hls="true"]', { timeout: 15000 });
+  const html = await fetch(postUrl).then((r) => r.text());
+  const hlsMatch =
+    html.match(/type="application\/x-mpegURL"\s+src="([^"]+\.m3u8[^"]*)"/) ||
+    html.match(/src="([^"]+\.m3u8[^"]*)"\s+type="application\/x-mpegURL"/);
+  expect(hlsMatch && hlsMatch[1]).toBeTruthy();
+  const hlsUrl = hlsMatch[1].startsWith('http') ? hlsMatch[1] : new URL(hlsMatch[1], SITE).href;
   // Direct R2 responses only include ACAO for CORS requests (with Origin)
   const playlistResp = await page.request.get(hlsUrl, { timeout: 20000, headers: { Origin: SITE } });
   expect(playlistResp.status()).toBe(200);
