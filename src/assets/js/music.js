@@ -29,6 +29,7 @@ let playerState = {
 
 let audioElement = null;
 let _waveformInstance = null;
+let _lastSaveAt = 0;
 
 /** Load persisted state */
 function loadState() {
@@ -83,7 +84,17 @@ function getAudio() {
     audioElement.addEventListener('timeupdate', () => {
       playerState.currentTime = audioElement.currentTime;
       updateProgressUI();
+      // Persist progress throttled (~5s) so a refresh resumes mid-track; the
+      // stored position is the "last known" point, not a live seek target.
+      const now = Date.now();
+      if (now - _lastSaveAt > 5000) {
+        _lastSaveAt = now;
+        saveState();
+      }
     });
+
+    audioElement.addEventListener('pause', saveState);
+    window.addEventListener('pagehide', saveState);
 
     audioElement.addEventListener('loadedmetadata', () => {
       playerState.duration = audioElement.duration;
@@ -166,12 +177,7 @@ function handleTrackEnd() {
     case 'all':
     default: {
       const next = (playerState.currentIndex + 1) % playerState.queue.length;
-      if (next === 0 && playerState.queue.length > 1) {
-        // Reached end of playlist
-        loadTrack(next);
-      } else {
-        loadTrack(next);
-      }
+      loadTrack(next);
       break;
     }
   }
