@@ -59,7 +59,7 @@ export default async function renderConfig(signal) {
               .map(
                 ([id, icon, label, body]) => `
               <section class="config-section" id="config-section-${id}" data-section="${id}">
-                <h3 class="config-section-title"><i class="${icon}"></i> ${escHtml(label)}</h3>
+                <h2 class="config-section-title"><i class="${icon}"></i> ${escHtml(label)}</h2>
                 <div class="config-fields">${body}</div>
               </section>`,
               )
@@ -160,17 +160,17 @@ function cfgGet(obj, path, def = '') {
   return path.split('.').reduce((o, k) => (o || {})[k], obj) ?? def;
 }
 function txt(key, label, hint, cfg, type = 'text') {
-  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><input type="${type}" class="input" data-config="${key}" value="${escHtml(String(cfgGet(cfg, key)))}" /></div>`;
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><input type="${type}" class="input" data-config="${key}" aria-label="${label}" value="${escHtml(String(cfgGet(cfg, key)))}" /></div>`;
 }
 function area(key, label, hint, cfg) {
-  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><textarea class="textarea" data-config="${key}" rows="2">${escHtml(String(cfgGet(cfg, key)))}</textarea></div>`;
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><textarea class="textarea" data-config="${key}" aria-label="${label}" rows="2">${escHtml(String(cfgGet(cfg, key)))}</textarea></div>`;
 }
 function num(key, label, hint, cfg) {
-  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><input type="number" class="input" data-config="${key}" data-type="number" value="${cfgGet(cfg, key, 0)}" /></div>`;
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><input type="number" class="input" data-config="${key}" data-type="number" aria-label="${label}" value="${cfgGet(cfg, key, 0)}" /></div>`;
 }
 function sel(key, label, hint, cfg, options) {
   const val = cfgGet(cfg, key);
-  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><select class="select" data-config="${key}">${options.map((o) => `<option value="${o[0]}" ${val === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select></div>`;
+  return `<div class="config-field"><label class="config-label"><span>${label}</span>${hint ? `<small>${hint}</small>` : ''}</label><select class="select" data-config="${key}" aria-label="${label}">${options.map((o) => `<option value="${o[0]}" ${val === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select></div>`;
 }
 function tog(key, label, hint, cfg) {
   const val = cfgGet(cfg, key, false);
@@ -184,7 +184,7 @@ function prefsSection() {
   return `
     <div class="config-field">
       <label class="config-label"><span>${t('config.adminTheme')}</span><small>${t('config.adminThemeHint')}</small></label>
-      <select class="select" id="admin-theme-select" style="width:200px" onchange="window.setAdminTheme(this.value)">
+      <select class="select" id="admin-theme-select" aria-label="${t('config.adminTheme')}" style="width:200px" onchange="window.setAdminTheme(this.value)">
         <option value="auto" ${themePref === 'auto' ? 'selected' : ''}>${t('config.themeAuto')}</option>
         <option value="light" ${themePref === 'light' ? 'selected' : ''}>${t('config.themeLight')}</option>
         <option value="dark" ${themePref === 'dark' ? 'selected' : ''}>${t('config.themeDark')}</option>
@@ -192,7 +192,7 @@ function prefsSection() {
     </div>
     <div class="config-field">
       <label class="config-label"><span>${t('config.adminLang')}</span><small>${t('config.adminLangHint')}</small></label>
-      <select class="select" id="admin-lang-select" style="width:200px" onchange="window.setAdminLang(this.value)">
+      <select class="select" id="admin-lang-select" aria-label="${t('config.adminLang')}" style="width:200px" onchange="window.setAdminLang(this.value)">
         <option value="zh-CN" ${lang === 'zh-CN' ? 'selected' : ''}>中文简体</option>
         <option value="en" ${lang === 'en' ? 'selected' : ''}>English</option>
       </select>
@@ -267,7 +267,7 @@ function mediaSection(cfg) {
       <label class="config-label"><span>${t('config.videoQuality')}</span><small>${t('config.videoQualityHint')}</small></label>
       <div class="config-quality-group">
         <label>${t('config.crf')}<input type="number" class="input" data-config="videoQuality.crf" value="${cfgGet(cfg, 'videoQuality.crf', 23)}" min="0" max="51" style="width:60px" /></label>
-        <select class="select" data-config="videoQuality.preset" style="width:110px">${['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow'].map((p) => `<option value="${p}" ${cfgGet(cfg, 'videoQuality.preset', 'fast') === p ? 'selected' : ''}>${p}</option>`).join('')}</select>
+        <label>${t('config.preset')}<select class="select" data-config="videoQuality.preset" aria-label="${t('config.preset')}" style="width:110px">${['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow'].map((p) => `<option value="${p}" ${cfgGet(cfg, 'videoQuality.preset', 'fast') === p ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
         <label>${t('config.maxHeight')}<select class="select" data-config="videoQuality.maxHeight" data-type="number" style="width:110px">${[
           [2160, '4K'],
           [1080, '1080p'],
@@ -290,11 +290,11 @@ function buildSection(cfg) {
   return `
     <div class="config-field">
       <label class="config-label"><span>${t('config.buildTimeout')}</span><small>${t('config.buildTimeoutHint')}</small></label>
-      <input type="number" class="input" data-config="build.timeoutMinutes" data-type="number" value="${cfgGet(cfg, 'build.timeoutMinutes', 90)}" min="10" max="360" step="5" style="width:120px" />
+      <input type="number" class="input" data-config="build.timeoutMinutes" data-type="number" aria-label="${t('config.buildTimeout')}" value="${cfgGet(cfg, 'build.timeoutMinutes', 90)}" min="10" max="360" step="5" style="width:120px" />
     </div>
     <div class="config-field">
       <label class="config-label"><span>${t('config.uploadAfterTiers')}</span><small>${t('config.uploadAfterTiersHint')}</small></label>
-      <input type="number" class="input" data-config="videoQuality.uploadAfterTiers" data-type="number" value="${cfgGet(cfg, 'videoQuality.uploadAfterTiers', 1)}" min="1" max="5" step="1" style="width:120px" />
+      <input type="number" class="input" data-config="videoQuality.uploadAfterTiers" data-type="number" aria-label="${t('config.uploadAfterTiers')}" value="${cfgGet(cfg, 'videoQuality.uploadAfterTiers', 1)}" min="1" max="5" step="1" style="width:120px" />
     </div>
   `;
 }

@@ -19,7 +19,7 @@ export default async function renderCleanup() {
         <div class="page-header"><div><h1>${t('cleanup.title')}</h1></div></div>
 
         <div class="card card-pad mb-4">
-          <h3 style="margin-bottom:6px"><i class="ri-delete-bin-line" style="color:var(--color-danger)"></i> ${t('cleanup.orphan')}</h3>
+          <h2 style="margin:0 0 6px"><i class="ri-delete-bin-line" style="color:var(--color-danger)"></i> ${t('cleanup.orphan')}</h2>
           <p class="muted mb-3">${t('cleanup.orphanDesc')}</p>
           <div class="cleanup-stat-row">
             <div class="dash-big-card"><span class="dash-big-num">${data.totalOrphans || 0}</span><span class="dash-big-label">${t('cleanup.orphanFiles')}</span></div>
@@ -53,7 +53,7 @@ export default async function renderCleanup() {
         </div>
 
         <div class="card card-pad">
-          <h3 style="margin-bottom:6px"><i class="ri-refresh-line" style="color:var(--color-accent)"></i> ${t('cleanup.cacheCleanup')}</h3>
+          <h2 style="margin:0 0 6px"><i class="ri-refresh-line" style="color:var(--color-accent)"></i> ${t('cleanup.cacheCleanup')}</h2>
           <p class="muted mb-3">${t('cleanup.cacheDesc')}</p>
           <button class="btn btn-danger" id="btn-clear-cache" onclick="doClearCache()"><i class="ri-delete-bin-line"></i> ${t('cleanup.clearCache')}</button>
         </div>

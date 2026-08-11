@@ -382,10 +382,10 @@ function renderPipeline(run) {
 
   return `
     <div class="build-pipeline">
-      <div class="pipeline-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">${segs}</div>
+      <div class="pipeline-bar" role="group" aria-label="Pipeline steps">${segs}</div>
       <div class="pipeline-meta">
         <span class="pipeline-label">${label}</span>
-        <span class="pipeline-percent">${percent}%</span>
+        <span class="pipeline-percent" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" aria-label="Pipeline progress">${percent}%</span>
       </div>
       ${etaText ? `<div class="pipeline-eta"><i class="ri-time-line"></i> ${etaText}</div>` : ''}
       ${running ? `<div class="build-live-progress hidden" id="build-live-progress"></div>` : ''}

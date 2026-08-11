@@ -72,19 +72,19 @@ export default async function renderDashboard(signal) {
     (!postList.length && dashData.posts !== '...') || dashData.posts === 0
       ? `
       <div class="card card-pad mb-4">
-        <h3 style="margin-bottom:12px"><i class="ri-rocket-line" style="color:var(--color-accent)"></i> ${t('dashboard.quickTitle')}</h3>
+        <h2 style="margin:0 0 12px"><i class="ri-rocket-line" style="color:var(--color-accent)"></i> ${t('dashboard.quickTitle')}</h2>
         <div class="quickstart-card">
           <div class="quickstart-step">
             <span class="quickstart-num">1</span>
-            <div><h4>${t('dashboard.q1Title')}</h4><p>${t('dashboard.q1Desc')}</p></div>
+            <div><h3>${t('dashboard.q1Title')}</h3><p>${t('dashboard.q1Desc')}</p></div>
           </div>
           <div class="quickstart-step">
             <span class="quickstart-num">2</span>
-            <div><h4>${t('dashboard.q2Title')}</h4><p>${t('dashboard.q2Desc')}</p></div>
+            <div><h3>${t('dashboard.q2Title')}</h3><p>${t('dashboard.q2Desc')}</p></div>
           </div>
           <div class="quickstart-step">
             <span class="quickstart-num">3</span>
-            <div><h4>${t('dashboard.q3Title')}</h4><p>${t('dashboard.q3Desc')}</p></div>
+            <div><h3>${t('dashboard.q3Title')}</h3><p>${t('dashboard.q3Desc')}</p></div>
           </div>
         </div>
       </div>
@@ -133,11 +133,11 @@ export default async function renderDashboard(signal) {
 
         <div class="dash-charts">
           <div class="dash-chart-card">
-            <h3><span>${t('dashboard.traffic')}</span><button class="btn btn-ghost btn-sm" onclick="location.reload()"><i class="ri-refresh-line"></i></button></h3>
+            <h2><span>${t('dashboard.traffic')}</span><button class="btn btn-ghost btn-sm" aria-label="${t('dashboard.refresh')}" onclick="location.reload()"><i class="ri-refresh-line"></i></button></h2>
             <div class="dash-chart-wrap"><canvas id="chart-traffic"></canvas></div>
           </div>
           <div class="dash-chart-card">
-            <h3>${t('dashboard.catTag')}</h3>
+            <h2>${t('dashboard.catTag')}</h2>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div class="dash-chart-wrap" style="height:200px"><canvas id="chart-categories"></canvas></div>
               <div class="dash-chart-wrap" style="height:200px"><canvas id="chart-tags"></canvas></div>
@@ -147,14 +147,14 @@ export default async function renderDashboard(signal) {
 
         <div class="dash-bottom">
           <div class="dash-chart-card">
-            <h3>${t('dashboard.leaderboard')}</h3>
+            <h2>${t('dashboard.leaderboard')}</h2>
             ${
               (trafficData.top5 || []).length
                 ? trafficData.top5
                     .map(
                       (item, i) => `
                 <a href="#editor&slug=${encodeURIComponent(item.slug)}" class="dash-top-item">
-                  <span class="dash-top-rank" style="color:${['var(--color-warning)', 'var(--color-text-tertiary)', '#cd7f32', 'var(--color-text-tertiary)', 'var(--color-text-tertiary)'][i] || 'var(--color-text-tertiary)'}">#${i + 1}</span>
+                  <span class="dash-top-rank" style="color:${['var(--color-rank-gold)', 'var(--color-text-tertiary)', 'var(--color-rank-bronze)', 'var(--color-text-tertiary)', 'var(--color-text-tertiary)'][i] || 'var(--color-text-tertiary)'}">#${i + 1}</span>
                   <span class="dash-top-slug">${escHtml(item.title || item.slug)}</span>
                   <span class="dash-top-count">${item.count} ${t('dashboard.viewsShort')}</span>
                 </a>`,
@@ -164,7 +164,7 @@ export default async function renderDashboard(signal) {
             }
           </div>
           <div class="dash-chart-card">
-            <h3>${t('dashboard.recentActivity')}</h3>
+            <h2>${t('dashboard.recentActivity')}</h2>
             ${
               activities.length
                 ? activities
