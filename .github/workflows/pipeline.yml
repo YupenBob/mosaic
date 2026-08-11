@@ -25,8 +25,9 @@ jobs:
     # Media transcoding of large source videos dominates runtime (a ~900MB 4K
     # drone clip takes ~26min for 5 tiers); give the job real headroom. The
     # admin can tune this in Settings -> Build (Worker passes it as a dispatch
-    # input); push-triggered runs fall back to 90.
-    timeout-minutes: ${{ inputs.timeout_minutes || 90 }}
+    # input); push-triggered runs fall back to 90. dispatch inputs are strings,
+    # so convert with fromJSON — a string here makes the job fail to start.
+    timeout-minutes: ${{ fromJSON(inputs.timeout_minutes || '90') }}
     permissions:
       contents: read
       pages: write
@@ -128,7 +129,7 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           VIDEO_CACHE_CONTROL: 'public, max-age=31536000'
           R2_CHECKSUMS_SYNC: '1'
-          TIMEOUT_MINUTES: ${{ inputs.timeout_minutes || 90 }}
+          TIMEOUT_MINUTES: ${{ fromJSON(inputs.timeout_minutes || '90') }}
         run: node scripts/compress.js
 
       - name: Save media checksums cache
