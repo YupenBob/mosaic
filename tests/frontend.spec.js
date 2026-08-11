@@ -70,6 +70,20 @@ test('category page stylesheet loads (relative path regression)', async ({ page 
   }
 });
 
+test('search filters posts (query -> dropdown + grid)', async ({ page }) => {
+  await page.goto(SITE, { waitUntil: 'domcontentloaded' });
+  const input = page.locator('.search-input');
+  await input.waitFor({ state: 'visible', timeout: 10000 });
+  await input.fill('20260703');
+  await page.locator('.search-result-item').first().waitFor({ state: 'visible', timeout: 8000 });
+  const results = await page.locator('.search-result-item').count();
+  expect(results).toBe(1);
+  const gridCards = await page.locator('.post-card').count();
+  expect(gridCards).toBe(1);
+  const title = (await page.locator('.post-card-title').first().textContent()).trim();
+  expect(title).toBe('20260703');
+});
+
 test('Worker health endpoint responds', async ({ page }) => {
   const response = await page.goto(`${API}/api/health`);
   expect(response.status()).toBe(200);

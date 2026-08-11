@@ -417,6 +417,11 @@ if (sitemapEnabled) {
     console.warn('Sitemap skipped: config.url is not set (sitemap requires absolute URLs)');
   }
 }
+if (SITE.url) {
+  const base = SITE.url.replace(/\/+$/, '');
+  const robots = ['User-agent: *', 'Allow: /', '', `Sitemap: ${base}/sitemap.xml`, ''].join('\n');
+  fs.writeFileSync(path.join(DIST, 'robots.txt'), robots);
+}
 
 // ── EJS rendering ──
 const viewsDir = path.join(SRC, 'layouts');

@@ -202,5 +202,12 @@ if (sitemap) {
   );
 }
 
+const robotsPath = path.join(DIST, 'robots.txt');
+const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, 'utf8') : '';
+check(
+  'robots.txt generated with sitemap link',
+  robots.includes('User-agent: *') && robots.includes(`Sitemap: ${siteBase}/sitemap.xml`),
+);
+
 console.log(`\ngenerate-data-smoke: ${failures === 0 ? 'OK' : failures + ' failure(s)'}`);
 process.exit(failures === 0 ? 0 : 1);
