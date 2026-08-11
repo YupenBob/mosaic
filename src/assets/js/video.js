@@ -223,17 +223,21 @@ class VideoPlayer {
         this.hls.on('hlsError', function (event, data) {
           vlog('error', 'HLS error: ' + data.type + ' - ' + (data.details || ''));
           if (data.fatal) {
-            vlog('error', 'HLS FATAL ' + data.type + ' — attempting recovery');
+            self._fatalCount = (self._fatalCount || 0) + 1;
+            vlog('error', 'HLS FATAL ' + data.type + ' (attempt ' + self._fatalCount + ')');
             try {
-              if (data.type === 'networkError') {
-                self.hls.startLoad();
-              } else if (data.type === 'mediaError') {
-                self.hls.recoverMediaError();
+              if (self._fatalCount <= 2) {
+                if (data.type === 'networkError') self.hls.startLoad();
+                else if (data.type === 'mediaError') self.hls.recoverMediaError();
+                else self.destroyHls();
               } else {
-                self.hls.destroy();
+                // Two recovery attempts failed — degrade to MP4 instead of a
+                // dead player.
+                self.destroyHls();
               }
             } catch (e) {
               vlog('error', 'HLS recovery failed: ' + e.message);
+              self.destroyHls();
             }
           }
         });
@@ -323,6 +327,40 @@ class VideoPlayer {
 
     // Show controls on load
     this.showControls();
+  }
+
+  /**
+   * hls.js hit an unrecoverable fatal error: destroy it and degrade to the
+   * best MP4 tier rendered as a data-res fallback source.
+   */
+  destroyHls() {
+    try {
+      if (this.hls) this.hls.destroy();
+    } catch {}
+    this.hls = null;
+    const mp4s = this.container.querySelectorAll('source[data-res][src]');
+    if (!mp4s.length) return;
+    const rank = (res) => (res === '4K' ? 2160 : parseInt(res) || 0);
+    let best = null;
+    let bestRank = -1;
+    mp4s.forEach((s) => {
+      const r = rank(s.dataset.res);
+      if (r > bestRank) {
+        bestRank = r;
+        best = s;
+      }
+    });
+    if (!best) return;
+    this.sources = {};
+    mp4s.forEach((s) => {
+      this.sources[s.dataset.res] = s.src;
+    });
+    this.currentRes = best.dataset.res;
+    this.video.src = best.src;
+    this.video.play().catch(() => {});
+    if (this.qualityMenu) this.buildQualityMenu();
+    this.updateQualityActive();
+    vlog('warn', 'HLS unrecoverable — fell back to MP4 (' + best.dataset.res + ')');
   }
 
   detectResolution() {

@@ -29,6 +29,14 @@ function videoElementHTML(vid) {
   if (hasHLS) {
     h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element" data-hls="true">';
     h += '<source src="' + vid.hls + '" type="application/x-mpegURL" />';
+    // MP4 tier fallbacks (only consumed if hls.js hits an unrecoverable fatal
+    // error, so playback degrades to a file instead of dying).
+    if (vid.sources) {
+      var hlsResKeys = Object.keys(vid.sources).sort().reverse();
+      for (var hr = 0; hr < hlsResKeys.length; hr++) {
+        h += '<source data-res="' + hlsResKeys[hr] + '" src="' + vid.sources[hlsResKeys[hr]] + '" type="video/mp4" />';
+      }
+    }
     h += '</video>';
   } else if (multiSrc) {
     h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element">';
