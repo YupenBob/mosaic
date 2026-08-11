@@ -172,13 +172,26 @@ for (const dir of postDirs) {
           if (Array.isArray(local)) waveform = local;
         } catch {}
       }
+      // Metadata + cover come from the compress manifest (restored in CI via the
+      // media checksums cache); fall back to the local pipeline outputs.
+      let meta = mediaChecksums[`music-meta:${slug}:${base}`];
+      if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+        try {
+          const local = JSON.parse(fs.readFileSync(path.join(musicOutDir, `${base}-meta.json`), 'utf-8'));
+          if (local && typeof local === 'object' && !Array.isArray(local)) meta = local;
+        } catch {}
+      }
+      const hasCover =
+        mediaChecksums[`music-cover:${slug}:${base}`] === 1 ||
+        fs.existsSync(path.join(musicOutDir, `${base}-cover.jpg`));
       music.push({
         file: f,
-        title: base,
-        artist,
-        cover: '',
+        title: (meta && meta.title) || base,
+        artist: (meta && meta.artist) || artist,
+        album: (meta && meta.album) || '',
+        cover: hasCover ? pUrl(slug, 'music', `${base}-cover.jpg`) : '',
         sources,
-        duration: 0,
+        duration: (meta && Number(meta.duration)) || 0,
         waveform,
       });
     }

@@ -16,6 +16,7 @@ import {
   manifestComplete,
   computeWaveformPeaks,
 } from './media-utils.mjs';
+import { extractMusicMeta, extractMusicCover } from './music-meta.mjs';
 import { canUpload, uploadFile, headObject } from '../worker/scripts/r2-upload.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -632,6 +633,19 @@ async function compressMusic(postDir, slug) {
       console.log(`  ${f} -> waveform (${peaks.length} peaks)`);
     } catch (e) {
       console.error(`  MUSIC WAVEFORM FAIL ${f}: ${e.message}`);
+    }
+    try {
+      const meta = await extractMusicMeta(src);
+      const coverOut = path.join(outDir, `${base}-cover.jpg`);
+      const hasCover = await extractMusicCover(src, coverOut);
+      checksums[`music-meta:${slug}:${base}`] = meta;
+      if (hasCover) checksums[`music-cover:${slug}:${base}`] = 1;
+      fs.writeFileSync(path.join(outDir, `${base}-meta.json`), JSON.stringify(meta));
+      console.log(
+        `  ${f} -> meta${hasCover ? ' + cover' : ''} (${meta.duration}s${meta.title ? ` "${meta.title}"` : ''})`,
+      );
+    } catch (e) {
+      console.error(`  MUSIC META FAIL ${f}: ${e.message}`);
     }
     tick(`${slug}/${f}`);
   }

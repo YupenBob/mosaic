@@ -131,6 +131,12 @@ for (const p of posts) {
 
   for (const m of p.music || []) {
     check(`${tag} music ${m.file} sources`, m.sources && isUrl(m.sources['128k']) && isUrl(m.sources['320k']));
+    check(
+      `${tag} music ${m.file} title/artist/album are strings`,
+      ['title', 'artist', 'album'].every((k) => typeof m[k] === 'string'),
+    );
+    check(`${tag} music ${m.file} duration is finite`, Number.isFinite(m.duration) && m.duration >= 0);
+    check(`${tag} music ${m.file} cover is empty-or-url`, m.cover === '' || isUrl(m.cover));
   }
 
   if (p.cover) check(`${tag} cover is URL`, isUrl(p.cover));
@@ -164,6 +170,19 @@ check(
 check(
   'music waveform field is array-or-null',
   posts.every((p) => (p.music || []).every((t) => t.waveform === null || Array.isArray(t.waveform))),
+);
+check(
+  'music meta fields present on every track',
+  posts.every((p) =>
+    (p.music || []).every(
+      (t) =>
+        typeof t.title === 'string' &&
+        typeof t.artist === 'string' &&
+        typeof t.album === 'string' &&
+        Number.isFinite(t.duration) &&
+        (t.cover === '' || isUrl(t.cover)),
+    ),
+  ),
 );
 
 // ── RSS / Sitemap content ──

@@ -115,6 +115,17 @@ function escHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
+function escAttr(s) {
+  return escHtml(s);
+}
+
+function fmtDur(seconds) {
+  var s = Math.max(0, Math.round(Number(seconds) || 0));
+  var m = Math.floor(s / 60);
+  var r = s % 60;
+  return m + ':' + (r < 10 ? '0' + r : r);
+}
+
 function renderMusicBlock(tracks) {
   var h = '<section class="music-section"><h2 class="section-title">' + t('music') + '</h2>';
   var hasWaveform = tracks.some(function(t) { return t.waveform && t.waveform.length; });
@@ -123,10 +134,14 @@ function renderMusicBlock(tracks) {
   }
   h += '<div class="music-track-list">';
   tracks.forEach(function(track, i) {
+    var cover = track.cover
+      ? '<span class="music-track-cover"><img src="' + escAttr(track.cover) + '" alt="" loading="lazy" /></span>'
+      : '<span class="music-track-cover music-track-cover-fallback"><i class="ri-music-2-line"></i></span>';
+    var dur = track.duration ? '<span class="music-track-duration">' + fmtDur(track.duration) + '</span>' : '';
     h += '<div class="music-track" data-index="' + i + '" role="button" tabindex="0">';
-    h += '<i class="ri-music-2-line"></i>';
-    h += '<span class="music-track-title">' + escHtml(track.title) + '</span>';
-    h += '<span class="music-track-artist">' + escHtml(track.artist) + '</span>';
+    h += cover;
+    h += '<span class="music-track-info"><span class="music-track-title">' + escHtml(track.title) + '</span><span class="music-track-artist">' + escHtml(track.artist) + '</span></span>';
+    h += dur;
     h += '</div>';
   });
   h += '</div></section>';
