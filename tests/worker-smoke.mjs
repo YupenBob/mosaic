@@ -405,6 +405,27 @@ await record('track rate limit (429 after burst, per-IP)', async () => {
   assert.equal(other.status, 200, 'a different IP is not rate-limited');
 });
 
+await record('track rate limit global (DO-level 429 after burst)', async () => {
+  // The StatsDurableObject is a single instance, so its counter is global
+  // across Worker isolates. Hit the DO directly to prove the limit holds even
+  // when requests would spread across different Worker isolates.
+  const ip = '198.51.100.77';
+  let limitedAt = null;
+  for (let i = 0; i < 65; i++) {
+    const r = await statsDO.fetch(
+      new Request('https://stats.local/view?slug=do-ratelimit', {
+        method: 'POST',
+        headers: { 'X-Real-IP': ip },
+      }),
+    );
+    if (r.status === 429) {
+      limitedAt = i + 1;
+      break;
+    }
+  }
+  assert.equal(limitedAt, 61, `expected 429 on request 61, got ${limitedAt}`);
+});
+
 // ── 11. HMAC client IP verification ──
 const signHmac = async (secret, message) => {
   const key = await crypto.subtle.importKey(
@@ -666,4 +687,4 @@ await record('GET /api/dirty (count state)', async () => {
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 35) process.exit(1);
+if (passed < 36) process.exit(1);

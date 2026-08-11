@@ -37,7 +37,7 @@ export function registerStatsPublic(app) {
     try {
       const resp = await statsFetch(c, '/like', slug, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Real-IP': await clientIp(c) },
         body: JSON.stringify({ action: body.action || 'like' }),
       });
       return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
@@ -57,7 +57,7 @@ export function registerStatsPublic(app) {
     try {
       const resp = await statsFetch(c, '/dwell', slug, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Real-IP': await clientIp(c) },
         body: JSON.stringify({ seconds: parseInt(body.seconds) || 0 }),
       });
       return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });

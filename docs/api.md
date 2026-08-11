@@ -34,8 +34,9 @@ Base URL：`https://mosaic-api.xsanye.cn`（前台与后台经 Pages Functions �
 | POST | `/api/track/like/:slug` | 点赞/取消点赞，body `{"action":"like"\|"unlike"}` |
 | POST | `/api/track/dwell/:slug` | 停留时长上报，body `{"seconds":N}`（上限 7200） |
 
-> 公开 track 端点有每 IP 每分钟 60 次的频率限制（超出返回 429 `TRACK_RATE_LIMITED`），
-> 防止刷量攻击；正常访客流量远低于该阈值。
+> 公开 track 端点有每 IP 每分钟 60 次的频率限制（超出返回 429 `TRACK_RATE_LIMITED`）。
+> Worker 中间件先挡掉单 isolate 突发，Stats Durable Object（全局单实例）再执行全局计数，
+> 跨 Worker isolate 分散的请求同样会被限制；正常访客流量远低于该阈值。
 | GET | `/api/stats/traffic` | 30 天流量聚合（byDay/byCategory/byTag/top5） |
 | GET | `/api/stats/:slug` | 单篇实时统计 `{views, likes, dwell_time}` |
 | GET | `/api/media/file/:slug/:filename` | 文件服务（向后兼容，搜索 processed + originals） |

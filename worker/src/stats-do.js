@@ -15,6 +15,32 @@ const MAX_HISTORY = 500;
 const DEDUP_MS = 10 * 60 * 1000;
 const MAX_DWELL = 7200;
 
+// ── Global track rate limit ──
+// The StatsDurableObject is a single instance, so a counter held here is
+// global across all Worker isolates (unlike per-isolate in-memory limiters).
+// The map lives in DO memory: it resets on eviction, which only means limits
+// restart after a cold start — acceptable for abuse protection.
+const TRACK_LIMIT = 60; // requests per minute per IP
+const TRACK_WINDOW_MS = 60 * 1000;
+const TRACK_MAP_MAX = 5000;
+const _trackCounts = new Map();
+
+function trackLimited(ip) {
+  const now = Date.now();
+  const entry = _trackCounts.get(ip);
+  if (!entry || now - entry.start > TRACK_WINDOW_MS) {
+    if (_trackCounts.size >= TRACK_MAP_MAX) {
+      for (const [k, v] of _trackCounts) {
+        if (now - v.start > TRACK_WINDOW_MS) _trackCounts.delete(k);
+      }
+    }
+    _trackCounts.set(ip, { start: now, count: 1 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > TRACK_LIMIT;
+}
+
 function ensure(map, slug) {
   if (!map[slug]) map[slug] = { views: 0, likes: 0, history: [] };
   else if (typeof map[slug] === 'number') map[slug] = { views: map[slug], likes: 0, history: [] };
@@ -119,6 +145,10 @@ export class StatsDurableObject {
   async fetch(request) {
     const url = new URL(request.url);
     const path = url.pathname;
+    const ip = request.headers.get('X-Real-IP') || request.headers.get('CF-Connecting-IP') || 'unknown';
+    if ((path === '/view' || path === '/like' || path === '/dwell') && trackLimited(ip)) {
+      return json({ error: 'Too many requests, try again later', code: 'TRACK_RATE_LIMITED' }, 429);
+    }
     let body = {};
     try {
       body = await request.json();
@@ -127,7 +157,6 @@ export class StatsDurableObject {
     if (!slug && path !== '/traffic') return json({ error: 'slug required' }, 400);
 
     if (path === '/view') {
-      const ip = request.headers.get('X-Real-IP') || request.headers.get('CF-Connecting-IP') || 'unknown';
       const result = await this._mutate((map) => view(map, slug, ip));
       return json({ ok: true, views: result.views, likes: result.likes });
     }
