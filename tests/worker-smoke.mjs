@@ -543,7 +543,71 @@ await record('build dispatch timeout fallback 90 (config read fails)', async () 
   }
 });
 
+await record('GET /api/stats/posts (bulk, structured)', async () => {
+  const r = await (await call('/api/stats/posts', { token: TOKEN })).json();
+  assert.ok(r.stats && typeof r.stats === 'object');
+  assert.ok(Object.hasOwn(r.stats, 'a'));
+  assert.ok(typeof r.updatedAt === 'string');
+});
+
+await record('GET /api/build/status + history (mock runs)', async () => {
+  mockRunStatus = 'completed';
+  const s = await (await call('/api/build/status', { token: TOKEN })).json();
+  assert.equal(s.runNumber, 7);
+  const h = await (await call('/api/build/history', { token: TOKEN })).json();
+  assert.ok(Array.isArray(h.runs) && h.runs.length >= 1);
+  assert.equal(h.runs[0].runNumber, 7);
+  mockRunStatus = 'in_progress';
+});
+
+await record('GET /api/build/progress (reads R2 site-data)', async () => {
+  const missing = await call('/api/build/progress', { token: TOKEN });
+  assert.equal(missing.status, 200);
+  await media.put('site-data/build-progress.json', JSON.stringify({ stage: 'media', done: 3, total: 10 }));
+  const r = await (await call('/api/build/progress', { token: TOKEN })).json();
+  assert.equal(r.stage, 'media');
+  assert.equal(r.done, 3);
+});
+
+await record('taxonomy delete (tag + category removed from posts)', async () => {
+  const rt = await (await call('/api/taxonomy/tag', { method: 'DELETE', token: TOKEN, body: { name: 'z' } })).json();
+  assert.ok(rt.affected >= 1);
+  const md = gh.get('content/posts/a/index.md');
+  assert.ok(!md.includes('"z"') && !md.includes('z,'));
+  const rc = await (await call('/api/taxonomy/category', { method: 'DELETE', token: TOKEN, body: { name: 'photography' } })).json();
+  assert.ok(rc.affected >= 1);
+  assert.ok(!gh.get('content/posts/a/index.md').includes('photography'));
+});
+
+await record('GET /api/posts pagination (limit/cursor)', async () => {
+  const all = await (await call('/api/posts?limit=0', { token: TOKEN })).json();
+  assert.ok(Array.isArray(all.posts) && all.posts.length >= 1);
+  const one = await (await call('/api/posts?limit=1', { token: TOKEN })).json();
+  assert.equal(one.posts.length, 1);
+  assert.ok('total' in one);
+});
+
+await record('GET /api/disk (parallel usage)', async () => {
+  const d = await (await call('/api/disk', { token: TOKEN })).json();
+  assert.ok(Number.isFinite(d.objects) && d.objects >= 1);
+  assert.ok(Number.isFinite(parseFloat(d.sizeMB)));
+});
+
+await record('cleanup scan/delete orphan (R2)', async () => {
+  store.set('originals/ghost-post/x.jpg', 'x');
+  const scan = await (await call('/api/cleanup', { token: TOKEN })).json();
+  assert.ok(scan.totalOrphans >= 1 && scan.orphans.some((o) => o.key.includes('ghost-post')));
+  const del = await (await call('/api/cleanup', { method: 'DELETE', token: TOKEN })).json();
+  assert.ok(del.deleted >= 1);
+  assert.ok(!store.has('originals/ghost-post/x.jpg'));
+});
+
+await record('GET /api/dirty (count state)', async () => {
+  const r = await (await call('/api/dirty', { token: TOKEN })).json();
+  assert.ok(Number.isInteger(r.count) && r.count >= 0);
+});
+
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 24) process.exit(1);
+if (passed < 32) process.exit(1);
