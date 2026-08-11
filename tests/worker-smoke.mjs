@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import app from '../worker/src/index.js';
 import { StatsDurableObject } from '../worker/src/stats-do.js';
 import { clientIp } from '../worker/src/auth.js';
+import { bustCache } from '../worker/src/github.js';
 
 // ── Mock R2 ──
 const store = new Map();
@@ -67,9 +68,15 @@ const gh = new Map([
   ['content/posts/a/index.md', '---\ntitle: A\ncategory: photo\ntags: [x, y]\n---\n\nbody'],
 ]);
 
+let mockRunStatus = 'in_progress';
+let lastDispatchBody = null;
 const ghFetch = async (url, opts = {}) => {
   const prefix = 'https://api.github.com/repos/test/repo/contents/';
   const href = String(url);
+  if (href.includes('/actions/workflows/pipeline.yml/dispatches')) {
+    lastDispatchBody = JSON.parse(opts.body || '{}');
+    return new Response(null, { status: 204 });
+  }
   if (href.includes('/actions/workflows/pipeline.yml/runs')) {
     return new Response(
       JSON.stringify({
@@ -77,7 +84,7 @@ const ghFetch = async (url, opts = {}) => {
           {
             id: 123,
             run_number: 7,
-            status: 'in_progress',
+            status: mockRunStatus,
             conclusion: null,
             display_title: 'smoke',
             head_branch: 'main',
@@ -479,7 +486,64 @@ await record('build cancel (auth required, cancels running run)', async () => {
   assert.equal((await r.json()).runNumber, 7);
 });
 
+// ── 16. Build dispatch: configurable timeout input ──
+await record('build dispatch timeout default 90', async () => {
+  mockRunStatus = 'completed';
+  try {
+    bustCache();
+    const r = await call('/api/build', { method: 'POST', token: TOKEN });
+    assert.equal(r.status, 200);
+    assert.ok(lastDispatchBody, 'dispatch body captured');
+    assert.equal(lastDispatchBody.ref, 'main');
+    assert.equal(lastDispatchBody.inputs.timeout_minutes, '90');
+  } finally {
+    mockRunStatus = 'in_progress';
+  }
+});
+
+await record('build dispatch timeout from config (120) + clamped (999→360, 5→10)', async () => {
+  mockRunStatus = 'completed';
+  const original = gh.get('mosaic.config.json');
+  const setBuild = (timeoutMinutes) =>
+    gh.set('mosaic.config.json', JSON.stringify({ ...JSON.parse(original), build: { timeoutMinutes } }));
+  try {
+    setBuild(120);
+    bustCache();
+    let r = await call('/api/build', { method: 'POST', token: TOKEN });
+    assert.equal(r.status, 200);
+    assert.equal(lastDispatchBody.inputs.timeout_minutes, '120');
+
+    setBuild(999);
+    bustCache();
+    r = await call('/api/build', { method: 'POST', token: TOKEN });
+    assert.equal(lastDispatchBody.inputs.timeout_minutes, '360');
+
+    setBuild(5);
+    bustCache();
+    r = await call('/api/build', { method: 'POST', token: TOKEN });
+    assert.equal(lastDispatchBody.inputs.timeout_minutes, '10');
+  } finally {
+    gh.set('mosaic.config.json', original);
+    mockRunStatus = 'in_progress';
+  }
+});
+
+await record('build dispatch timeout fallback 90 (config read fails)', async () => {
+  mockRunStatus = 'completed';
+  const original = gh.get('mosaic.config.json');
+  try {
+    gh.delete('mosaic.config.json');
+    bustCache();
+    const r = await call('/api/build', { method: 'POST', token: TOKEN });
+    assert.equal(r.status, 200);
+    assert.equal(lastDispatchBody.inputs.timeout_minutes, '90');
+  } finally {
+    gh.set('mosaic.config.json', original);
+    mockRunStatus = 'in_progress';
+  }
+});
+
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 21) process.exit(1);
+if (passed < 24) process.exit(1);

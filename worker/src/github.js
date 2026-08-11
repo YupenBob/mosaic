@@ -195,12 +195,20 @@ export async function deletePost(c, slug, message) {
 
 export async function dispatchBuild(c) {
   // Prefer workflow_dispatch (no git history noise). Requires GITHUB_TOKEN with actions:write.
+  // Pass the admin-configurable job timeout (build.timeoutMinutes, default 90,
+  // clamped to 10-360) as a dispatch input so pipeline.yml can honor it.
+  let timeoutMinutes = 90;
+  try {
+    const cfg = await getConfig(c);
+    const t = Number(cfg.build?.timeoutMinutes);
+    if (Number.isInteger(t)) timeoutMinutes = Math.min(360, Math.max(10, t));
+  } catch {}
   const dispatchResp = await fetch(
     `${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/dispatches`,
     {
       method: 'POST',
       headers: { ...headers(c), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref: 'main' }),
+      body: JSON.stringify({ ref: 'main', inputs: { timeout_minutes: String(timeoutMinutes) } }),
     },
   );
   if (dispatchResp.ok || dispatchResp.status === 204) {
