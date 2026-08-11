@@ -39,21 +39,42 @@ function reportDwell(slug, seconds, apiBase) {
 }
 
 function trackDwellTime(slug, apiBase) {
-  const startTime = Date.now();
+  let visibleMs = 0;
+  let lastVisibleAt = Date.now();
+  let reported = false;
+
+  // Only count dwell while the tab is visible: a backgrounded tab would
+  // otherwise inflate the per-session time and pollute the stats.
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      lastVisibleAt = Date.now();
+    } else {
+      visibleMs += Date.now() - lastVisibleAt;
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+
+  const elapsedSec = () => {
+    const current = visibleMs + (document.visibilityState === 'visible' ? Date.now() - lastVisibleAt : 0);
+    return Math.min(Math.floor(current / 1000), MAX_SESSION);
+  };
 
   const interval = setInterval(() => {
-    const elapsed = Math.min(Math.floor((Date.now() - startTime) / 1000), MAX_SESSION);
-    // Store elapsed time for this session (replaces, doesn't add)
-    saveDwellTime(slug, elapsed);
-    reportDwell(slug, elapsed, apiBase);
+    saveDwellTime(slug, elapsedSec());
+    reportDwell(slug, elapsedSec(), apiBase);
   }, SAVE_INTERVAL);
 
-  window.addEventListener('beforeunload', () => {
+  // pagehide is the reliable hook on mobile Safari; beforeunload is a fallback.
+  const reportOnce = () => {
+    if (reported) return;
+    reported = true;
     clearInterval(interval);
-    const elapsed = Math.min(Math.floor((Date.now() - startTime) / 1000), MAX_SESSION);
-    saveDwellTime(slug, elapsed);
-    reportDwell(slug, elapsed, apiBase);
-  });
+    document.removeEventListener('visibilitychange', onVisibility);
+    saveDwellTime(slug, elapsedSec());
+    reportDwell(slug, elapsedSec(), apiBase);
+  };
+  window.addEventListener('pagehide', reportOnce);
+  window.addEventListener('beforeunload', reportOnce);
 }
 
 function loadDwellTime(slug) {
