@@ -8,8 +8,8 @@ on:
       timeout_minutes:
         description: 'Pipeline job timeout in minutes (10-360)'
         required: false
-        default: 90
-        type: number
+        default: '90'
+        type: string
 
 concurrency:
   group: mosaic-pipeline
@@ -44,14 +44,24 @@ jobs:
 
       - name: Install tools
         run: |
-          sudo apt-get update -qq
-          # ubuntu-latest ships ffmpeg; only install what's missing
-          command -v ffmpeg >/dev/null || sudo apt-get install -y -qq ffmpeg
-          command -v rclone >/dev/null || sudo apt-get install -y -qq rclone
-          command -v exiftool >/dev/null || sudo apt-get install -y -qq libimage-exiftool-perl
+          # apt on shared runners is flaky; retry before giving up
+          for i in 1 2 3 4 5; do
+            sudo apt-get update -qq && break
+            echo "apt-get update failed (attempt $i), retrying..."
+            sleep 10
+          done
+          for i in 1 2 3 4 5; do
+            command -v ffmpeg >/dev/null || sudo apt-get install -y -qq ffmpeg
+            command -v rclone >/dev/null || sudo apt-get install -y -qq rclone
+            command -v exiftool >/dev/null || sudo apt-get install -y -qq libimage-exiftool-perl
+            command -v ffmpeg >/dev/null && command -v rclone >/dev/null && command -v exiftool >/dev/null && break
+            echo "tool install incomplete (attempt $i), retrying..."
+            sleep 10
+          done
+          command -v ffmpeg >/dev/null && command -v rclone >/dev/null && command -v exiftool >/dev/null || { echo "required tools missing"; exit 1; }
 
       - name: Install deps
-        run: npm ci
+        run: npm ci || { sleep 10; npm ci; }
 
       # compress.js streams video tiers to R2 via worker/scripts/r2-upload.mjs
       # (@aws-sdk lives in worker/node_modules), so worker deps must exist
@@ -86,7 +96,7 @@ jobs:
           echo "access_key_id = $R2_ACCESS_KEY" >> ~/.config/rclone/rclone.conf
           echo "secret_access_key = $R2_SECRET_KEY" >> ~/.config/rclone/rclone.conf
           echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
-          rclone copy r2:${R2_BUCKET}/originals/ content/posts/ --transfers 4 -v
+          rclone copy r2:${R2_BUCKET}/originals/ content/posts/ --transfers 4 --retries 5 --low-level-retries 20 -v
           echo "Synced from R2"
 
       # ── 1b. Strip EXIF from originals (privacy: GPS etc.) ──
@@ -225,7 +235,7 @@ jobs:
           echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
           rclone copy content/posts/ r2:${R2_BUCKET}/originals/ \
             --include "*/photos/**" --include "*/videos/**" --include "*/music/**" --include "*/cover.*" \
-            --checksum --transfers 4
+            --checksum --transfers 4 --retries 5 --low-level-retries 20
           echo "Originals synced back (EXIF stripped)"
 
       - name: Progress — deploy

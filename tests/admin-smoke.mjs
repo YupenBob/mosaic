@@ -12,8 +12,11 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 
 const ADMIN_URL = (process.env.ADMIN_URL || 'https://mosaic-admin.xsanye.cn').replace(/\/+$/, '');
-const devVars = fs.readFileSync(new URL('../worker/.dev.vars', import.meta.url), 'utf8');
-const password = (devVars.match(/^ADMIN_PASSWORD=(.*)$/m) || [])[1]?.trim() || '';
+let password = '';
+try {
+  const devVars = fs.readFileSync(new URL('../worker/.dev.vars', import.meta.url), 'utf8');
+  password = (devVars.match(/^ADMIN_PASSWORD=(.*)$/m) || [])[1]?.trim() || '';
+} catch {}
 
 if (!password) {
   console.log('SKIP admin-smoke — ADMIN_PASSWORD not found in worker/.dev.vars (CI has no local secrets)');
