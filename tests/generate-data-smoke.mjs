@@ -166,5 +166,41 @@ check(
   posts.every((p) => (p.music || []).every((t) => t.waveform === null || Array.isArray(t.waveform))),
 );
 
+// ── RSS / Sitemap content ──
+const feedPath = path.join(DIST, 'feed.xml');
+const sitemapPath = path.join(DIST, 'sitemap.xml');
+const feed = fs.existsSync(feedPath) ? fs.readFileSync(feedPath, 'utf8') : '';
+const sitemap = fs.existsSync(sitemapPath) ? fs.readFileSync(sitemapPath, 'utf8') : '';
+let siteBase = '';
+try {
+  const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf8'));
+  siteBase = (cfg.url || '').replace(/\/+$/, '');
+} catch {}
+
+check('feed.xml generated', feed.startsWith('<?xml') && feed.includes('<rss version="2.0"'));
+if (feed) {
+  const feedItems = (feed.match(/<item>/g) || []).length;
+  check('feed has one item per post', feedItems === posts.length, `items=${feedItems} posts=${posts.length}`);
+  const missingFeed = posts.filter((p) => !feed.includes(`${siteBase}/posts/${encodeURIComponent(p.slug)}/`));
+  check(
+    'feed links every post',
+    missingFeed.length === 0,
+    missingFeed.length ? missingFeed.map((p) => p.slug).join(',') : '',
+  );
+}
+
+check('sitemap.xml generated', sitemap.startsWith('<?xml') && sitemap.includes('<urlset'));
+if (sitemap) {
+  const locCount = (sitemap.match(/<loc>/g) || []).length;
+  const expectedLocs = 2 + categories.length + tags.length + posts.length; // home + 404 + cats + tags + posts
+  check('sitemap loc count matches', locCount === expectedLocs, `locs=${locCount} expected=${expectedLocs}`);
+  const missingSitemap = posts.filter((p) => !sitemap.includes(`${siteBase}/posts/${encodeURIComponent(p.slug)}/`));
+  check(
+    'sitemap covers every post',
+    missingSitemap.length === 0,
+    missingSitemap.length ? missingSitemap.map((p) => p.slug).join(',') : '',
+  );
+}
+
 console.log(`\ngenerate-data-smoke: ${failures === 0 ? 'OK' : failures + ' failure(s)'}`);
 process.exit(failures === 0 ? 0 : 1);
