@@ -33,7 +33,7 @@
 ### 直连 vs 代理
 
 - 图片/封面：`<img>` 不需要 CORS，直连 `mosaic-media.xsanye.cn`
-- HLS：hls.js 跨域 XHR 需要 CORS。当前策略为 R2 对象 `Cache-Control: public, max-age=31536000`（pipeline 默认 `VIDEO_CACHE_CONTROL`）+ 桶级 CORS，前提是媒体域 **Transform Rule** 已强制 `Access-Control-Allow-Origin: *`；若移动端 HLS E2E（断言 ACAO=*）失败，回退 `no-store` 并排查 Transform Rule
+- HLS：hls.js 跨域 XHR 需要 CORS。当前媒体域 **Transform Rule 尚未配置**，视频对象保持 `Cache-Control: no-store`（上传器默认，pipeline 不覆盖），保证直连响应始终带 ACAO；配置 Transform Rule 强制 `Access-Control-Allow-Origin: *` 后，再把 `VIDEO_CACHE_CONTROL` 设为 `public, max-age=31536000` 恢复边缘缓存
 
 ### CORS 排查
 

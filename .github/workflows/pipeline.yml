@@ -127,7 +127,6 @@ jobs:
           R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          VIDEO_CACHE_CONTROL: 'public, max-age=31536000'
           R2_CHECKSUMS_SYNC: '1'
           TIMEOUT_MINUTES: ${{ fromJSON(inputs.timeout_minutes || '90') }}
         run: node scripts/compress.js
@@ -219,13 +218,15 @@ jobs:
           echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
           node scripts/upload.js
 
-      # ── 4a. Upload video HLS via SDK (Cache-Control: no-store + correct types) ──
+      # ── 4a. Upload video HLS via SDK (correct types) ──
+      # Cache-Control stays no-store (uploader default) until a Cloudflare
+      # Transform Rule forces ACAO on the media host; only then flip
+      # VIDEO_CACHE_CONTROL to 'public, max-age=31536000' for edge caching.
       - name: Upload video media
         env:
           R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
           R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          VIDEO_CACHE_CONTROL: 'public, max-age=31536000'
         run: |
           if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
           node worker/scripts/upload-videos.mjs
