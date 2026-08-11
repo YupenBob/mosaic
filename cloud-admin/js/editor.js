@@ -196,10 +196,13 @@ function loadDraft(slug) {
 }
 
 function saveDraft() {
-  const slug = getCurrentSlug();
-  state.editorDraftKey = slug || '__new';
+  // Key drafts by a stable bucket: the URL slug for edits, '__new' for new
+  // posts. The typed slug lives in data.slug (restoreDraft fills the field),
+  // so a refresh before creation still finds the draft.
+  const key = state.params.slug || '__new';
+  state.editorDraftKey = key;
   const data = {
-    slug,
+    slug: getCurrentSlug(),
     title: document.getElementById('fm-title')?.value || '',
     date: document.getElementById('fm-date')?.value || '',
     category: document.getElementById('fm-category')?.value || '',
@@ -216,7 +219,7 @@ function saveDraft() {
     updatedAt: Date.now(),
   };
   try {
-    localStorage.setItem(draftKey(slug), JSON.stringify(data));
+    localStorage.setItem(draftKey(key), JSON.stringify(data));
   } catch {}
 }
 
@@ -239,6 +242,7 @@ window.restoreDraft = () => {
     const el = document.getElementById(id);
     if (el && el.value !== v) el.value = v;
   };
+  set('fm-slug', d.slug || '');
   set('fm-title', d.title || '');
   set('fm-date', d.date || '');
   set('fm-category', d.category || '');
@@ -258,7 +262,7 @@ window.restoreDraft = () => {
 
 window.discardDraft = () => {
   try {
-    localStorage.removeItem(draftKey(getCurrentSlug()));
+    localStorage.removeItem(draftKey(state.params.slug || '__new'));
   } catch {}
   document.getElementById('draft-banner')?.remove();
   window._draftSnapshot = null;
@@ -300,7 +304,8 @@ window.doSavePost = async (goBack) => {
       location.hash = 'editor&slug=' + encodeURIComponent(slug);
     }
     try {
-      localStorage.removeItem(draftKey(slug));
+      localStorage.removeItem(draftKey(state.params.slug || '__new'));
+      if (!state.params.slug) localStorage.removeItem(draftKey(slug));
     } catch {}
     state.editorDirty = false;
     window.checkDirty && window.checkDirty();
