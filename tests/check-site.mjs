@@ -154,13 +154,17 @@ async function main() {
         const sm = await fetch(`${SITE}/sitemap.xml`, { signal: AbortSignal.timeout(15000) });
         const xml = await sm.text();
         const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-        const candidates = locs.filter((u) => !u.includes('404.html')).slice(0, 5);
+        const candidates = locs.filter((u) => !u.includes('404.html'));
+        // Spread the sample across the whole list (home, categories, tags,
+        // posts) instead of only the first entries.
+        const step = Math.max(1, Math.floor(candidates.length / 8));
+        const sample = candidates.filter((_, i) => i % step === 0).slice(0, 8);
         let okUrls = 0;
-        for (const u of candidates) {
+        for (const u of sample) {
           const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
           if (r.ok) okUrls++;
         }
-        check('sitemap URLs resolve (sample)', okUrls === candidates.length, `${okUrls}/${candidates.length}`);
+        check('sitemap URLs resolve (sample)', okUrls === sample.length, `${okUrls}/${sample.length}`);
       } catch (e) {
         check('sitemap URLs resolve (sample)', false, e.message);
       }
