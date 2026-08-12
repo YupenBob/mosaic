@@ -3,8 +3,8 @@
  * API returns an empty list today) plus Deploy legacy redirect page.
  */
 import { trash as trashApi } from '../src/api.js';
-import { t } from './i18n.js';
-import { escHtml, toast, modalConfirm, emptyState } from './ui.js';
+import { t } from './i18n.js?v=1';
+import { escHtml, toast, modalConfirm, emptyState } from './ui.js?v=1';
 
 export default async function renderTrash() {
   let items = [];

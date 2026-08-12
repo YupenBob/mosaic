@@ -2,9 +2,9 @@
  * Dashboard page — health bar, stat cards, charts, leaderboard, activity.
  */
 import { posts as postsApi, stats, health, disk, config, build, taxonomy } from '../src/api.js';
-import { t } from './i18n.js';
-import { state } from './state.js';
-import { escHtml, formatTime, quick, loadLib, emptyState } from './ui.js';
+import { t } from './i18n.js?v=1';
+import { state } from './state.js?v=1';
+import { escHtml, formatTime, quick, loadLib, emptyState } from './ui.js?v=1';
 
 const CHART_URL = 'js/vendor/chart.umd.min.js';
 

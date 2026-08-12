@@ -3,9 +3,9 @@
  * drafts, cover picker, stats section and the media panel.
  */
 import { posts as postsApi, media as mediaApi } from '../src/api.js';
-import { t } from './i18n.js';
-import { state } from './state.js';
-import { escHtml, toast, modalConfirm, loadLib, openModal, closeModal } from './ui.js';
+import { t } from './i18n.js?v=1';
+import { state } from './state.js?v=1';
+import { escHtml, toast, modalConfirm, loadLib, openModal, closeModal } from './ui.js?v=1';
 
 const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';

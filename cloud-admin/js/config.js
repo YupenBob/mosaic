@@ -3,10 +3,10 @@
  * dirty tracking with save/discard, favicon upload.
  */
 import { config, getToken } from '../src/api.js';
-import { t, setLang } from './i18n.js';
-import { setTheme, getThemePref } from './theme.js';
-import { state } from './state.js';
-import { escHtml, toast } from './ui.js';
+import { t, setLang } from './i18n.js?v=1';
+import { setTheme, getThemePref } from './theme.js?v=1';
+import { state } from './state.js?v=1';
+import { escHtml, toast } from './ui.js?v=1';
 
 const LOGO_DATA_URI =
   'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 48 48%27%3E%3Crect x=%272%27 y=%272%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.9%27/%3E%3Crect x=%2726%27 y=%272%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.65%27/%3E%3Crect x=%272%27 y=%2726%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.4%27/%3E%3Crect x=%2726%27 y=%2726%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.75%27/%3E%3C/svg%3E';

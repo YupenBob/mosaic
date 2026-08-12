@@ -2,7 +2,7 @@
  * UI toolkit — escaping, toasts, modals, empty states, badges, clipboard,
  * dynamic script loading and formatting helpers.
  */
-import { t } from './i18n.js';
+import { t } from './i18n.js?v=1';
 
 export function escHtml(s) {
   if (s === null || s === undefined) return '';

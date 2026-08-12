@@ -3,8 +3,8 @@
  * (opens editor prefilled) and delete (Worker endpoint, hidden when absent).
  */
 import { taxonomy } from '../src/api.js';
-import { t } from './i18n.js';
-import { escHtml, toast, modalConfirm, modalInput, emptyState } from './ui.js';
+import { t } from './i18n.js?v=1';
+import { escHtml, toast, modalConfirm, modalInput, emptyState } from './ui.js?v=1';
 
 let deleteSupported = null;
 

@@ -3,8 +3,8 @@
  * retry/cancel, thumbnails and graceful handling when the post isn't saved.
  */
 import { upload, getToken } from '../src/api.js';
-import { t } from './i18n.js';
-import { escHtml } from './ui.js';
+import { t } from './i18n.js?v=1';
+import { escHtml } from './ui.js?v=1';
 
 const CONCURRENCY = 3;
 // Files above this size use resumable multipart uploads (R2 part uploads).

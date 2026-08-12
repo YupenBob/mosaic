@@ -3,8 +3,8 @@
  * indeterminate progress, copy-path actions and typed confirmation.
  */
 import { getToken } from '../src/api.js';
-import { t } from './i18n.js';
-import { escHtml, modalConfirm, copyText, fmtSize } from './ui.js';
+import { t } from './i18n.js?v=1';
+import { escHtml, modalConfirm, copyText, fmtSize } from './ui.js?v=1';
 
 export default async function renderCleanup() {
   const API = window.__API_BASE__ || '/api';

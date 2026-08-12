@@ -4,20 +4,20 @@
  * keyboard shortcuts and unsaved-changes guard.
  */
 import { auth, getToken, setToken, posts as postsApi, build } from '../src/api.js';
-import { t, setLang, onLangChange } from './i18n.js';
-import { initTheme, cycleTheme } from './theme.js';
-import { state } from './state.js';
-import { toast, modalConfirm, escHtml, debounce, formatTime } from './ui.js';
-import { setupUploadZone } from './upload.js';
+import { t, setLang, onLangChange } from './i18n.js?v=1';
+import { initTheme, cycleTheme } from './theme.js?v=1';
+import { state } from './state.js?v=1';
+import { toast, modalConfirm, escHtml, debounce, formatTime } from './ui.js?v=1';
+import { setupUploadZone } from './upload.js?v=1';
 
-import renderDashboard, { dashboardSkeleton } from './dashboard.js';
-import renderPosts, { postsSkeleton } from './posts.js';
-import renderEditor, { editorSkeleton, updateCoverPreview } from './editor.js';
-import renderBuild, { buildSkeleton } from './build.js';
-import renderConfig, { configSkeleton } from './config.js';
-import renderTaxonomy, { taxonomySkeleton } from './taxonomy.js';
-import renderCleanup, { cleanupSkeleton } from './cleanup.js';
-import renderTrash, { renderDeployRedirect, trashSkeleton } from './trash.js';
+import renderDashboard, { dashboardSkeleton } from './dashboard.js?v=1';
+import renderPosts, { postsSkeleton } from './posts.js?v=1';
+import renderEditor, { editorSkeleton, updateCoverPreview } from './editor.js?v=1';
+import renderBuild, { buildSkeleton } from './build.js?v=1';
+import renderConfig, { configSkeleton } from './config.js?v=1';
+import renderTaxonomy, { taxonomySkeleton } from './taxonomy.js?v=1';
+import renderCleanup, { cleanupSkeleton } from './cleanup.js?v=1';
+import renderTrash, { renderDeployRedirect, trashSkeleton } from './trash.js?v=1';
 
 const pages = {
   dashboard: {

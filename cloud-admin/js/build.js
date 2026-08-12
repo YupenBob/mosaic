@@ -3,9 +3,18 @@
  * failure diagnosis, history, dynamic polling and completion notifications.
  */
 import { build } from '../src/api.js';
-import { t } from './i18n.js';
-import { state } from './state.js';
-import { escHtml, formatTime, fmtDuration, getStatusDef, statusBadge, toast, copyText, modalConfirm } from './ui.js';
+import { t } from './i18n.js?v=1';
+import { state } from './state.js?v=1';
+import {
+  escHtml,
+  formatTime,
+  fmtDuration,
+  getStatusDef,
+  statusBadge,
+  toast,
+  copyText,
+  modalConfirm,
+} from './ui.js?v=1';
 
 // Chinese labels for the known pipeline steps (GitHub returns English names)
 const STEP_LABELS_ZH = {
