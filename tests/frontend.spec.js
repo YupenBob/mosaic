@@ -97,6 +97,52 @@ test('gallery: open post gallery and switch quality', async ({ page }) => {
   console.log(`Gallery quality switch: src=${src}`);
 });
 
+test('gallery: wheel zoom keeps the cursor-fixed content point', async ({ page }) => {
+  const posts = await fetch(`${SITE}/data/posts.json`)
+    .then((r) => r.json())
+    .catch(() => []);
+  const galleryPost = (posts || []).find((p) => (p.photos || []).length > 0);
+  test.skip(!galleryPost, 'no gallery post in this build');
+  await page.goto(`${SITE}/posts/${galleryPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+  const firstItem = page.locator('.gallery-item img, .gallery-single-item img').first();
+  await firstItem.waitFor({ state: 'visible', timeout: 15000 });
+  await page.locator('#gallery-overlay').waitFor({ state: 'attached', timeout: 15000 });
+  await firstItem.click();
+  await page.locator('#gallery-current-img').waitFor({ state: 'visible', timeout: 10000 });
+  await page.waitForFunction(() => document.getElementById('gallery-current-img')?.naturalWidth > 0, null, {
+    timeout: 20000,
+  });
+  await page.waitForTimeout(300);
+  const localAt = ({ x, y }) =>
+    page.evaluate(
+      ({ x, y }) => {
+        const img = document.getElementById('gallery-current-img');
+        const r = img.getBoundingClientRect();
+        const m = new DOMMatrix(getComputedStyle(img).transform);
+        return { x: (x - (r.left + r.width / 2)) / m.a, y: (y - (r.top + r.height / 2)) / m.a, scale: m.a };
+      },
+      { x, y },
+    );
+  const r0 = await page.locator('#gallery-current-img').boundingBox();
+  const cursor = { x: r0.x + r0.width * 0.35, y: r0.y + r0.height * 0.45 };
+  const before = await localAt(cursor);
+  for (let i = 0; i < 3; i++) {
+    await page.evaluate(({ x, y }) => {
+      document
+        .getElementById('gallery-overlay')
+        .dispatchEvent(
+          new WheelEvent('wheel', { clientX: x, clientY: y, deltaY: -120, bubbles: true, cancelable: true }),
+        );
+    }, cursor);
+    await page.waitForTimeout(40);
+  }
+  const after = await localAt(cursor);
+  const drift = Math.hypot(after.x - before.x, after.y - before.y);
+  expect(drift).toBeLessThan(1);
+  expect(after.scale).toBeGreaterThan(1.4);
+  console.log(`Gallery zoom focus drift=${drift.toFixed(3)}px scale=${after.scale.toFixed(2)}`);
+});
+
 test('video player: custom controls render and quality menu opens', async ({ page }) => {
   const posts = await fetch(`${SITE}/data/posts.json`)
     .then((r) => r.json())

@@ -223,7 +223,9 @@ function preloadNeighbors(idx) {
   const range = PRELOAD_RANGE[3][state.currentRes] || 3;
   for (let i = -range; i <= range; i++) {
     if (i === 0) continue;
-    const ni = (idx + i + N) % N;
+    // JS % keeps the sign of the dividend — normalize so near-index photos at
+    // the start of a small gallery don't resolve to a negative index.
+    const ni = (((idx + i) % N) + N) % N;
     if (!state.photos[ni]._preloaded) {
       const pre = new Image();
       pre.src = getSrc(state.photos[ni], i === 0 ? state.currentRes : '720p');
@@ -360,7 +362,10 @@ let zoomState = { scale: 1, panX: 0, panY: 0, lastTap: 0 };
 function resetZoom() {
   zoomState = { scale: 1, panX: 0, panY: 0, lastTap: 0 };
   const img = $('#gallery-current-img');
-  if (img) img.style.transform = '';
+  if (img) {
+    img.style.transform = '';
+    img.style.cursor = '';
+  }
 }
 
 function applyTransform() {
@@ -421,8 +426,12 @@ function setupGestures(overlay) {
         if (touchState.startDist > 0) {
           const oldScale = zoomState.scale;
           const newScale = Math.max(0.5, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
-          zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
-          zoomState.panY = cy - (cy - zoomState.panY) * (newScale / oldScale);
+          // Keep the content point under the pinch center stationary: with
+          // center = boxCenter + pan, the correct update is
+          // pan' = (cursor - boxCenter) - (cursor - boxCenter - pan) * ratio.
+          const ratio = newScale / oldScale;
+          zoomState.panX = cx + zoomState.panX - cx * ratio;
+          zoomState.panY = cy + zoomState.panY - cy * ratio;
           zoomState.scale = newScale;
           applyTransform();
         }
@@ -453,8 +462,10 @@ function setupGestures(overlay) {
       const oldScale = zoomState.scale;
       const newScale = Math.max(0.5, Math.min(5, oldScale + (e.deltaY > 0 ? -0.15 : 0.15)));
       const ratio = newScale / oldScale;
-      zoomState.panX = cx - (cx - zoomState.panX) * ratio;
-      zoomState.panY = cy - (cy - zoomState.panY) * ratio;
+      // pan' = (cursor - boxCenter) - (cursor - boxCenter - pan) * ratio
+      //      = (cx + pan) - cx * ratio
+      zoomState.panX = cx + zoomState.panX - cx * ratio;
+      zoomState.panY = cy + zoomState.panY - cy * ratio;
       zoomState.scale = newScale;
       applyTransform();
     },
@@ -500,8 +511,9 @@ function setupGestures(overlay) {
       cy = e.clientY - (imgRect.top + imgRect.height / 2);
     const oldScale = zoomState.scale;
     const newScale = 2;
-    zoomState.panX = cx - (cx - zoomState.panX) * (newScale / oldScale);
-    zoomState.panY = cy - (cy - zoomState.panY) * (newScale / oldScale);
+    const ratio = newScale / oldScale;
+    zoomState.panX = cx + zoomState.panX - cx * ratio;
+    zoomState.panY = cy + zoomState.panY - cy * ratio;
     zoomState.scale = newScale;
     applyTransform();
   });
