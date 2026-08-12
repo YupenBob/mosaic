@@ -247,14 +247,12 @@ export async function dispatchBuild(c) {
   throw new Error(`workflow_dispatch failed: ${dispatchResp.status} — ${body.slice(0, 200)}`);
 }
 
-export async function getLatestRun(c) {
-  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=1`, {
-    headers: headers(c),
-  });
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  const run = data.workflow_runs?.[0];
-  if (!run) return null;
+/**
+ * Assemble the full build detail object (metadata + job step timeline) from a
+ * GitHub workflow run. Shared by the latest-run status endpoint and the
+ * per-run detail endpoint.
+ */
+export async function buildRunDetail(c, run) {
   const repo = c.env.GITHUB_REPO;
   const result = {
     id: run.id,
@@ -313,6 +311,27 @@ export async function getLatestRun(c) {
   }
 
   return result;
+}
+
+export async function getLatestRun(c) {
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/pipeline.yml/runs?per_page=1`, {
+    headers: headers(c),
+  });
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  const run = data.workflow_runs?.[0];
+  if (!run) return null;
+  return buildRunDetail(c, run);
+}
+
+export async function getRunById(c, id) {
+  const resp = await fetch(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/runs/${id}`, {
+    headers: headers(c),
+  });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error(`GitHub getRunById: ${resp.status}`);
+  const run = await resp.json();
+  return buildRunDetail(c, run);
 }
 
 // Cancel the latest running workflow run (requires a token with actions:write).

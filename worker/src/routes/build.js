@@ -1,7 +1,7 @@
 /**
  * Build lifecycle: trigger, status/history/progress, done, cancel.
  */
-import { dispatchBuild, getLatestRun, getRunHistory, cancelRun, clearDirty, markDirty } from '../github.js';
+import { dispatchBuild, getLatestRun, getRunById, getRunHistory, cancelRun, clearDirty, markDirty } from '../github.js';
 import { verifyToken } from '../auth.js';
 import { defer } from '../shared.js';
 
@@ -73,6 +73,17 @@ export function registerBuild(app) {
     try {
       const run = await getLatestRun(c);
       if (!run) return c.json({ status: 'unknown' });
+      return c.json(run);
+    } catch (e) {
+      return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502);
+    }
+  });
+
+  // Single build run detail (metadata + step timeline) by GitHub run id.
+  app.get('/api/build/run/:id', async (c) => {
+    try {
+      const run = await getRunById(c, c.req.param('id'));
+      if (!run) return c.json({ error: 'Build run not found', code: 'NOT_FOUND' }, 404);
       return c.json(run);
     } catch (e) {
       return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502);

@@ -45,10 +45,20 @@ try {
   await page.click('#login-btn');
   await page.waitForSelector('#app:not([style*="display:none"])', { timeout: 30000 });
 
+  // Discover the latest build run id so the detail page can be scanned too.
+  let routes = [...ROUTES];
+  await page.evaluate(() => (location.hash = 'build'));
+  await page.waitForTimeout(6000);
+  const runId = await page.evaluate(() => document.querySelector('.build-history-row')?.dataset.runId || '');
+  if (runId) {
+    routes.push(`build&run=${runId}`);
+    console.log(`Build detail route added: build&run=${runId}`);
+  }
+
   for (const theme of THEMES) {
     await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme);
     await page.waitForTimeout(800);
-    for (const route of ROUTES) {
+    for (const route of routes) {
       await page.evaluate((h) => (location.hash = h), route);
       await page.waitForTimeout(5000);
       await page.addScriptTag({ path: AXE });

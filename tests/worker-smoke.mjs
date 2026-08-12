@@ -146,6 +146,66 @@ const ghFetch = async (url, opts = {}) => {
   if (href.includes('/actions/runs/') && href.endsWith('/cancel')) {
     return new Response(null, { status: 202 });
   }
+  const runMatch = href.match(/\/actions\/runs\/(\d+)$/);
+  if (runMatch) {
+    const id = Number(runMatch[1]);
+    if (id !== 123) {
+      return new Response(JSON.stringify({ message: 'Not Found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const completed = mockRunStatus === 'completed';
+    return new Response(
+      JSON.stringify({
+        id: 123,
+        run_number: 7,
+        status: mockRunStatus,
+        conclusion: completed ? 'failure' : null,
+        display_title: 'smoke',
+        head_branch: 'main',
+        head_sha: 'abc1234',
+        head_commit: { message: 'smoke commit' },
+        html_url: 'https://github.com/test/repo/actions/runs/123',
+        created_at: new Date(Date.now() - 60000).toISOString(),
+        updated_at: new Date().toISOString(),
+        event: 'workflow_dispatch',
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+  if (/\/actions\/runs\/123\/jobs$/.test(href)) {
+    const now = new Date().toISOString();
+    const past = new Date(Date.now() - 60000).toISOString();
+    return new Response(
+      JSON.stringify({
+        jobs: [
+          {
+            html_url: 'https://github.com/test/repo/actions/runs/123/job/1',
+            steps: [
+              {
+                name: 'Checkout',
+                status: 'completed',
+                conclusion: 'success',
+                number: 1,
+                started_at: past,
+                completed_at: now,
+              },
+              {
+                name: 'Deploy to Cloudflare Pages',
+                status: 'completed',
+                conclusion: 'failure',
+                number: 2,
+                started_at: past,
+                completed_at: now,
+              },
+            ],
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
   if (!href.startsWith(prefix)) return new Response(JSON.stringify({}), { status: 404 });
   const key = decodeURIComponent(href.slice(prefix.length)).replace(/\/+$/, '');
   if (key === 'content/posts') {
@@ -715,6 +775,21 @@ await record('GET /api/build/status + history (mock runs)', async () => {
   const h = await (await call('/api/build/history', { token: TOKEN })).json();
   assert.ok(Array.isArray(h.runs) && h.runs.length >= 1);
   assert.equal(h.runs[0].runNumber, 7);
+  mockRunStatus = 'in_progress';
+});
+
+await record('GET /api/build/run/:id (auth + 404 + full detail)', async () => {
+  const unauth = await call('/api/build/run/123');
+  assert.equal(unauth.status, 401);
+  const nf = await call('/api/build/run/999', { token: TOKEN });
+  assert.equal(nf.status, 404);
+  mockRunStatus = 'completed';
+  const r = await (await call('/api/build/run/123', { token: TOKEN })).json();
+  assert.equal(r.runNumber, 7);
+  assert.ok(Array.isArray(r.steps) && r.steps.length >= 2);
+  assert.equal(r.failedStep.number, 2);
+  assert.ok(String(r.jobUrl).includes('/job/1'));
+  assert.ok(String(r.failedStep.logUrl).includes('#step:2:1'));
   mockRunStatus = 'in_progress';
 });
 

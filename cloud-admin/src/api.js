@@ -161,6 +161,9 @@ export const build = {
 
   history: () => apiFetch('/build/history'),
 
+  /** Single build run detail (metadata + step timeline) by GitHub run id. */
+  run: (id) => apiFetch(`/build/run/${encodeURIComponent(id)}`),
+
   trigger: () => apiFetch('/build', { method: 'POST' }),
 
   progress: () => apiFetch('/build/progress').catch(() => null),

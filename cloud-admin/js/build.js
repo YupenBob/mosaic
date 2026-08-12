@@ -4,6 +4,7 @@
  */
 import { build } from '../src/api.js';
 import { t } from './i18n.js';
+import { state } from './state.js';
 import { escHtml, formatTime, fmtDuration, getStatusDef, statusBadge, toast, copyText, modalConfirm } from './ui.js';
 
 // Chinese labels for the known pipeline steps (GitHub returns English names)
@@ -48,6 +49,7 @@ let stepsDetailOpen = false;
 let lastSteps = [];
 
 export default async function renderBuild(signal) {
+  if (state.params.run) return renderBuildDetail(signal, state.params.run);
   let statusData = null,
     historyData = { runs: [] };
   try {
@@ -596,23 +598,168 @@ function renderRunHistory(runs) {
           const time = formatTime(r.createdAt);
           const dur = buildDuration(r);
           return `
-          <div class="build-history-row">
-            <span class="build-history-run">#${r.runNumber}</span>
-            ${statusBadge(s)}
-            <span class="build-history-title">${escHtml(r.displayTitle || r.commitMessage || '')}</span>
-            ${dur ? `<span class="muted" style="min-width:64px;text-align:right">${dur}</span>` : ''}
+          <div class="build-history-row" data-run-id="${r.id}">
+            <a class="build-history-main" href="#build&run=${r.id}" aria-label="${t('build.detailAria', { n: r.runNumber })}">
+              <span class="build-history-run">#${r.runNumber}</span>
+              ${statusBadge(s)}
+              <span class="build-history-title">${escHtml(r.displayTitle || r.commitMessage || '')}</span>
+              ${dur ? `<span class="muted" style="min-width:64px;text-align:right">${dur}</span>` : ''}
+              <span class="build-history-time">${time}</span>
+            </a>
             ${
               r.commitUrl
                 ? `<a href="${escHtml(r.commitUrl)}" target="_blank" rel="noopener" class="build-history-meta" title="${escHtml(r.headShaFull || r.headSha)}">${escHtml(r.headSha || '')}</a>`
                 : `<span class="build-history-meta">${escHtml(r.headSha || '')}</span>`
             }
-            <span class="build-history-time">${time}</span>
             ${r.htmlUrl ? `<a href="${r.htmlUrl}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none">${t('build.viewOnGitHub')} <i class="ri-external-link-line"></i></a>` : ''}
+            <i class="ri-arrow-right-s-line build-history-arrow" aria-hidden="true"></i>
           </div>`;
         })
         .join('')}
     </div>
   `;
+}
+
+function buildDetailHtml(run, s, steps) {
+  const dur = buildDuration(run);
+  const failed = run.failedStep;
+  const metaItems = [
+    [t('build.branch'), escHtml(run.headBranch || '—')],
+    [
+      t('build.commit'),
+      run.commitUrl
+        ? `<a href="${escHtml(run.commitUrl)}" target="_blank" rel="noopener" title="${escHtml(run.headShaFull || run.headSha || '')}">${escHtml(run.headShaFull || run.headSha || '—')}</a>`
+        : escHtml(run.headShaFull || run.headSha || '—'),
+    ],
+    [t('build.event'), escHtml(run.event || '—')],
+    [t('build.time'), escHtml(formatTime(run.createdAt))],
+    [t('build.duration'), escHtml(dur || '—')],
+  ];
+  const stepRows = steps.length
+    ? `<div class="build-detail-steps">${steps
+        .map((st) => {
+          const { cls, label } = stepStatusInfo(st);
+          let d = '';
+          if (st.status === 'completed' && st.startedAt && st.completedAt) {
+            d = fmtDuration(Math.round((new Date(st.completedAt) - new Date(st.startedAt)) / 1000));
+          } else if (st.status === 'in_progress' && st.startedAt) {
+            d = t('build.elapsedShort', {
+              t: fmtDuration(Math.max(0, Math.round((Date.now() - new Date(st.startedAt)) / 1000))),
+            });
+          }
+          const isFailed = st.conclusion === 'failure';
+          const logLink =
+            isFailed && failed && failed.number === st.number && failed.logUrl
+              ? `<a href="${escHtml(failed.logUrl)}" target="_blank" rel="noopener" class="btn btn-sm btn-danger" style="text-decoration:none"><i class="ri-file-list-3-line"></i> ${t('build.viewLog')}</a>`
+              : '';
+          return `
+          <div class="build-step-row${isFailed ? ' step-failed' : ''}">
+            <span class="step-num">#${st.number}</span>
+            <span class="step-dot ${cls}"></span>
+            <span class="step-name">${escHtml(stepLabel(st.name))}</span>
+            <span class="step-status ${cls}">${escHtml(label)}</span>
+            ${d ? `<span class="step-dur">${d}</span>` : ''}
+            ${logLink}
+          </div>`;
+        })
+        .join('')}</div>`
+    : `<p class="muted">${t('build.noSteps')}</p>`;
+  const jobLink = run.jobUrl
+    ? `<a href="${escHtml(run.jobUrl)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none"><i class="ri-github-line"></i> GitHub Job</a>`
+    : '';
+  return `
+    <div class="card card-pad">
+      <div class="build-detail-meta">
+        ${metaItems
+          .map(
+            ([k, v]) => `
+          <div class="build-detail-meta-item">
+            <span class="build-detail-meta-key">${k}</span>
+            <span class="build-detail-meta-val">${v}</span>
+          </div>`,
+          )
+          .join('')}
+      </div>
+    </div>
+    <div class="card card-pad" style="margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h2 style="margin:0">${t('build.stepsTitle')}</h2>
+        ${jobLink}
+      </div>
+      ${stepRows}
+    </div>
+  `;
+}
+
+async function renderBuildDetail(signal, runId) {
+  let run = null;
+  let error = '';
+  try {
+    run = await build.run(runId);
+  } catch (e) {
+    error = e.message || '';
+  }
+  if (signal.aborted) return '';
+
+  if (!run) {
+    return {
+      html: `
+        <div class="page-anim">
+          <div class="page-header">
+            <div><h1>${t('build.detail')}</h1></div>
+            <div class="page-header-actions">
+              <button class="btn btn-secondary" onclick="location.hash='build'"><i class="ri-arrow-left-line"></i> ${t('build.backToBuild')}</button>
+            </div>
+          </div>
+          <div class="card card-pad" style="text-align:center;padding:60px 24px">
+            <i class="ri-error-warning-line" style="font-size:42px;color:var(--color-text-tertiary)"></i>
+            <h2 style="margin:12px 0 4px">${t('build.detailNotFound')}</h2>
+            ${error ? `<p class="muted">${escHtml(error)}</p>` : ''}
+          </div>
+        </div>`,
+      onMount() {},
+    };
+  }
+
+  const s = getStatusDef(run.status, run.conclusion);
+  const running = run.status === 'in_progress' || run.status === 'queued';
+  const detailHtml = buildDetailHtml(run, s, run.steps || []);
+
+  return {
+    html: `
+      <div class="page-anim">
+        <div class="page-header">
+          <div>
+            <h1>#${run.runNumber} ${escHtml(run.displayTitle || run.commitMessage || '')}</h1>
+            <p class="page-subtitle">${t('build.detail')} ${statusBadge(s)}</p>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" onclick="location.hash='build'"><i class="ri-arrow-left-line"></i> ${t('build.backToBuild')}</button>
+            ${run.htmlUrl ? `<a href="${escHtml(run.htmlUrl)}" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration:none">${t('build.viewOnGitHub')} <i class="ri-external-link-line"></i></a>` : ''}
+          </div>
+        </div>
+        <div id="build-detail-root">${detailHtml}</div>
+      </div>
+    `,
+    onMount() {
+      if (!running) return;
+      const timer = setInterval(async () => {
+        try {
+          const next = await build.run(runId);
+          if (signal.aborted) return;
+          const root = document.getElementById('build-detail-root');
+          if (!root) return;
+          const ns = getStatusDef(next.status, next.conclusion);
+          const nextRunning = next.status === 'in_progress' || next.status === 'queued';
+          root.innerHTML = buildDetailHtml(next, ns, next.steps || []);
+          if (!nextRunning) clearInterval(timer);
+        } catch {}
+      }, 5000);
+      const stop = () => clearInterval(timer);
+      signal.addEventListener('abort', stop, { once: true });
+      window.addEventListener('hashchange', stop, { once: true });
+    },
+  };
 }
 
 function renderEmptyState() {

@@ -75,6 +75,36 @@ try {
     process.exitCode = 1;
   }
 
+  // Build detail page: clicking a history row opens the run detail with a step
+  // timeline; back returns to the list.
+  if (historyRows > 0) {
+    await page.locator('.build-history-main').first().click();
+    await page.waitForSelector('#build-detail-root', { timeout: 15000 });
+    await page.waitForTimeout(1500);
+    const detailTitle = (
+      await page
+        .locator('.page-header h1')
+        .textContent()
+        .catch(() => '')
+    ).trim();
+    const stepRows = await page.locator('#build-detail-root .build-step-row').count();
+    const backBtn = await page.locator('.page-header-actions button[onclick*="hash=\'build\'"]').count();
+    console.log(`Build detail page — title=${detailTitle.slice(0, 40)}, steps=${stepRows}, backBtn=${backBtn}`);
+    if (stepRows < 1 || backBtn < 1) {
+      console.error('Build detail smoke failed: expected step timeline + back button');
+      process.exitCode = 1;
+    }
+    await page.evaluate(() => {
+      location.hash = 'build';
+    });
+    await page.waitForTimeout(5000);
+    const backRows = await page.locator('.build-history-row').count();
+    if (backRows < 1) {
+      console.error('Build detail smoke failed: back did not restore the history list');
+      process.exitCode = 1;
+    }
+  }
+
   // Editor page: new-post form renders with its core fields (render-only, so
   // we don't trip draft autosave or the leave-interception guard).
   await page.evaluate(() => {
