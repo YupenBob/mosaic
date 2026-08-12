@@ -71,26 +71,49 @@ function setupLazyLoading() {
   $$('.gallery-item img, .gallery-single-item img').forEach((img) => obs.observe(img));
 }
 
-function loadThumb(img) {
+// Target tier from the image's rendered width × device pixel ratio, so a
+// 2x display still gets a crisp source. Offscreen images (content-visibility)
+// may report 0 width — fall back to the conservative 480p tier.
+function pickRes(img) {
+  const dpr = window.devicePixelRatio || 1;
+  const needed = (img.clientWidth || 0) * dpr;
+  if (needed >= 1600) return '1080p';
+  if (needed >= 900) return '720p';
+  return '480p';
+}
+
+function tierSrc(img, res) {
+  return img.dataset['src' + res.replace('p', '')] || img.dataset.src480;
+}
+
+function decodeThenSwap(img, src) {
+  return new Promise((resolve) => {
+    const probe = new Image();
+    const done = (ok) => {
+      if (ok) img.src = src;
+      resolve(ok);
+    };
+    probe.onload = () => done(true);
+    probe.onerror = () => done(false);
+    probe.src = src;
+    if (probe.complete && probe.naturalWidth > 0) done(true);
+  });
+}
+
+// Gradient blur-up: LQIP (already the src) -> 480p -> target tier. Each tier
+// decodes in the background, so the page upgrades smoothly instead of one
+// big jump to a possibly-wrong resolution.
+async function loadThumb(img) {
   if (img.classList.contains('loaded')) return;
-  // Pick the sharp source from the image's rendered width (LQIP stays as the
-  // src until the high-res decode finishes — a real two-stage blur-up).
-  // Offscreen images may report 0 width (content-visibility) — fall back to a
-  // conservative 480p instead of assuming a huge viewport.
-  const w = img.clientWidth || 0;
-  const hi =
-    (w >= 1280 ? img.dataset.src1080 : w >= 720 ? img.dataset.src720 : img.dataset.src480) || img.dataset.src480;
-  if (!hi) return;
-  const applyHi = () => {
-    if (img.classList.contains('loaded')) return;
-    img.src = hi;
-    requestAnimationFrame(() => img.classList.add('loaded'));
-  };
-  const probe = new Image();
-  probe.onload = applyHi;
-  probe.onerror = () => img.classList.add('loaded');
-  probe.src = hi;
-  if (probe.complete && probe.naturalWidth > 0) applyHi();
+  const target = pickRes(img);
+  const chain = [tierSrc(img, '480p')];
+  if (target !== '480p') chain.push(tierSrc(img, target));
+  for (let i = 0; i < chain.length; i++) {
+    if (!chain[i]) continue;
+    const ok = await decodeThenSwap(img, chain[i]);
+    if (!ok) break;
+  }
+  if (!img.classList.contains('loaded')) img.classList.add('loaded');
 }
 
 /* ========== Overlay ========== */

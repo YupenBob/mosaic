@@ -64,12 +64,28 @@ await record('placeholders interleave text and media', () => {
   const { blocks } = buildBlocks({ body, photos, videos, music });
   assert.deepEqual(
     blocks.map((b) => b.type),
-    ['text', 'gallery', 'text', 'video', 'text', 'videos', 'music'],
+    ['text', 'gallery', 'text', 'video', 'text', 'music'],
   );
   assert.match(blocks[0].html, /Intro/);
   assert.match(blocks[2].html, /Mid/);
   assert.match(blocks[4].html, /Out/);
   assert.equal(blocks[3].video.base, 'v1');
+});
+
+await record('video:N suppresses the auto-appended videos block', () => {
+  const body = 'Intro\n\n{{video:0}}\n\nOut';
+  const { blocks } = buildBlocks({ body, photos, videos, music });
+  const types = blocks.map((b) => b.type);
+  assert.deepEqual(types, ['text', 'video', 'text', 'gallery', 'music']);
+  assert.equal(types.filter((t) => t === 'videos').length, 0);
+});
+
+await record('photo:N suppresses the auto-appended gallery block', () => {
+  const body = 'Intro\n\n{{photo:0}}\n\nOut';
+  const { blocks } = buildBlocks({ body, photos, videos, music });
+  const types = blocks.map((b) => b.type);
+  assert.deepEqual(types, ['text', 'photo', 'text', 'videos', 'music']);
+  assert.equal(types.filter((t) => t === 'gallery').length, 0);
 });
 
 await record('unreferenced media appended once, no duplicates', () => {

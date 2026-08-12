@@ -74,7 +74,10 @@ export function buildBlocks({ body, photos = [], videos = [], music = [], videoM
       const block = mediaBlock(raw, index);
       if (block) {
         blocks.push(block);
-        if (kind === 'gallery' || kind === 'videos' || kind === 'music') placed.add(kind);
+        // A single-item placeholder (photo:N / video:N) still counts as
+        // "referenced": suppress the auto-append of the whole gallery/videos
+        // block so media is never duplicated.
+        placed.add(kind === 'video' ? 'videos' : kind === 'photo' ? 'gallery' : kind);
       }
     } else {
       buf.push(line);
