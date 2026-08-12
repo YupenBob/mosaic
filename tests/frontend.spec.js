@@ -155,16 +155,18 @@ test('video player: custom controls render and quality menu opens', async ({ pag
   });
   expect(resp.status()).toBe(200);
   await page.waitForSelector('.video-element[data-hls="true"]', { timeout: 15000 });
+  // Posts can carry multiple video blocks/playlists — scope to the first one.
+  const container = page.locator('.video-container').first();
   // Controls reveal on hover over the container.
-  await page.hover('.video-container');
-  await page.locator('.video-big-play').waitFor({ state: 'visible', timeout: 10000 });
-  await page.locator('.vc-quality-btn').waitFor({ state: 'visible', timeout: 10000 });
-  await page.locator('.vc-quality-btn').click();
+  await container.hover();
+  await container.locator('.video-big-play').waitFor({ state: 'visible', timeout: 10000 });
+  await container.locator('.vc-quality-btn').waitFor({ state: 'visible', timeout: 10000 });
+  await container.locator('.vc-quality-btn').click();
   // Quality options are populated once the HLS manifest parses.
-  await page.waitForFunction(() => document.querySelectorAll('.vc-quality-menu button').length > 0, null, {
+  await page.waitForFunction(() => document.querySelector('.video-container .vc-quality-menu button') != null, null, {
     timeout: 15000,
   });
-  const opts = await page.locator('.vc-quality-menu button').count();
+  const opts = await container.locator('.vc-quality-menu button').count();
   expect(opts).toBeGreaterThan(0);
   console.log(`Video controls: quality options=${opts}`);
 });
