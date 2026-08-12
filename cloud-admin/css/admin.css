@@ -310,6 +310,7 @@ textarea {
 }
 .dirty-banner.is-building .dirty-banner-cta {
   background: transparent;
+  color: #fff; /* white on the blue building banner (WCAG AA) */
 }
 
 /* Topbar */

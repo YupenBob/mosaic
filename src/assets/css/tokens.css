@@ -90,9 +90,10 @@
   padding: 0 1px;
 }
 
-/* Dark mode */
+/* Dark mode — follows the system unless the visitor pinned a theme via the
+   header toggle (data-theme="light"/"dark" set before first paint). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --color-search-highlight: #ffd43b;
     --color-search-highlight-text: #1d1d1f;
     --color-bg: #1c1c1e;
@@ -111,4 +112,23 @@
     --color-accent-text-hover: #a8b8ff;
     --shadow-card: 0 2px 12px var(--color-card-shadow);
   }
+}
+:root[data-theme='dark'] {
+  --color-search-highlight: #ffd43b;
+  --color-search-highlight-text: #1d1d1f;
+  --color-bg: #1c1c1e;
+  --color-surface: #2c2c2e;
+  --color-surface-hover: #3a3a3c;
+  --color-text-primary: #f5f5f7;
+  --color-text-secondary: #98989d;
+  --color-text-tertiary: #98989d; /* >= 4.5:1 on dark surface (WCAG AA) */
+  --color-border: #48484a;
+  --color-border-light: #38383a;
+  --color-tag-bg: #3a3a3c;
+  --color-tag-text: #d1d1d6;
+  --color-card-shadow: rgba(0, 0, 0, 0.3);
+  --color-overlay: rgba(0, 0, 0, 0.92);
+  --color-accent-text: #8fa3ff; /* >= 4.5:1 on dark surfaces (WCAG AA) */
+  --color-accent-text-hover: #a8b8ff;
+  --shadow-card: 0 2px 12px var(--color-card-shadow);
 }

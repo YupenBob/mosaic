@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="data-base" content="<%= rp %>data" />
   <title>404 - <%= site.title %></title>
+  <script>
+    /* Apply the pinned theme before first paint (no flash of wrong theme) */
+    (function () {
+      try {
+        var t = localStorage.getItem('mosaic_theme');
+        var dark =
+          t === 'dark' ||
+          (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" sizes="any" href="<%= rp %>assets/logo.svg" />
   <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
@@ -16,6 +28,7 @@
   <header class="header">
     <div class="container">
       <a href="<%= rp %>index.html" class="header-logo"><img src="<%= rp %>assets/logo.svg" alt="" class="header-logo-icon" width="28" height="28" /><%= site.title %></a>
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="<%= t('theme_light') %>" title="<%= t('theme_light') %>"><i class="ri-sun-line"></i></button>
     </div>
   </header>
   <main class="main">
@@ -32,5 +45,7 @@
       <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
     </div>
   </footer>
+  <script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
+  <script type="module" src="<%= rp %>assets/js/app.js"></script>
 </body>
 </html>

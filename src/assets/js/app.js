@@ -4,6 +4,7 @@
 import { $ } from './utils.js';
 import { setPosts, initI18n } from './data.js';
 import { register, loadComponents } from './components.js';
+import { initTheme, cycleTheme } from './theme.js';
 
 const DATA_BASE = document.querySelector('meta[name="data-base"]')?.content || '/data';
 
@@ -109,6 +110,9 @@ register({
 
 async function init() {
   const pageType = document.body.dataset.page || 'list';
+  initTheme();
+  const themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) themeToggle.addEventListener('click', cycleTheme);
   try {
     await loadComponents(null, pageType);
   } catch (err) {

@@ -11,6 +11,18 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <meta name="description" content="<%= pageDesc %>" />
   <meta name="data-base" content="<%= rp %>data" />
   <title><%= pageDataTitle %></title>
+  <script>
+    /* Apply the pinned theme before first paint (no flash of wrong theme) */
+    (function () {
+      try {
+        var t = localStorage.getItem('mosaic_theme');
+        var dark =
+          t === 'dark' ||
+          (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" sizes="any" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
   <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
@@ -48,6 +60,7 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
         <% }); %>
       <% } %>
     </nav>
+    <button type="button" class="theme-toggle" id="theme-toggle" aria-label="<%= t('theme_light') %>" title="<%= t('theme_light') %>"><i class="ri-sun-line"></i></button>
   </div>
 </header>
 
