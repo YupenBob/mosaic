@@ -10,6 +10,76 @@ import { escHtml, toast, modalConfirm, loadLib, openModal, closeModal } from './
 const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';
 const layouts = ['default', 'video-first', 'gallery-first', 'music-first'];
+const PLACEHOLDER_RE = /^\s*\{\{(gallery|videos|music|video:(\d+)|photo:(\d+))\}\}\s*$/;
+
+// Normalize a placeholder so it stands alone on its own line, surrounded by
+// blank lines (the rule scripts/blocks.mjs uses to place media blocks).
+function insertPlaceholderAt(ph, at) {
+  const ta = document.getElementById('fm-body');
+  if (!ta) return;
+  const value = ta.value;
+  const pos = Math.max(0, Math.min(at, value.length));
+  const before = value.slice(0, pos);
+  const after = value.slice(pos);
+  let lead = '';
+  if (before) {
+    lead = before.endsWith('\n\n') ? '\n' : before.endsWith('\n') ? '\n' : '\n\n';
+  }
+  let tail = '';
+  if (after) {
+    tail = after.startsWith('\n\n') ? '\n' : after.startsWith('\n') ? '\n' : '\n\n';
+  }
+  ta.setRangeText(lead + ph + tail, pos, pos, 'end');
+  ta.dispatchEvent(new Event('input'));
+}
+
+window.insertPlaceholder = (ph) => {
+  const ta = document.getElementById('fm-body');
+  if (!ta) return;
+  insertPlaceholderAt(ph, ta.selectionStart ?? ta.value.length);
+  ta.focus();
+};
+
+function dropOffset(e) {
+  const ta = document.getElementById('fm-body');
+  if (!ta) return 0;
+  if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (pos && pos.offsetNode === ta) return pos.offset;
+  }
+  if (document.caretRangeFromPoint) {
+    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    if (range) return range.startOffset;
+  }
+  return ta.selectionStart ?? ta.value.length;
+}
+
+function wireBodyDnD() {
+  const ta = document.getElementById('fm-body');
+  const panel = document.getElementById('existing-media');
+  if (!ta || !panel) return;
+  ta.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer || !e.dataTransfer.types.includes('text/plain')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    ta.classList.add('drag-over');
+  });
+  ta.addEventListener('dragleave', () => ta.classList.remove('drag-over'));
+  ta.addEventListener('drop', (e) => {
+    ta.classList.remove('drag-over');
+    const ph = ((e.dataTransfer && e.dataTransfer.getData('text/plain')) || '').trim();
+    if (!/^\{\{(gallery|videos|music|video:\d+|photo:\d+)\}\}$/.test(ph)) return;
+    e.preventDefault();
+    insertPlaceholderAt(ph, dropOffset(e));
+    ta.focus();
+  });
+  panel.addEventListener('dragstart', (e) => {
+    const cell = e.target.closest('.media-cell[draggable]');
+    if (!cell || !cell.dataset.ph) return;
+    e.dataTransfer.setData('text/plain', cell.dataset.ph);
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+}
 
 let draftTimer = null;
 
@@ -142,6 +212,7 @@ export default async function renderEditor(signal) {
               </div>
             </div>
             <textarea id="fm-body" spellcheck="false" aria-label="${t('editor.body')}">${escHtml(body)}</textarea>
+            <p class="placeholder-hint" id="placeholder-hint"><i class="ri-drag-drop-line"></i> ${t('editor.placeholderHint')}</p>
             <div class="markdown-preview hidden" id="fm-preview"></div>
           </div>
 
@@ -165,6 +236,7 @@ export default async function renderEditor(signal) {
       state.editorDirty = false;
       state.editorDraftKey = slug || null;
       wireEditorInputs();
+      wireBodyDnD();
       updateCoverPreview();
       if (slug) loadExistingMedia(slug);
       window._draftSnapshot = null;
@@ -380,7 +452,23 @@ async function renderPreview() {
   }
   const raw = document.getElementById('fm-body').value || '';
   const slug = getCurrentSlug();
-  let html = window.marked.parse(raw, { async: false, breaks: true });
+  // Isolate standalone placeholder lines so Markdown renders the rest, then
+  // swap tokens for live preview cards (same rules as scripts/blocks.mjs).
+  const media = window._editorMedia || { photos: [], videos: [], music: [] };
+  const lines = raw.split('\n');
+  const cards = [];
+  const protectedLines = lines.map((line, i) => {
+    const m = PLACEHOLDER_RE.exec(line);
+    const prevBlank = i === 0 || !lines[i - 1].trim();
+    const nextBlank = i === lines.length - 1 || !lines[i + 1].trim();
+    if (m && prevBlank && nextBlank) {
+      const token = `@@MPH${cards.length}@@`;
+      cards.push(buildPlaceholderCard(m[1], media));
+      return token;
+    }
+    return line;
+  });
+  let html = window.marked.parse(protectedLines.join('\n'), { async: false, breaks: true });
   html = window.DOMPurify.sanitize(html);
   // Resolve relative media paths against the originals bucket for preview
   if (slug) {
@@ -390,7 +478,74 @@ async function renderPreview() {
       (m, attr, path) => `${attr}="${base}/originals/${encodeURIComponent(slug)}/${path}"`,
     );
   }
+  cards.forEach((card, i) => {
+    html = html.replace(`@@MPH${i}@@`, card);
+  });
   preview.innerHTML = html;
+}
+
+function placeholderCard(raw, iconClass, title, meta, thumbsHtml = '') {
+  return `
+    <div class="ph-card" data-ph="${escHtml(raw)}">
+      <div class="ph-card-icon"><i class="${iconClass}"></i></div>
+      <div class="ph-card-body">
+        <span class="ph-card-title">{{${escHtml(raw)}}}</span>
+        <span class="ph-card-meta">${title}${meta ? ' · ' + meta : ''}</span>
+        ${thumbsHtml}
+      </div>
+    </div>`;
+}
+
+function placeholderErrorCard(raw, total) {
+  return `
+    <div class="ph-card ph-card-error" data-ph="${escHtml(raw)}">
+      <div class="ph-card-icon"><i class="ri-error-warning-line"></i></div>
+      <div class="ph-card-body">
+        <span class="ph-card-title">{{${escHtml(raw)}}}</span>
+        <span class="ph-card-meta">${t('editor.placeholderOutOfRange', { n: total })}</span>
+      </div>
+    </div>`;
+}
+
+function buildPlaceholderCard(raw, media) {
+  const kind = raw.split(':')[0];
+  if (kind === 'gallery') {
+    const items = media.photos || [];
+    const thumbs = items
+      .slice(0, 5)
+      .map((f) => `<img src="${escHtml(f.url || '')}" alt="" />`)
+      .join('');
+    const more = items.length > 5 ? `<span class="ph-card-more">+${items.length - 5}</span>` : '';
+    return placeholderCard(
+      raw,
+      'ri-image-line',
+      `${t('editor.placeholderGallery')} · ${items.length} ${t('editor.photos')}`,
+      '',
+      items.length ? `<div class="ph-card-thumbs">${thumbs}${more}</div>` : '',
+    );
+  }
+  if (kind === 'photo') {
+    const item = (media.photos || [])[Number(raw.split(':')[1])];
+    if (!item) return placeholderErrorCard(raw, (media.photos || []).length);
+    return placeholderCard(
+      raw,
+      'ri-image-line',
+      t('editor.placeholderGallery'),
+      escHtml(item.name),
+      `<div class="ph-card-thumbs"><img src="${escHtml(item.url || '')}" alt="" /></div>`,
+    );
+  }
+  if (kind === 'videos') {
+    const n = (media.videos || []).length;
+    return placeholderCard(raw, 'ri-video-line', `${t('editor.placeholderVideos')} · ${n}`, '');
+  }
+  if (kind === 'video') {
+    const item = (media.videos || [])[Number(raw.split(':')[1])];
+    if (!item) return placeholderErrorCard(raw, (media.videos || []).length);
+    return placeholderCard(raw, 'ri-video-line', t('editor.placeholderVideos'), escHtml(item.name));
+  }
+  const n = (media.music || []).length;
+  return placeholderCard(raw, 'ri-music-2-line', `${t('editor.placeholderMusic')} · ${n}`, '');
 }
 
 // ── Cover ──────────────────────────────────
@@ -477,47 +632,71 @@ window.toggleMediaPanel = () => {
 };
 
 // ── Media list ─────────────────────────────
+function mediaCell(type, f, i, slug) {
+  const ph = type === 'photo' ? `{{photo:${i}}}` : type === 'video' ? `{{video:${i}}}` : '{{music}}';
+  const inner =
+    type === 'photo'
+      ? `<img src="${escHtml(f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />`
+      : `<div class="media-cell-icon"><i class="ri-${type === 'video' ? 'video' : 'music'}-line"></i></div>`;
+  const click =
+    type === 'photo'
+      ? `onclick="window.pickCover('${escHtml(f.name)}')"`
+      : `onclick="window.insertPlaceholder('${escHtml(ph)}')"`;
+  return `
+    <div class="media-cell" ${click} draggable="true" data-ph="${escHtml(ph)}" title="${escHtml(f.name)} — ${t('editor.dragInsertHint')}">
+      ${inner}
+      <div class="media-cell-name">${escHtml(f.name)}</div>
+      <button type="button" class="media-cell-insert" onclick="event.stopPropagation();window.insertPlaceholder('${escHtml(ph)}')" title="${t('editor.insert')}" aria-label="${t('editor.insert')} ${escHtml(f.name)}"><i class="ri-corner-down-left-line"></i></button>
+      <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','${type}s')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line"></i></button>
+    </div>`;
+}
+
+function mediaGroup(title, count, insertPh, cellsHtml) {
+  return `
+    <div class="media-group-head">
+      <span class="editor-section-title" style="margin:0">${title} (${count})</span>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="window.insertPlaceholder('${escHtml(insertPh)}')">${t('editor.insertAll')}</button>
+    </div>
+    ${cellsHtml}`;
+}
+
 export async function loadExistingMedia(slug) {
   const el = document.getElementById('existing-media');
   if (!el) return;
   el.innerHTML = `<p class="media-empty">${t('editor.loadMedia')}</p>`;
   try {
     const data = await mediaApi.list(slug);
-    let html = `<div class="editor-section-title">${t('editor.existingMedia')}</div>`;
     const photos = data.photos || [];
     const videos = data.videos || [];
-    if (!photos.length && !videos.length) {
+    const music = data.music || [];
+    window._editorMedia = { photos, videos, music };
+    let html = `<div class="editor-section-title">${t('editor.existingMedia')}</div>`;
+    if (!photos.length && !videos.length && !music.length) {
       html += `<p class="media-empty">${t('editor.noMedia')}</p>`;
     } else {
       if (photos.length) {
-        html +=
-          '<div class="media-grid">' +
-          photos
-            .map(
-              (f) => `
-          <div class="media-cell" onclick="window.pickCover('${escHtml(f.name)}')" title="${escHtml(f.name)}">
-            <img src="${escHtml(f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />
-            <div class="media-cell-name">${escHtml(f.name)}</div>
-            <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','photos')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line"></i></button>
-          </div>`,
-            )
-            .join('') +
-          '</div>';
+        html += mediaGroup(
+          t('editor.photos'),
+          photos.length,
+          '{{gallery}}',
+          `<div class="media-grid">${photos.map((f, i) => mediaCell('photo', f, i, slug)).join('')}</div>`,
+        );
       }
       if (videos.length) {
-        html +=
-          '<div class="media-grid" style="margin-top:8px">' +
-          videos
-            .map(
-              (f) => `
-          <div class="media-cell" title="${escHtml(f.name)}">
-            <div class="media-cell-icon"><i class="ri-video-line"></i></div>
-            <div class="media-cell-name">${escHtml(f.name)}</div>
-            <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','videos')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line"></i></button>
-          </div>`,
-            )
-            .join('') +
-          '</div>';
+        html += mediaGroup(
+          t('editor.placeholderVideos'),
+          videos.length,
+          '{{videos}}',
+          `<div class="media-grid" style="margin-top:8px">${videos.map((f, i) => mediaCell('video', f, i, slug)).join('')}</div>`,
+        );
+      }
+      if (music.length) {
+        html += mediaGroup(
+          t('editor.music'),
+          music.length,
+          '{{music}}',
+          `<div class="media-grid" style="margin-top:8px">${music.map((f, i) => mediaCell('music', f, i, slug)).join('')}</div>`,
+        );
       }
     }
     el.innerHTML = html;

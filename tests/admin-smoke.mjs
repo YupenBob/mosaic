@@ -102,6 +102,32 @@ try {
     process.exitCode = 1;
   }
 
+  // Editor page (media post): media panel cells are draggable and carry
+  // insert buttons/insert-all (placeholder composition UX).
+  let mediaSlug = '';
+  try {
+    const front = await fetch('https://mosaic.xsanye.cn/data/posts.json').then((r) => r.json());
+    mediaSlug = (front || []).find(
+      (p) => (p.photos || []).length || (p.videos || []).length || (p.music || []).length,
+    )?.slug;
+  } catch {}
+  if (mediaSlug) {
+    await page.evaluate((s) => {
+      location.hash = 'editor&slug=' + s;
+    }, mediaSlug);
+    await page.waitForTimeout(5000);
+    const draggableCells = await page.locator('#existing-media .media-cell[draggable]').count();
+    const insertBtns = await page.locator('#existing-media .media-cell-insert').count();
+    const insertAllBtns = await page.locator('#existing-media .media-group-head .btn').count();
+    console.log(
+      `Editor media panel (${mediaSlug}) — draggable=${draggableCells}, insertBtns=${insertBtns}, insertAll=${insertAllBtns}`,
+    );
+    if (draggableCells < 1 || insertBtns < 1 || insertAllBtns < 1) {
+      console.error('Editor smoke failed: expected draggable media cells + insert buttons');
+      process.exitCode = 1;
+    }
+  }
+
   // Config page: section cards render
   await page.evaluate(() => {
     location.hash = 'config';
