@@ -11,67 +11,308 @@ const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';
 const layouts = ['default', 'video-first', 'gallery-first', 'music-first'];
 const PLACEHOLDER_RE = /^\s*\{\{(gallery|videos|music|video:(\d+)|photo:(\d+))\}\}\s*$/;
+const BLOCK_DRAG_PREFIX = '__mosaic_block:';
+let editorBlocks = [];
 
-// Normalize a placeholder so it stands alone on its own line, surrounded by
-// blank lines (the rule scripts/blocks.mjs uses to place media blocks).
-function insertPlaceholderAt(ph, at) {
+function getEditorMedia() {
+  return window._editorMedia || { photos: [], videos: [], music: [] };
+}
+
+// Parse the markdown body into editor blocks (mirrors scripts/blocks.mjs:
+// standalone placeholders surrounded by blank lines become media blocks;
+// out-of-range photo:N / video:N stay literal; unplaced media stay unplaced).
+function parseBodyBlocks(body) {
+  const lines = String(body || '').split(/\r?\n/);
+  const blocks = [];
+  let buf = [];
+  const flushText = () => {
+    const text = buf.join('\n').trim();
+    buf = [];
+    if (text) blocks.push({ type: 'text', text });
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = PLACEHOLDER_RE.exec(line);
+    const prevBlank = i === 0 || !lines[i - 1].trim();
+    const nextBlank = i === lines.length - 1 || !lines[i + 1].trim();
+    if (m && prevBlank && nextBlank) {
+      const raw = m[1];
+      const idx = m[2] !== undefined ? Number(m[2]) : m[3] !== undefined ? Number(m[3]) : null;
+      const kind = raw.split(':')[0];
+      const media = getEditorMedia();
+      if ((kind === 'video' && !(media.videos || [])[idx]) || (kind === 'photo' && !(media.photos || [])[idx])) {
+        buf.push(line);
+        continue;
+      }
+      flushText();
+      blocks.push({ type: kind, raw, index: idx });
+    } else {
+      buf.push(line);
+    }
+  }
+  flushText();
+  if (!blocks.length) blocks.push({ type: 'text', text: '' });
+  return blocks;
+}
+
+function serializeBlocks(blocks) {
+  const parts = [];
+  for (const b of blocks) {
+    if (b.type === 'text') {
+      if (b.text.trim()) parts.push(b.text.trim());
+    } else {
+      parts.push('{{' + b.raw + '}}');
+    }
+  }
+  const body = parts.join('\n\n');
+  return body ? body + '\n' : '';
+}
+
+function syncBodyFromBlocks() {
   const ta = document.getElementById('fm-body');
   if (!ta) return;
-  const value = ta.value;
-  const pos = Math.max(0, Math.min(at, value.length));
-  const before = value.slice(0, pos);
-  const after = value.slice(pos);
-  let lead = '';
-  if (before) {
-    lead = before.endsWith('\n\n') ? '\n' : before.endsWith('\n') ? '\n' : '\n\n';
+  const body = serializeBlocks(editorBlocks);
+  if (ta.value !== body) {
+    ta.value = body;
+    ta.dispatchEvent(new Event('input'));
   }
-  let tail = '';
-  if (after) {
-    tail = after.startsWith('\n\n') ? '\n' : after.startsWith('\n') ? '\n' : '\n\n';
+}
+
+function mediaRow(name, icon) {
+  return `<div class="fm-media-row"><i class="${icon}"></i><span>${escHtml(name)}</span></div>`;
+}
+
+function mediaRows(names, icon) {
+  if (!names.length) return `<p class="muted">0</p>`;
+  return `<div class="fm-media-rows">${names.map((n) => mediaRow(n, icon)).join('')}</div>`;
+}
+
+function mediaBlockHtml(b, media) {
+  if (b.type === 'gallery') {
+    const items = media.photos || [];
+    const thumbs = items
+      .slice(0, 8)
+      .map((f) => `<img src="${escHtml(f.url || '')}" alt="" loading="lazy" />`)
+      .join('');
+    const more = items.length > 8 ? `<span class="fm-media-more">+${items.length - 8}</span>` : '';
+    return items.length ? `<div class="fm-media-gallery">${thumbs}${more}</div>` : `<p class="muted">0</p>`;
   }
-  ta.setRangeText(lead + ph + tail, pos, pos, 'end');
-  ta.dispatchEvent(new Event('input'));
+  if (b.type === 'photo') {
+    const item = (media.photos || [])[b.index];
+    return item ? `<img class="fm-media-single" src="${escHtml(item.url || '')}" alt="" loading="lazy" />` : '';
+  }
+  if (b.type === 'videos')
+    return mediaRows(
+      (media.videos || []).map((f) => f.name),
+      'ri-video-line',
+    );
+  if (b.type === 'video') {
+    const item = (media.videos || [])[b.index];
+    return item ? mediaRow(item.name, 'ri-video-line') : '';
+  }
+  return mediaRows(
+    (media.music || []).map((f) => f.name),
+    'ri-music-2-line',
+  );
+}
+
+function blockMediaIcon(type) {
+  if (type === 'photo' || type === 'gallery') return 'image-line';
+  if (type === 'video' || type === 'videos') return 'video-line';
+  return 'music-2-line';
+}
+
+function blockActionsHtml() {
+  return `
+    <div class="fm-block-actions">
+      <button type="button" class="fm-block-drag" draggable="true" title="${t('editor.blockDrag')}" aria-label="${t('editor.blockDrag')}"><i class="ri-drag-move-2-line"></i></button>
+      <button type="button" class="fm-block-btn" data-act="up" title="${t('editor.blockUp')}" aria-label="${t('editor.blockUp')}"><i class="ri-arrow-up-line"></i></button>
+      <button type="button" class="fm-block-btn" data-act="down" title="${t('editor.blockDown')}" aria-label="${t('editor.blockDown')}"><i class="ri-arrow-down-line"></i></button>
+      <button type="button" class="fm-block-btn fm-block-btn-danger" data-act="remove" title="${t('editor.blockRemove')}" aria-label="${t('editor.blockRemove')}"><i class="ri-close-line"></i></button>
+    </div>`;
+}
+
+function blockHtml(b, i, media) {
+  if (b.type === 'text') {
+    return `
+      <div class="fm-block fm-text-block-wrap" data-index="${i}">
+        <textarea class="fm-text-block" aria-label="${t('editor.blockTextLabel')} ${i + 1}" spellcheck="false" placeholder="${t('editor.blockTextLabel')}">${escHtml(b.text)}</textarea>
+        ${blockActionsHtml()}
+      </div>`;
+  }
+  return `
+    <div class="fm-block fm-media-block" data-index="${i}" data-raw="${escHtml(b.raw)}">
+      <div class="fm-block-label"><i class="ri-${blockMediaIcon(b.type)}"></i> {{${escHtml(b.raw)}}}</div>
+      <div class="fm-block-media">${mediaBlockHtml(b, media)}</div>
+      ${blockActionsHtml()}
+    </div>`;
+}
+
+function unplacedHint(media) {
+  const parts = [];
+  if (media.photos.length) parts.push(`${t('editor.photos')}×${media.photos.length}`);
+  if (media.videos.length) parts.push(`${t('editor.placeholderVideos')}×${media.videos.length}`);
+  if (media.music.length) parts.push(`${t('editor.music')}×${media.music.length}`);
+  if (!parts.length) return '';
+  return `<p class="unplaced-hint"><i class="ri-information-line"></i> ${t('editor.unplacedMedia')} ${parts.join('、')}</p>`;
+}
+
+function autoGrow(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = Math.max(60, ta.scrollHeight) + 'px';
+}
+
+function renderBlocksInto(container) {
+  const media = getEditorMedia();
+  container.innerHTML = editorBlocks.map((b, i) => blockHtml(b, i, media)).join('') + unplacedHint(media);
+  container.querySelectorAll('.fm-text-block').forEach((ta) => autoGrow(ta));
+}
+
+function renderBlocksFromBody() {
+  const container = document.getElementById('fm-blocks');
+  const ta = document.getElementById('fm-body');
+  if (!container || !ta) return;
+  editorBlocks = parseBodyBlocks(ta.value);
+  renderBlocksInto(container);
+}
+
+function commitBlocks() {
+  syncBodyFromBlocks();
+  renderBlocksInto(document.getElementById('fm-blocks'));
+}
+
+function moveBlock(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= editorBlocks.length) return;
+  [editorBlocks[i], editorBlocks[j]] = [editorBlocks[j], editorBlocks[i]];
+  commitBlocks();
+}
+
+function removeBlock(i) {
+  editorBlocks.splice(i, 1);
+  if (!editorBlocks.length) editorBlocks.push({ type: 'text', text: '' });
+  commitBlocks();
+}
+
+function insertMediaBlock(ph, at) {
+  const m = PLACEHOLDER_RE.exec(ph);
+  if (!m) return;
+  const media = getEditorMedia();
+  const raw = m[1];
+  const idx = m[2] !== undefined ? Number(m[2]) : m[3] !== undefined ? Number(m[3]) : null;
+  const kind = raw.split(':')[0];
+  if ((kind === 'video' && !(media.videos || [])[idx]) || (kind === 'photo' && !(media.photos || [])[idx])) {
+    toast(
+      t('editor.placeholderOutOfRange', {
+        n: kind === 'video' ? (media.videos || []).length : (media.photos || []).length,
+      }),
+      'error',
+    );
+    return;
+  }
+  const pos = Math.max(0, Math.min(at, editorBlocks.length));
+  editorBlocks.splice(pos, 0, { type: kind, raw, index: idx });
+  commitBlocks();
 }
 
 window.insertPlaceholder = (ph) => {
-  const ta = document.getElementById('fm-body');
-  if (!ta) return;
-  insertPlaceholderAt(ph, ta.selectionStart ?? ta.value.length);
-  ta.focus();
+  insertMediaBlock(ph.trim(), editorBlocks.length);
 };
 
-function dropOffset(e) {
-  const ta = document.getElementById('fm-body');
-  if (!ta) return 0;
-  if (document.caretPositionFromPoint) {
-    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-    if (pos && pos.offsetNode === ta) return pos.offset;
+function blockIndexFromPoint(y) {
+  const els = [...document.querySelectorAll('#fm-blocks .fm-block')];
+  for (let i = 0; i < els.length; i++) {
+    const r = els[i].getBoundingClientRect();
+    if (y < r.top + r.height / 2) return i;
   }
-  if (document.caretRangeFromPoint) {
-    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-    if (range) return range.startOffset;
+  return els.length;
+}
+
+function showDropLine(y) {
+  const container = document.getElementById('fm-blocks');
+  if (!container) return;
+  let line = container.querySelector('.fm-drop-line');
+  if (!line) {
+    line = document.createElement('div');
+    line.className = 'fm-drop-line';
+    container.appendChild(line);
   }
-  return ta.selectionStart ?? ta.value.length;
+  const els = [...container.querySelectorAll('.fm-block')];
+  const at = blockIndexFromPoint(y);
+  const top =
+    at < els.length
+      ? els[at].offsetTop
+      : els.length
+        ? els[els.length - 1].offsetTop + els[els.length - 1].offsetHeight
+        : 0;
+  line.style.top = top + 'px';
+  line.style.display = 'block';
+}
+
+function hideDropLine() {
+  const line = document.getElementById('fm-blocks')?.querySelector('.fm-drop-line');
+  if (line) line.style.display = 'none';
 }
 
 function wireBodyDnD() {
-  const ta = document.getElementById('fm-body');
+  const container = document.getElementById('fm-blocks');
   const panel = document.getElementById('existing-media');
-  if (!ta || !panel) return;
-  ta.addEventListener('dragover', (e) => {
-    if (!e.dataTransfer || !e.dataTransfer.types.includes('text/plain')) return;
+  if (!container || !panel) return;
+  container.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer || !(e.dataTransfer.types || []).includes('text/plain')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    ta.classList.add('drag-over');
+    showDropLine(e.clientY);
   });
-  ta.addEventListener('dragleave', () => ta.classList.remove('drag-over'));
-  ta.addEventListener('drop', (e) => {
-    ta.classList.remove('drag-over');
-    const ph = ((e.dataTransfer && e.dataTransfer.getData('text/plain')) || '').trim();
-    if (!/^\{\{(gallery|videos|music|video:\d+|photo:\d+)\}\}$/.test(ph)) return;
-    e.preventDefault();
-    insertPlaceholderAt(ph, dropOffset(e));
-    ta.focus();
+  container.addEventListener('dragleave', (e) => {
+    if (!container.contains(e.relatedTarget)) hideDropLine();
+  });
+  container.addEventListener('drop', (e) => {
+    hideDropLine();
+    const text = ((e.dataTransfer && e.dataTransfer.getData('text/plain')) || '').trim();
+    const at = blockIndexFromPoint(e.clientY);
+    if (text.startsWith(BLOCK_DRAG_PREFIX)) {
+      const from = Number(text.slice(BLOCK_DRAG_PREFIX.length));
+      if (Number.isFinite(from) && editorBlocks[from]) {
+        const [moved] = editorBlocks.splice(from, 1);
+        const insertAt = from < at ? at - 1 : at;
+        editorBlocks.splice(Math.max(0, Math.min(insertAt, editorBlocks.length)), 0, moved);
+        commitBlocks();
+        e.preventDefault();
+      }
+      return;
+    }
+    if (/^\{\{(gallery|videos|music|video:\d+|photo:\d+)\}\}$/.test(text)) {
+      e.preventDefault();
+      insertMediaBlock(text, at);
+    }
+  });
+  container.addEventListener('dragstart', (e) => {
+    const handle = e.target.closest('.fm-block-drag');
+    if (!handle) return;
+    const i = Number(handle.closest('.fm-block')?.dataset.index);
+    if (!Number.isFinite(i)) return;
+    e.dataTransfer.setData('text/plain', BLOCK_DRAG_PREFIX + i);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  container.addEventListener('input', (e) => {
+    const ta = e.target.closest('.fm-text-block');
+    if (!ta) return;
+    const i = Number(ta.closest('.fm-text-block-wrap')?.dataset.index);
+    if (Number.isFinite(i) && editorBlocks[i]) {
+      editorBlocks[i].text = ta.value;
+      autoGrow(ta);
+      syncBodyFromBlocks();
+    }
+  });
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('.fm-block-btn');
+    if (!btn) return;
+    const i = Number(btn.closest('.fm-block')?.dataset.index);
+    if (!Number.isFinite(i)) return;
+    if (btn.dataset.act === 'up') moveBlock(i, -1);
+    else if (btn.dataset.act === 'down') moveBlock(i, 1);
+    else if (btn.dataset.act === 'remove') removeBlock(i);
   });
   panel.addEventListener('dragstart', (e) => {
     const cell = e.target.closest('.media-cell[draggable]');
@@ -211,7 +452,8 @@ export default async function renderEditor(signal) {
                 <button class="tab-btn" data-mode="split" role="tab" onclick="editorMode('split')">${t('editor.split')}</button>
               </div>
             </div>
-            <textarea id="fm-body" spellcheck="false" aria-label="${t('editor.body')}">${escHtml(body)}</textarea>
+            <textarea id="fm-body" spellcheck="false" aria-label="${t('editor.body')}" style="display:none">${escHtml(body)}</textarea>
+            <div id="fm-blocks" class="fm-blocks" aria-label="${t('editor.body')}"></div>
             <p class="placeholder-hint" id="placeholder-hint"><i class="ri-drag-drop-line"></i> ${t('editor.placeholderHint')}</p>
             <div class="markdown-preview hidden" id="fm-preview"></div>
           </div>
@@ -237,6 +479,7 @@ export default async function renderEditor(signal) {
       state.editorDraftKey = slug || null;
       wireEditorInputs();
       wireBodyDnD();
+      renderBlocksFromBody();
       updateCoverPreview();
       if (slug) loadExistingMedia(slug);
       window._draftSnapshot = null;
@@ -325,6 +568,7 @@ window.restoreDraft = () => {
   set('fm-views', d.views || 0);
   set('fm-likes', d.likes || 0);
   set('fm-body', d.body || '');
+  renderBlocksFromBody();
   state.editorDirty = true;
   updateCoverPreview();
   document.getElementById('draft-banner')?.remove();
@@ -392,13 +636,16 @@ window.doSavePost = async (goBack) => {
 
 // ── Markdown toolbar / modes ───────────────
 function wrapSelection(before, after, placeholder) {
-  const ta = document.getElementById('fm-body');
+  const ta =
+    document.activeElement && document.activeElement.classList.contains('fm-text-block')
+      ? document.activeElement
+      : document.querySelector('#fm-blocks .fm-text-block');
   if (!ta) return;
   const start = ta.selectionStart,
     end = ta.selectionEnd;
   const selected = ta.value.slice(start, end) || placeholder;
   ta.setRangeText(before + selected + after, start, end, 'end');
-  ta.dispatchEvent(new Event('input'));
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
   ta.focus();
 }
 
@@ -417,24 +664,24 @@ window.editorToolbar = (kind) => {
 };
 
 window.editorMode = async (mode) => {
-  const ta = document.getElementById('fm-body');
+  const blocksEl = document.getElementById('fm-blocks');
   const preview = document.getElementById('fm-preview');
-  if (!ta || !preview) return;
+  if (!blocksEl || !preview) return;
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
-  ta.style.display = mode === 'preview' ? 'none' : '';
+  blocksEl.classList.toggle('hidden', mode === 'preview');
   preview.classList.toggle('hidden', mode !== 'preview' && mode !== 'split');
   preview.style.display = mode === 'preview' || mode === 'split' ? 'block' : 'none';
   if (mode === 'split') {
-    ta.style.width = '50%';
-    ta.style.float = 'left';
-    ta.style.borderRight = '1px solid var(--color-border-light)';
+    blocksEl.style.width = '50%';
+    blocksEl.style.float = 'left';
+    blocksEl.style.borderRight = '1px solid var(--color-border-light)';
     preview.style.width = '50%';
     preview.style.float = 'right';
-    preview.style.minHeight = ta.offsetHeight + 'px';
+    preview.style.minHeight = blocksEl.offsetHeight + 'px';
   } else {
-    ta.style.width = '100%';
-    ta.style.float = 'none';
-    ta.style.borderRight = 'none';
+    blocksEl.style.width = '100%';
+    blocksEl.style.float = 'none';
+    blocksEl.style.borderRight = 'none';
     preview.style.width = '100%';
     preview.style.float = 'none';
   }
@@ -700,6 +947,7 @@ export async function loadExistingMedia(slug) {
       }
     }
     el.innerHTML = html;
+    renderBlocksFromBody();
   } catch {
     el.innerHTML = `<p class="media-empty">${t('editor.loadError')}</p>`;
   }

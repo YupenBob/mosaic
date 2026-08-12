@@ -879,7 +879,7 @@ body.sidebar-collapsed .nav-badge {
 }
 .badge-info {
   background: var(--color-info-soft);
-  color: var(--color-info);
+  color: var(--color-accent-hover); /* >= 4.5:1 on info-soft (WCAG AA) */
 }
 .badge-neutral {
   background: var(--color-surface-hover);
@@ -1801,7 +1801,7 @@ body.sidebar-collapsed .nav-badge {
   border-radius: var(--radius-sm);
   margin-bottom: 14px;
   background: var(--color-info-soft);
-  color: var(--color-info);
+  color: var(--color-accent-hover); /* >= 4.5:1 on info-soft (WCAG AA) */
   font-size: var(--font-size-sm);
   border: 1px solid color-mix(in srgb, var(--color-info) 25%, transparent);
 }
@@ -2458,10 +2458,146 @@ body.sidebar-collapsed .nav-badge {
   margin: 6px 2px;
   line-height: 1.5;
 }
-#fm-body.drag-over {
-  outline: 2px dashed var(--color-accent);
-  outline-offset: -4px;
-  background: var(--color-accent-soft);
+.fm-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 220px;
+  position: relative;
+  padding: 4px;
+}
+.fm-blocks.hidden {
+  display: none;
+}
+.fm-block {
+  position: relative;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: border-color var(--transition-fast);
+}
+.fm-block:focus-within,
+.fm-block:hover {
+  border-color: var(--color-border);
+}
+.fm-text-block {
+  width: 100%;
+  min-height: 60px;
+  border: none;
+  resize: none;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  background: transparent;
+  color: var(--color-text-primary);
+  outline: none;
+}
+.fm-text-block::placeholder {
+  color: var(--color-text-tertiary);
+}
+.fm-block-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.fm-block:hover .fm-block-actions,
+.fm-block:focus-within .fm-block-actions {
+  opacity: 1;
+}
+.fm-block-btn,
+.fm-block-drag {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.fm-block-drag {
+  cursor: grab;
+}
+.fm-block-btn-danger:hover {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.fm-block-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+.fm-block-media {
+  padding: 10px 12px 12px;
+}
+.fm-media-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+.fm-media-gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light);
+}
+.fm-media-single {
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: 8px;
+}
+.fm-media-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fm-media-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  padding: 6px 8px;
+  background: var(--color-surface-hover);
+  border-radius: 6px;
+}
+.fm-media-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+.fm-drop-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-accent);
+  border-radius: 1px;
+  display: none;
+  z-index: 2;
+  pointer-events: none;
+}
+.unplaced-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  padding: 8px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
 }
 .ph-card {
   display: flex;
@@ -2777,7 +2913,7 @@ body.sidebar-collapsed .nav-badge {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   background: var(--color-info-soft);
-  color: var(--color-info);
+  color: var(--color-accent-hover); /* >= 4.5:1 on info-soft (WCAG AA) */
   font-size: var(--font-size-sm);
   font-weight: 500;
 }

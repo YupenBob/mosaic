@@ -90,15 +90,16 @@ try {
     .isVisible()
     .catch(() => false);
   const bodyVisible = await page
-    .locator('#fm-body')
+    .locator('#fm-blocks')
     .isVisible()
     .catch(() => false);
+  const bodyTextarea = await page.locator('#fm-body').count();
   const mediaInput = await page.locator('#editor-media-input').count();
   console.log(
-    `Editor page loaded — slug=${slugVisible}, title=${titleVisible}, body=${bodyVisible}, mediaInput=${mediaInput}`,
+    `Editor page loaded — slug=${slugVisible}, title=${titleVisible}, body=${bodyVisible}, bodyTextarea=${bodyTextarea}, mediaInput=${mediaInput}`,
   );
-  if (!slugVisible || !titleVisible || !bodyVisible || mediaInput < 1) {
-    console.error('Editor smoke failed: expected slug/title/body fields + media input');
+  if (!slugVisible || !titleVisible || !bodyVisible || bodyTextarea < 1 || mediaInput < 1) {
+    console.error('Editor smoke failed: expected slug/title fields + block editor + media input');
     process.exitCode = 1;
   }
 
