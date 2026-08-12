@@ -85,20 +85,19 @@ function renderGallery(photos, threshold) {
   var cls = single ? 'gallery-single' : 'gallery-grid';
   var h = '<section class="gallery-section">';
   h += '<div class="' + cls + '" data-total="' + photos.length + '">';
-  photos.forEach(function(p) {
+  photos.forEach(function(p, idx) {
+    // Two-stage blur-up: src is the tiny LQIP placeholder, sharp image swaps
+    // in via gallery.js after it decodes. No srcset here — srcset would make
+    // the browser skip the placeholder entirely (loading it directly).
+    var attrs = 'data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" data-src-orig="' + p.srcOrig + '" ';
+    if (idx === 0) attrs += 'fetchpriority="high" ';
     if (single) {
       h += '<div class="gallery-single-item">';
-      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" data-src-orig="' + p.srcOrig + '" ';
-      h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
-      h += 'sizes="100vw" ';
-      h += 'src="' + p.src10p + '" alt="Photo" loading="lazy" onload="this.classList.add(\'loaded\')" />';
+      h += '<img ' + attrs + 'src="' + p.src10p + '" alt="Photo" loading="lazy" />';
       h += '</div>';
     } else {
       h += '<div class="gallery-item">';
-      h += '<img data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" data-src-orig="' + p.srcOrig + '" ';
-      h += 'srcset="' + p.src480 + ' 854w, ' + p.src720 + ' 1280w, ' + p.src1080 + ' 1920w" ';
-      h += 'sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" ';
-      h += 'src="' + p.src10p + '" alt="Photo" loading="lazy" onload="this.classList.add(\'loaded\')" />';
+      h += '<img ' + attrs + 'src="' + p.src10p + '" alt="Photo" loading="lazy" />';
       h += '</div>';
     }
   });

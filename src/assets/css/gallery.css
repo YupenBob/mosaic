@@ -13,11 +13,10 @@
   height: auto;
   border-radius: var(--card-radius-sm);
   cursor: pointer;
-  opacity: 0;
-  filter: blur(10px);
-  transform: scale(1.1);
+  opacity: 1;
+  filter: blur(12px);
+  transform: scale(1.05);
   transition:
-    opacity var(--transition-fast),
     filter 0.4s ease,
     transform 0.4s ease;
 }
@@ -26,29 +25,25 @@
   transform: scale(1);
 }
 
-.gallery-single-item img.loaded {
-  opacity: 1;
-}
-
 .gallery-grid {
-  display: grid;
-  gap: var(--space-2);
+  columns: 4;
+  column-gap: var(--space-2);
   margin: var(--space-8) 0;
 }
 
 @media (min-width: 1024px) {
   .gallery-grid {
-    grid-template-columns: repeat(4, 1fr);
+    columns: 4;
   }
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .gallery-grid {
-    grid-template-columns: repeat(3, 1fr);
+    columns: 3;
   }
 }
 @media (max-width: 639px) {
   .gallery-grid {
-    grid-template-columns: repeat(2, 1fr);
+    columns: 2;
   }
 }
 
@@ -57,7 +52,8 @@
   cursor: pointer;
   overflow: hidden;
   border-radius: 4px;
-  aspect-ratio: 1;
+  break-inside: avoid;
+  margin-bottom: var(--space-2);
   background: var(--color-border-light);
   content-visibility: auto;
   contain-intrinsic-size: auto 240px;
@@ -65,14 +61,14 @@
 
 .gallery-item img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  filter: blur(10px);
-  transform: scale(1.1);
+  height: auto;
+  display: block;
+  object-fit: contain;
+  opacity: 1;
+  filter: blur(12px);
+  transform: scale(1.05);
   transition:
     transform var(--transition-normal),
-    opacity var(--transition-fast),
     filter 0.4s ease;
 }
 
@@ -83,6 +79,13 @@
 }
 .gallery-item:hover img.loaded {
   transform: scale(1.04);
+}
+
+/* Viewer: fit (contain) ⇄ fill (cover) toggle */
+.gallery-current-image.fill {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* ========== Fullscreen Overlay ========== */
@@ -152,6 +155,31 @@
 }
 
 .gallery-dl-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.gallery-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.gallery-fit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.15rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.gallery-fit-btn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
 }

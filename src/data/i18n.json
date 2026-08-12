@@ -17,6 +17,8 @@
   "videos_title": { "zh-CN": "视频", "en": "Videos" },
   "playlist_label": { "zh-CN": "播放列表", "en": "Playlist" },
   "music": { "zh-CN": "音乐", "en": "Music" },
+  "gallery_fit": { "zh-CN": "适应窗口", "en": "Fit" },
+  "gallery_fill": { "zh-CN": "填满屏幕", "en": "Fill" },
   "views": { "zh-CN": "浏览", "en": "views" },
   "comments_title": { "zh-CN": "评论", "en": "Comments" }
 }

@@ -143,6 +143,55 @@ test('gallery: wheel zoom keeps the cursor-fixed content point', async ({ page }
   console.log(`Gallery zoom focus drift=${drift.toFixed(3)}px scale=${after.scale.toFixed(2)}`);
 });
 
+test('gallery: blur-up loads LQIP first, then swaps to the sharp source', async ({ page }) => {
+  const posts = await fetch(`${SITE}/data/posts.json`)
+    .then((r) => r.json())
+    .catch(() => []);
+  const galleryPost = (posts || []).find((p) => (p.photos || []).length > 0);
+  test.skip(!galleryPost, 'no gallery post in this build');
+  await page.goto(`${SITE}/posts/${galleryPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+  const img = page.locator('.gallery-item img, .gallery-single-item img').first();
+  await img.waitFor({ state: 'attached', timeout: 15000 });
+  const placeholderSrc = await img.getAttribute('src');
+  expect(placeholderSrc).toContain('-10p.'); // LQIP is the initial src
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel);
+      return el && el.classList.contains('loaded') && !el.getAttribute('src').includes('-10p.');
+    },
+    '.gallery-item img, .gallery-single-item img',
+    { timeout: 20000 },
+  );
+  const sharpSrc = await img.getAttribute('src');
+  expect(sharpSrc).toMatch(/\-(480|720|1080)p\./);
+  console.log(`Gallery blur-up: ${placeholderSrc.slice(-24)} -> ${sharpSrc.slice(-24)}`);
+});
+
+test('gallery: masonry grid keeps natural aspect when a post has many photos', async ({ page }) => {
+  const posts = await fetch(`${SITE}/data/posts.json`)
+    .then((r) => r.json())
+    .catch(() => []);
+  const gridPost = (posts || []).find((p) => (p.photos || []).length > 5);
+  test.skip(!gridPost, 'no multi-photo (grid) post in this build');
+  await page.goto(`${SITE}/posts/${gridPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+  const grid = page.locator('.gallery-grid');
+  await grid.waitFor({ state: 'visible', timeout: 15000 });
+  const cols = await grid.evaluate((el) => Number(getComputedStyle(el).columnCount));
+  expect(cols).toBeGreaterThanOrEqual(2);
+  const item = grid.locator('.gallery-item').first();
+  await item.waitFor({ state: 'visible', timeout: 15000 });
+  // The item keeps its image's real aspect (no forced 1:1 crop).
+  const ratio = await item.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const img = el.querySelector('img');
+    return { displayed: r.width / r.height, natural: img.naturalWidth / img.naturalHeight };
+  });
+  expect(Math.abs(ratio.displayed - ratio.natural)).toBeLessThan(0.08);
+  console.log(
+    `Gallery masonry: columns=${cols}, displayed=${ratio.displayed.toFixed(2)} natural=${ratio.natural.toFixed(2)}`,
+  );
+});
+
 test('video player: custom controls render and quality menu opens', async ({ page }) => {
   const posts = await fetch(`${SITE}/data/posts.json`)
     .then((r) => r.json())

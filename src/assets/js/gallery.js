@@ -3,6 +3,7 @@
  * macOS-style toolbar at top, thumbnail strip at bottom.
  */
 import { $, $$ } from './utils.js';
+import { t } from './data.js';
 
 const RESOLUTIONS = ['480p', '720p', '1080p', 'orig'];
 const RES_LABELS = { '480p': '低清', '720p': '中清', '1080p': '高清', orig: '原图' };
@@ -71,11 +72,25 @@ function setupLazyLoading() {
 }
 
 function loadThumb(img) {
-  const src = img.dataset.src480 || img.src;
-  if (!src || img.classList.contains('loaded')) return;
-  img.src = src;
-  img.onload = () => img.classList.add('loaded');
-  if (img.complete) img.classList.add('loaded');
+  if (img.classList.contains('loaded')) return;
+  // Pick the sharp source from the image's rendered width (LQIP stays as the
+  // src until the high-res decode finishes — a real two-stage blur-up).
+  // Offscreen images may report 0 width (content-visibility) — fall back to a
+  // conservative 480p instead of assuming a huge viewport.
+  const w = img.clientWidth || 0;
+  const hi =
+    (w >= 1280 ? img.dataset.src1080 : w >= 720 ? img.dataset.src720 : img.dataset.src480) || img.dataset.src480;
+  if (!hi) return;
+  const applyHi = () => {
+    if (img.classList.contains('loaded')) return;
+    img.src = hi;
+    requestAnimationFrame(() => img.classList.add('loaded'));
+  };
+  const probe = new Image();
+  probe.onload = applyHi;
+  probe.onerror = () => img.classList.add('loaded');
+  probe.src = hi;
+  if (probe.complete && probe.naturalWidth > 0) applyHi();
 }
 
 /* ========== Overlay ========== */
@@ -93,7 +108,10 @@ function createOverlay() {
       <div class="gallery-quality-pills" id="gallery-quality">
         ${RESOLUTIONS.map((r) => `<button class="gq-pill" data-res="${r}">${RES_LABELS[r]}</button>`).join('')}
       </div>
-      <a class="gallery-dl-btn" id="gallery-download" href="#" download title="Download"><i class="ri-download-line"></i></a>
+      <div class="gallery-toolbar-right">
+        <button class="gallery-fit-btn" id="gallery-fit" aria-label="${t('gallery_fit')}" title="${t('gallery_fit')}"><i class="ri-fullscreen-line"></i></button>
+        <a class="gallery-dl-btn" id="gallery-download" href="#" download title="Download"><i class="ri-download-line"></i></a>
+      </div>
     </div>
     <div class="gallery-main-area">
       <button class="gallery-nav-btn gallery-nav-prev" id="gallery-prev" aria-label="Previous photo"><i class="ri-arrow-left-s-line"></i></button>
@@ -122,6 +140,17 @@ function createOverlay() {
       switchQuality(pill.dataset.res);
     });
   });
+  const fitBtn = $('#gallery-fit');
+  if (fitBtn) {
+    fitBtn.addEventListener('click', () => {
+      const img = $('#gallery-current-img');
+      if (!img) return;
+      const fill = img.classList.toggle('fill');
+      fitBtn.setAttribute('aria-label', fill ? t('gallery_fit') : t('gallery_fill'));
+      fitBtn.setAttribute('title', fill ? t('gallery_fit') : t('gallery_fill'));
+      fitBtn.querySelector('i').className = fill ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
+    });
+  }
 
   // Filmstrip scroll buttons
   $('#filmstrip-left').addEventListener('click', () => scrollFilmstrip(-200));
