@@ -53,7 +53,7 @@ cd .. && npx wrangler pages deploy cloud-admin --project-name mosaic-admin
 
 ### 7. 媒体域 CORS（推荐）
 
-按 [SETUP.md](SETUP.md) 6.2 节添加 Transform Rule，以保证 HLS 跨域播放稳定；配置后可把 `VIDEO_CACHE_CONTROL` 设为 `public, max-age=31536000` 恢复视频边缘缓存。
+媒体域 CORS Transform Rule 已在 `xsanye.cn` zone 配置（Modify Response Header 强制 `Access-Control-Allow-Origin: *`），CI 视频缓存头已恢复为 `public, max-age=86400`。若你的 zone 尚未配置，按 [SETUP.md](SETUP.md) 6.2 节添加。
 
 ## 验证清单
 

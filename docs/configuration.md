@@ -121,7 +121,7 @@
 | 变量 | 位置 | 说明 |
 | --- | --- | --- |
 | `DEV_MODE` | Worker | 未配置 ADMIN_PASSWORD 时显式允许无鉴权（仅本地开发） |
-| `VIDEO_CACHE_CONTROL` | CI | 视频上传器的缓存头（默认 `no-store`；配置 CORS Transform Rule 后可设为 `public, max-age=31536000` 恢复边缘缓存） |
+| `VIDEO_CACHE_CONTROL` | CI | 视频上传器的缓存头（当前 `public, max-age=86400`；CORS Transform Rule 已生效，1 天保守 TTL，稳定后可拉长） |
 | `CHECKSUMS_FILE` | 构建 | 覆盖媒体 checksum 文件路径（默认 `dist/.media-checksums.json`） |
 | `R2_PUBLIC_URL` | 构建 | 覆盖媒体直连域名（可选，默认取 `config.mediaBase`） |
 

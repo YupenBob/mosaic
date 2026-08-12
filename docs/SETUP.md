@@ -189,7 +189,7 @@ echo "$PROXY_SECRET" | npx wrangler pages secret put PROXY_SECRET --project-name
 3. 操作：设置静态值 `Access-Control-Allow-Origin` = `*`
 4. 部署
 
-配置后可将 CI 环境变量 `VIDEO_CACHE_CONTROL` 设为 `public, max-age=31536000` 以恢复视频边缘缓存（详见 [operations.md](operations.md)）。
+该规则已在 `xsanye.cn` zone 生效；CI 中 `VIDEO_CACHE_CONTROL` 已设为 `public, max-age=86400`（1 天保守 TTL）。需要调整时改 `.github/workflows/pipeline.yml` 中的该环境变量即可（详见 [operations.md](operations.md)）。
 
 ---
 

@@ -226,7 +226,7 @@ video_mode: stacked           # stacked | playlist
 
 ## 路线图
 
-- [ ] 媒体域 Transform Rule：恢复边缘缓存的同时保证 CORS（视频播放延迟进一步下降）
+- [x] 媒体域 Transform Rule：恢复边缘缓存的同时保证 CORS（视频播放延迟进一步下降）
 - [x] 音乐播放器波形可视化（compress 生成 peaks，前端画布渲染 + 点击跳转）
 - [x] 移动端 HLS 自动化矩阵（Chromium/WebKit × iPhone/Pixel/小屏视口）
 - [ ] 真机 HLS 验证（iOS Safari / Android Chrome 实体设备，手动）

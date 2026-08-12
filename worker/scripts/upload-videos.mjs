@@ -16,7 +16,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { canUpload, headObject, uploadFile } from './r2-upload.mjs';
+import { canUpload, headObjectMeta, uploadFile, copyWithCacheControl } from './r2-upload.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
@@ -38,6 +38,7 @@ if (!fs.existsSync(postsDir)) {
 }
 
 let total = 0;
+let updated = 0;
 for (const slug of fs.readdirSync(postsDir)) {
   const vdir = path.join(postsDir, slug, 'media', 'videos');
   if (!fs.existsSync(vdir)) continue;
@@ -45,16 +46,25 @@ for (const slug of fs.readdirSync(postsDir)) {
     const filePath = path.join(vdir, f);
     const key = `processed/${slug}/videos/${f}`;
     try {
-      const existing = await headObject(key);
-      if (existing !== null) continue; // streamed by compress.js already
-      await uploadFile({ key, filePath, cacheControl });
-      console.log(`  upload ${key}`);
-      total++;
+      const existing = await headObjectMeta(key);
+      if (existing === null) {
+        await uploadFile({ key, filePath, cacheControl });
+        console.log(`  upload ${key}`);
+        total++;
+      } else if (existing.cacheControl !== cacheControl) {
+        // Object exists with a stale Cache-Control (e.g. no-store from before
+        // the media CORS Transform Rule). Rewrite metadata only — no transfer.
+        await copyWithCacheControl({ key, filePath, cacheControl });
+        console.log(`  cache ${key} (${existing.cacheControl || 'none'} -> ${cacheControl})`);
+        updated++;
+      }
     } catch (e) {
       console.error(`  FAIL ${key}: ${e.message}`);
       process.exitCode = 1;
     }
   }
 }
-console.log(`Video reconcile complete: ${total} missing files uploaded (Cache-Control: ${cacheControl})`);
+console.log(
+  `Video reconcile complete: ${total} uploaded, ${updated} cache-control updated (Cache-Control: ${cacheControl})`,
+);
 if (process.exitCode) process.exit(1);

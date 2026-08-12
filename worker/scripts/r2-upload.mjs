@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { S3Client, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, HeadObjectCommand, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -93,4 +93,38 @@ export async function headObject(key, bucket = DEFAULT_BUCKET) {
     if (e?.$metadata?.httpStatusCode === 404) return null;
     throw e;
   }
+}
+
+/** Returns { size, cacheControl } for an object, or null when it does not exist. */
+export async function headObjectMeta(key, bucket = DEFAULT_BUCKET) {
+  try {
+    const client = getClient();
+    const res = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return {
+      size: typeof res.ContentLength === 'number' ? res.ContentLength : 0,
+      cacheControl: typeof res.CacheControl === 'string' ? res.CacheControl : '',
+    };
+  } catch (e) {
+    if (e?.$metadata?.httpStatusCode === 404) return null;
+    throw e;
+  }
+}
+
+/**
+ * Rewrite only the HTTP metadata of an existing object (no data transfer) —
+ * used to flip Cache-Control after the media CORS Transform Rule goes live.
+ * MetadataDirective REPLACE requires supplying the full metadata set.
+ */
+export async function copyWithCacheControl({ key, filePath, cacheControl, bucket = DEFAULT_BUCKET }) {
+  const client = getClient();
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      CopySource: `${bucket}/${key}`,
+      MetadataDirective: 'REPLACE',
+      CacheControl: cacheControl,
+      ContentType: contentTypeFor(filePath),
+    }),
+  );
 }

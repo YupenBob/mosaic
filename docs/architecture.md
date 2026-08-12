@@ -63,7 +63,7 @@ flowchart LR
 3. `compress.js`：图片 WebP（480/720/1080 + LQIP）、视频 HLS+MP4（240p–1080p，4K 可配）、音乐 MP3（128k/320k），并把**产物清单**写回 checksums（缓存命中时跳过转码、generate 仍能拿到档位信息）
 4. `generate.js`：Markdown → 静态 HTML + RSS/Sitemap + 前端数据
 5. 测试：`npm run check`（语法 + proxy 同步 + worker/build smoke）、`npm run lint`、`npm run format:check`、Playwright 本地静态预览 E2E
-6. 上传 processed（rclone）+ 视频媒体（SDK 上传器，`Cache-Control: public, max-age=31536000` + 正确 Content-Type）
+6. 上传 processed（rclone）+ 视频媒体（SDK 上传器，`Cache-Control: public, max-age=86400` + 正确 Content-Type；已有对象做元数据级缓存头刷新）
 7. 剥离后的 originals 回传 R2
 8. `minify.js`（esbuild）压缩 `dist/assets` 前端资源（保留 ESM import）；剥离 `dist` 媒体目录并拷贝 Functions
 9. `wrangler pages deploy` 部署前台
