@@ -23,28 +23,12 @@ const videos = [{ base: 'v1' }, { base: 'v2' }];
 const music = [{ file: 'm1.mp3', title: 'M1' }];
 
 await record('default order: text → gallery → videos → music', () => {
-  const { blocks } = buildBlocks({ body: 'Hello', photos, videos, music, layout: 'default' });
+  const { blocks } = buildBlocks({ body: 'Hello', photos, videos, music });
   assert.deepEqual(
     blocks.map((b) => b.type),
     ['text', 'gallery', 'videos', 'music'],
   );
   assert.match(blocks[0].html, /Hello/);
-});
-
-await record('gallery-first order', () => {
-  const { blocks } = buildBlocks({ body: 'Hello', photos, videos, music, layout: 'gallery-first' });
-  assert.deepEqual(
-    blocks.map((b) => b.type),
-    ['gallery', 'text', 'videos', 'music'],
-  );
-});
-
-await record('video-first order', () => {
-  const { blocks } = buildBlocks({ body: 'Hello', photos, videos, music, layout: 'video-first' });
-  assert.deepEqual(
-    blocks.map((b) => b.type),
-    ['videos', 'text', 'gallery', 'music'],
-  );
 });
 
 await record('empty media omits blocks', () => {
@@ -148,4 +132,4 @@ await record('deriveType: text/gallery/video/music/mixed', () => {
 
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nblocks-smoke: ${passed} groups passed`);
-if (passed < 13) process.exit(1);
+if (passed !== results.length) process.exit(1);

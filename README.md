@@ -161,7 +161,6 @@ category: photography/nature   # 支持多级分类
 tags: [风光, 旅行]
 description: "一场影像之旅。"
 cover: cover.jpg
-layout: video-first           # default | video-first | gallery-first
 video_mode: stacked           # stacked | playlist
 ---
 ```

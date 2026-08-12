@@ -9,10 +9,11 @@ import { escHtml, toast, modalConfirm, loadLib, openModal, closeModal } from './
 
 const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';
-const layouts = ['default', 'video-first', 'gallery-first', 'music-first'];
 const PLACEHOLDER_RE = /^\s*\{\{(gallery|videos|music|video:(\d+)|photo:(\d+))\}\}\s*$/;
 const BLOCK_DRAG_PREFIX = '__mosaic_block:';
 let editorBlocks = [];
+let previewVisible = false;
+let previewTimer = null;
 
 function getEditorMedia() {
   return window._editorMedia || { photos: [], videos: [], music: [] };
@@ -76,6 +77,14 @@ function syncBodyFromBlocks() {
     ta.value = body;
     ta.dispatchEvent(new Event('input'));
   }
+  schedulePreview();
+}
+
+// Live preview for split/preview modes: debounce re-render on every body change.
+function schedulePreview() {
+  if (!previewVisible) return;
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(renderPreview, 180);
 }
 
 function mediaRow(name, icon) {
@@ -125,7 +134,7 @@ function blockMediaIcon(type) {
 function blockActionsHtml() {
   return `
     <div class="fm-block-actions">
-      <button type="button" class="fm-block-drag" draggable="true" title="${t('editor.blockDrag')}" aria-label="${t('editor.blockDrag')}"><i class="ri-drag-move-2-line"></i></button>
+      <span class="fm-block-drag" role="button" tabindex="0" draggable="true" title="${t('editor.blockDrag')}" aria-label="${t('editor.blockDrag')}"><i class="ri-drag-move-2-line"></i></span>
       <button type="button" class="fm-block-btn" data-act="up" title="${t('editor.blockUp')}" aria-label="${t('editor.blockUp')}"><i class="ri-arrow-up-line"></i></button>
       <button type="button" class="fm-block-btn" data-act="down" title="${t('editor.blockDown')}" aria-label="${t('editor.blockDown')}"><i class="ri-arrow-down-line"></i></button>
       <button type="button" class="fm-block-btn fm-block-btn-danger" data-act="remove" title="${t('editor.blockRemove')}" aria-label="${t('editor.blockRemove')}"><i class="ri-close-line"></i></button>
@@ -258,43 +267,62 @@ function wireBodyDnD() {
   const container = document.getElementById('fm-blocks');
   const panel = document.getElementById('existing-media');
   if (!container || !panel) return;
-  container.addEventListener('dragover', (e) => {
-    if (!e.dataTransfer || !(e.dataTransfer.types || []).includes('text/plain')) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    showDropLine(e.clientY);
-  });
-  container.addEventListener('dragleave', (e) => {
-    if (!container.contains(e.relatedTarget)) hideDropLine();
-  });
-  container.addEventListener('drop', (e) => {
-    hideDropLine();
-    const text = ((e.dataTransfer && e.dataTransfer.getData('text/plain')) || '').trim();
-    const at = blockIndexFromPoint(e.clientY);
-    if (text.startsWith(BLOCK_DRAG_PREFIX)) {
-      const from = Number(text.slice(BLOCK_DRAG_PREFIX.length));
-      if (Number.isFinite(from) && editorBlocks[from]) {
-        const [moved] = editorBlocks.splice(from, 1);
-        const insertAt = from < at ? at - 1 : at;
-        editorBlocks.splice(Math.max(0, Math.min(insertAt, editorBlocks.length)), 0, moved);
-        commitBlocks();
-        e.preventDefault();
-      }
-      return;
-    }
-    if (/^\{\{(gallery|videos|music|video:\d+|photo:\d+)\}\}$/.test(text)) {
+  // Capture phase so the browser's built-in text-drop on the textarea never
+  // takes over: block reordering must win over inserting dragged text.
+  container.addEventListener(
+    'dragover',
+    (e) => {
+      if (!e.dataTransfer || !(e.dataTransfer.types || []).includes('text/plain')) return;
       e.preventDefault();
-      insertMediaBlock(text, at);
-    }
-  });
-  container.addEventListener('dragstart', (e) => {
-    const handle = e.target.closest('.fm-block-drag');
-    if (!handle) return;
-    const i = Number(handle.closest('.fm-block')?.dataset.index);
-    if (!Number.isFinite(i)) return;
-    e.dataTransfer.setData('text/plain', BLOCK_DRAG_PREFIX + i);
-    e.dataTransfer.effectAllowed = 'move';
-  });
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+      showDropLine(e.clientY);
+    },
+    true,
+  );
+  container.addEventListener(
+    'dragleave',
+    (e) => {
+      if (!container.contains(e.relatedTarget)) hideDropLine();
+    },
+    true,
+  );
+  container.addEventListener(
+    'drop',
+    (e) => {
+      hideDropLine();
+      const text = ((e.dataTransfer && e.dataTransfer.getData('text/plain')) || '').trim();
+      const at = blockIndexFromPoint(e.clientY);
+      if (text.startsWith(BLOCK_DRAG_PREFIX)) {
+        const from = Number(text.slice(BLOCK_DRAG_PREFIX.length));
+        if (Number.isFinite(from) && editorBlocks[from]) {
+          const [moved] = editorBlocks.splice(from, 1);
+          const insertAt = from < at ? at - 1 : at;
+          editorBlocks.splice(Math.max(0, Math.min(insertAt, editorBlocks.length)), 0, moved);
+          commitBlocks();
+          e.preventDefault();
+        }
+        return;
+      }
+      if (/^\{\{(gallery|videos|music|video:\d+|photo:\d+)\}\}$/.test(text)) {
+        e.preventDefault();
+        insertMediaBlock(text, at);
+      }
+    },
+    true,
+  );
+  container.addEventListener(
+    'dragstart',
+    (e) => {
+      const handle = e.target.closest('.fm-block-drag');
+      if (!handle) return;
+      const i = Number(handle.closest('.fm-block')?.dataset.index);
+      if (!Number.isFinite(i)) return;
+      e.dataTransfer.setData('text/plain', BLOCK_DRAG_PREFIX + i);
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    true,
+  );
   container.addEventListener('input', (e) => {
     const ta = e.target.closest('.fm-text-block');
     if (!ta) return;
@@ -409,11 +437,6 @@ export default async function renderEditor(signal) {
               <span class="field-label">${t('editor.description')}</span>
               <textarea id="fm-desc" class="textarea" rows="2">${escHtml(fmv('description'))}</textarea>
             </label>
-            <label class="field">
-              <span class="field-label">${t('editor.layout')}</span>
-              <select id="fm-layout" class="select">${layouts.map((l) => `<option value="${l}" ${fmv('layout') === l ? 'selected' : ''}>${l}</option>`).join('')}</select>
-            </label>
-
             <div class="editor-section-title">${t('editor.cover')}</div>
             <label class="field">
               <input type="text" id="fm-cover" class="input" value="${escHtml(fmv('cover'))}" placeholder="cover.jpg or video:0 or photo:0" />
@@ -526,7 +549,6 @@ function saveDraft() {
       .map((s) => s.trim())
       .filter(Boolean),
     description: document.getElementById('fm-desc')?.value || '',
-    layout: document.getElementById('fm-layout')?.value || 'default',
     cover: document.getElementById('fm-cover')?.value || '',
     views: parseInt(document.getElementById('fm-views')?.value) || 0,
     likes: parseInt(document.getElementById('fm-likes')?.value) || 0,
@@ -540,7 +562,7 @@ function saveDraft() {
 
 function wireEditorInputs() {
   const fields = document.querySelectorAll(
-    '#fm-title, #fm-date, #fm-category, #fm-tags, #fm-desc, #fm-layout, #fm-cover, #fm-views, #fm-likes, #fm-slug, #fm-body',
+    '#fm-title, #fm-date, #fm-category, #fm-tags, #fm-desc, #fm-cover, #fm-views, #fm-likes, #fm-slug, #fm-body',
   );
   const onInput = () => {
     state.editorDirty = true;
@@ -563,7 +585,6 @@ window.restoreDraft = () => {
   set('fm-category', d.category || '');
   set('fm-tags', (d.tags || []).join(', '));
   set('fm-desc', d.description || '');
-  set('fm-layout', d.layout || 'default');
   set('fm-cover', d.cover || '');
   set('fm-views', d.views || 0);
   set('fm-likes', d.likes || 0);
@@ -604,7 +625,6 @@ window.doSavePost = async (goBack) => {
       .map((s) => s.trim())
       .filter(Boolean),
     description: document.getElementById('fm-desc').value,
-    layout: document.getElementById('fm-layout').value,
     cover: document.getElementById('fm-cover').value.trim(),
     views: parseInt(document.getElementById('fm-views')?.value) || 0,
     likes: parseInt(document.getElementById('fm-likes')?.value) || 0,
@@ -667,6 +687,7 @@ window.editorMode = async (mode) => {
   const blocksEl = document.getElementById('fm-blocks');
   const preview = document.getElementById('fm-preview');
   if (!blocksEl || !preview) return;
+  previewVisible = mode === 'preview' || mode === 'split';
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
   blocksEl.classList.toggle('hidden', mode === 'preview');
   preview.classList.toggle('hidden', mode !== 'preview' && mode !== 'split');

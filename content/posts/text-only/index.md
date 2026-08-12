@@ -4,7 +4,6 @@ date: 2026-05-01
 category: 随笔
 tags: [极简, 随笔]
 description: "为什么少即是多——关于摄影、设计和生活的个人思考。"
-layout: default
 cover: cover.jpg
 ---
 

@@ -15,7 +15,6 @@ const ROOT = path.resolve(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 
 const RES_KEYS = ['4K', '1080p', '720p', '480p', '360p', '240p'];
-const LAYOUTS = ['default', 'video-first', 'gallery-first'];
 const VIDEO_MODES = ['stacked', 'playlist'];
 
 function isUrl(v) {
@@ -87,7 +86,7 @@ for (const p of posts) {
       typeof p.bodyHTML === 'string',
   );
   check(`${tag} tags is string array`, Array.isArray(p.tags) && p.tags.every((t) => typeof t === 'string'));
-  check(`${tag} layout/videoMode valid`, LAYOUTS.includes(p.layout) && VIDEO_MODES.includes(p.videoMode));
+  check(`${tag} videoMode valid`, VIDEO_MODES.includes(p.videoMode));
   check(`${tag} coverAspect finite`, Number.isFinite(p.coverAspect) && p.coverAspect > 0);
   check(
     `${tag} stats numeric`,

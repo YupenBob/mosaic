@@ -67,7 +67,6 @@ for (const dir of postDirs) {
       .slice(0, 200)
       .replace(/[#*`\[\]()\n]/g, '')
       .trim();
-  const layout = data.layout || 'default';
   const videoMode = data.video_mode || 'stacked';
   // ── Photos ──
   const photos = [];
@@ -268,7 +267,6 @@ for (const dir of postDirs) {
     photos,
     videos,
     music,
-    layout,
     videoMode,
     blocksOrder: Array.isArray(data.blocks) ? data.blocks : null,
   });
@@ -284,7 +282,6 @@ for (const dir of postDirs) {
     category,
     tags,
     description,
-    layout,
     videoMode,
     cover,
     coverAspect,

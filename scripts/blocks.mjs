@@ -10,7 +10,7 @@
  * - Out-of-range video:N / photo:N references stay literal in the text so the
  *   author sees them.
  * - Without placeholders, legacy ordering applies: text → gallery → videos →
- *   music, with gallery-first / video-first reordering.
+ *   music (or an explicit `blocks` frontmatter order when provided).
  */
 import { marked } from 'marked';
 
@@ -26,22 +26,13 @@ const PLACEHOLDER_RE = /^\s*\{\{(gallery|videos|music|video:(\d+)|photo:(\d+))\}
  * @param {Array}  input.photos      Parsed photo objects.
  * @param {Array}  input.videos      Parsed video objects.
  * @param {Array}  input.music       Parsed music track objects.
- * @param {string} input.layout      default | gallery-first | video-first.
  * @param {string} input.videoMode   stacked | playlist (used by the videos block).
  * @param {Array}  input.blocksOrder Optional explicit type order (text/gallery/
  *                                   videos/music); ignored when placeholders are
  *                                   present (placeholder order wins).
  * @returns {{blocks: Array, bodyHTML: string}}
  */
-export function buildBlocks({
-  body,
-  photos = [],
-  videos = [],
-  music = [],
-  layout = 'default',
-  videoMode = 'stacked',
-  blocksOrder = null,
-}) {
+export function buildBlocks({ body, photos = [], videos = [], music = [], videoMode = 'stacked', blocksOrder = null }) {
   const lines = String(body || '').split(/\r?\n/);
   const blocks = [];
   const placed = new Set();
@@ -100,13 +91,7 @@ export function buildBlocks({
       music: music.length ? { type: 'music', tracks: music } : null,
     };
     const order =
-      Array.isArray(blocksOrder) && blocksOrder.length
-        ? blocksOrder
-        : layout === 'gallery-first'
-          ? ['gallery', 'text', 'videos', 'music']
-          : layout === 'video-first'
-            ? ['videos', 'text', 'gallery', 'music']
-            : ['text', 'gallery', 'videos', 'music'];
+      Array.isArray(blocksOrder) && blocksOrder.length ? blocksOrder : ['text', 'gallery', 'videos', 'music'];
     return {
       blocks: order.map((t) => byType[t]).filter(Boolean),
       bodyHTML: byType.text ? byType.text.html : '',
