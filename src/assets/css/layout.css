@@ -106,6 +106,38 @@
   outline-offset: 2px;
 }
 
+/* Mobile: keep logo + theme toggle, let category nav scroll instead of
+   overflowing the viewport */
+@media (max-width: 639px) {
+  .header .container {
+    gap: var(--space-2);
+  }
+  .header-logo {
+    font-size: var(--font-size-lg);
+  }
+  .header-logo-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .header-nav {
+    overflow-x: auto;
+    flex-shrink: 1;
+    min-width: 0;
+    scrollbar-width: none;
+  }
+  .header-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .header-nav a {
+    white-space: nowrap;
+    padding: var(--space-2);
+  }
+  .theme-toggle {
+    width: 32px;
+    height: 32px;
+  }
+}
+
 /* Main */
 .main {
   min-height: calc(100vh - var(--header-height));
@@ -135,6 +167,21 @@
   font-size: var(--font-size-xs);
   margin-bottom: var(--space-1);
   letter-spacing: 0.02em;
+}
+.footer-feed {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-xs);
+}
+.footer-feed a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-tertiary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+.footer-feed a:hover {
+  color: var(--color-accent-text);
 }
 
 /* Card Grid — masonry via CSS columns */

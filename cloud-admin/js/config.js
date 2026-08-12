@@ -9,7 +9,7 @@ import { state } from './state.js';
 import { escHtml, toast } from './ui.js';
 
 const LOGO_DATA_URI =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.9'/%3E%3Crect x='26' y='2' width='20' height='20' rx='5' fill='%234361ee' opacity='.65'/%3E%3Crect x='2' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.4'/%3E%3Crect x='26' y='26' width='20' height='20' rx='5' fill='%234361ee' opacity='.75'/%3E%3C/svg%3E";
+  'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 48 48%27%3E%3Crect x=%272%27 y=%272%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.9%27/%3E%3Crect x=%2726%27 y=%272%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.65%27/%3E%3Crect x=%272%27 y=%2726%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.4%27/%3E%3Crect x=%2726%27 y=%2726%27 width=%2720%27 height=%2720%27 rx=%275%27 fill=%27%234361ee%27 opacity=%27.75%27/%3E%3C/svg%3E';
 
 export default async function renderConfig(signal) {
   let cfg = {};

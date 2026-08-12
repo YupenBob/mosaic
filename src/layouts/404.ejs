@@ -43,6 +43,7 @@
     <div class="container">
       <p class="footer-tagline"><%= site.subtitle || '' %></p>
       <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
+      <p class="footer-feed"><a href="<%= rp %>feed.xml" title="RSS" aria-label="RSS"><i class="ri-rss-line"></i> RSS</a></p>
     </div>
   </footer>
   <script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
