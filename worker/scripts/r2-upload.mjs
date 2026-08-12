@@ -145,11 +145,17 @@ export async function listVideoKeys(bucket = DEFAULT_BUCKET) {
  */
 export async function copyWithCacheControl({ key, cacheControl, contentType, bucket = DEFAULT_BUCKET }) {
   const client = getClient();
+  // x-amz-copy-source is a header: non-ASCII / special characters must be
+  // percent-encoded per path segment (slashes stay as separators).
+  const copySource = `${bucket}/${key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')}`;
   await client.send(
     new CopyObjectCommand({
       Bucket: bucket,
       Key: key,
-      CopySource: `${bucket}/${key}`,
+      CopySource: copySource,
       MetadataDirective: 'REPLACE',
       CacheControl: cacheControl,
       ContentType: contentType,
