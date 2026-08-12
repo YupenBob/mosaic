@@ -11,7 +11,13 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { S3Client, HeadObjectCommand, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  HeadObjectCommand,
+  PutObjectCommand,
+  CopyObjectCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,7 +101,7 @@ export async function headObject(key, bucket = DEFAULT_BUCKET) {
   }
 }
 
-/** Returns { size, cacheControl } for an object, or null when it does not exist. */
+/** Returns { size, cacheControl, contentType } for an object, or null when it does not exist. */
 export async function headObjectMeta(key, bucket = DEFAULT_BUCKET) {
   try {
     const client = getClient();
@@ -103,6 +109,7 @@ export async function headObjectMeta(key, bucket = DEFAULT_BUCKET) {
     return {
       size: typeof res.ContentLength === 'number' ? res.ContentLength : 0,
       cacheControl: typeof res.CacheControl === 'string' ? res.CacheControl : '',
+      contentType: typeof res.ContentType === 'string' ? res.ContentType : 'application/octet-stream',
     };
   } catch (e) {
     if (e?.$metadata?.httpStatusCode === 404) return null;
@@ -111,11 +118,32 @@ export async function headObjectMeta(key, bucket = DEFAULT_BUCKET) {
 }
 
 /**
+ * List all processed video object keys in the bucket (paginated). Independent
+ * of local dist files, so cache-control refreshes work on cache-hit builds.
+ */
+export async function listVideoKeys(bucket = DEFAULT_BUCKET) {
+  const client = getClient();
+  const keys = [];
+  let token;
+  do {
+    const res = await client.send(
+      new ListObjectsV2Command({ Bucket: bucket, Prefix: 'processed/', ContinuationToken: token }),
+    );
+    for (const obj of res.Contents || []) {
+      const key = obj.Key || '';
+      if (/\.(m3u8|ts|mp4|m4s)$/i.test(key)) keys.push(key);
+    }
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
+  return keys;
+}
+
+/**
  * Rewrite only the HTTP metadata of an existing object (no data transfer) —
  * used to flip Cache-Control after the media CORS Transform Rule goes live.
  * MetadataDirective REPLACE requires supplying the full metadata set.
  */
-export async function copyWithCacheControl({ key, filePath, cacheControl, bucket = DEFAULT_BUCKET }) {
+export async function copyWithCacheControl({ key, cacheControl, contentType, bucket = DEFAULT_BUCKET }) {
   const client = getClient();
   await client.send(
     new CopyObjectCommand({
@@ -124,7 +152,7 @@ export async function copyWithCacheControl({ key, filePath, cacheControl, bucket
       CopySource: `${bucket}/${key}`,
       MetadataDirective: 'REPLACE',
       CacheControl: cacheControl,
-      ContentType: contentTypeFor(filePath),
+      ContentType: contentType,
     }),
   );
 }

@@ -16,7 +16,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { canUpload, headObjectMeta, uploadFile, copyWithCacheControl } from './r2-upload.mjs';
+import { canUpload, headObjectMeta, uploadFile, copyWithCacheControl, listVideoKeys } from './r2-upload.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
@@ -38,7 +38,6 @@ if (!fs.existsSync(postsDir)) {
 }
 
 let total = 0;
-let updated = 0;
 for (const slug of fs.readdirSync(postsDir)) {
   const vdir = path.join(postsDir, slug, 'media', 'videos');
   if (!fs.existsSync(vdir)) continue;
@@ -51,12 +50,6 @@ for (const slug of fs.readdirSync(postsDir)) {
         await uploadFile({ key, filePath, cacheControl });
         console.log(`  upload ${key}`);
         total++;
-      } else if (existing.cacheControl !== cacheControl) {
-        // Object exists with a stale Cache-Control (e.g. no-store from before
-        // the media CORS Transform Rule). Rewrite metadata only — no transfer.
-        await copyWithCacheControl({ key, filePath, cacheControl });
-        console.log(`  cache ${key} (${existing.cacheControl || 'none'} -> ${cacheControl})`);
-        updated++;
       }
     } catch (e) {
       console.error(`  FAIL ${key}: ${e.message}`);
@@ -64,7 +57,24 @@ for (const slug of fs.readdirSync(postsDir)) {
     }
   }
 }
+
+// Refresh Cache-Control on ALL existing processed video objects (independent of
+// local dist, so cache-hit builds still flip previously no-store objects).
+let refreshed = 0;
+for (const key of await listVideoKeys()) {
+  try {
+    const meta = await headObjectMeta(key);
+    if (meta && meta.cacheControl !== cacheControl) {
+      await copyWithCacheControl({ key, cacheControl, contentType: meta.contentType });
+      console.log(`  cache ${key} (${meta.cacheControl || 'none'} -> ${cacheControl})`);
+      refreshed++;
+    }
+  } catch (e) {
+    console.error(`  REFRESH FAIL ${key}: ${e.message}`);
+    process.exitCode = 1;
+  }
+}
 console.log(
-  `Video reconcile complete: ${total} uploaded, ${updated} cache-control updated (Cache-Control: ${cacheControl})`,
+  `Video reconcile complete: ${total} uploaded, ${refreshed} cache-control refreshed (Cache-Control: ${cacheControl})`,
 );
 if (process.exitCode) process.exit(1);
