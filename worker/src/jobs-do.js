@@ -191,6 +191,15 @@ export class JobsDurableObject {
         jobs: Object.values(state.jobs).map(({ config: _config, lease: _lease, ...job }) => job),
       };
     if (operation === 'enqueue') {
+      // Legacy root covers now upload through photos/: retain their stable identity.
+      const legacyCover = state.manifest.assets[`${data.slug}/covers/${data.filename}`];
+      if (
+        data.folder === 'photos' &&
+        legacyCover &&
+        legacyCover.status !== 'deleted' &&
+        !state.manifest.assets[data.id]
+      )
+        data = { ...data, id: legacyCover.id, folder: 'covers' };
       state.config = data.config;
       const previous = state.manifest.assets[data.id];
       const current = previous && state.jobs[previous.jobId];

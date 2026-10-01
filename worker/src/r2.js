@@ -246,7 +246,7 @@ export async function listMedia(c, mediaBaseOverride) {
       ? `${r2Public}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(name)}`
       : `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`;
     const ext = name.split('.').pop()?.toLowerCase();
-    const task = taskByFile.get(`${folder}/${name}`);
+    const task = taskByFile.get(`${folder}/${name}`) || taskByFile.get(`covers/${name}`);
     const item = { name, url, size, ...(task ? { status: task.status, taskId: task.taskId } : {}) };
     if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) result.photos.push(item);
     else if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) result.videos.push(item);

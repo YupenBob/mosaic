@@ -224,3 +224,10 @@ assert.equal(
 console.log(
   'Jobs migration gate, safe cleanup, 1200-record recovery, durable configuration reconciliation and cache failure passed',
 );
+const coverReplacement = createRuntime();
+const oldCover = await coverReplacement.enqueue('cover', 'cover.jpg', Buffer.from('old'), { folder: 'covers' });
+const newCover = await coverReplacement.enqueue('cover', 'cover.jpg', Buffer.from('new'));
+assert.notEqual(newCover.taskId, oldCover.taskId);
+const coverAssets = (await coverReplacement.call('state')).manifest.assets;
+assert.equal(Object.keys(coverAssets).length, 1, 'legacy covers retain their identity when uploaded through photos');
+assert.equal(coverAssets['cover/covers/cover.jpg'].source.key, 'originals/cover/photos/cover.jpg');
