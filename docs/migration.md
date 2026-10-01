@@ -1,76 +1,28 @@
-# Mosaic 版本升级与迁移指南
+# 迁移与回退
 
-本文面向**已在使用旧版本的用户**，说明如何升级到当前版本（v1.0）。全新部署请直接看 [SETUP.md](SETUP.md)。
+此分支保留旧文章地址、内容块语法、Stats DO 和代理同步契约。不要先启用新的站点工作流再部署任务 Worker，否则无法取得已发布清单。
 
-## v0.8 → v1.0 概览
+## 上线顺序
 
-主要变化：
+1. 保存当前 Pages 部署 ID、Git SHA 和 R2 `site-data/media-checksums.json`、旧 `posts.json`。保留旧工作流版本。配置相同的 Actions/Worker `PIPELINE_SECRET`，核对桶、Worker 名称、Pages 项目、分支和 CORS。
+2. 在站点自动发布暂停期间先运行 `Mosaic Infrastructure`：保留 STATS/v1，增加 JOBS/v2-media-jobs，配置两份 Pages 的 `API_TARGET`，再发布后台。默认生产分支为 main，feature 分支只做离线检查。
+3. 启动 `Mosaic Media`。迁移脚本分页列出 originals，读取旧 checksum 清单，HEAD 核验图片、视频 MP4/播放列表/所有分片、海报、音乐与元数据。有效旧产物立即导入，不要求重编码；缺失项登记待处理任务。
+4. 检查迁移标记 `site-data/media-migration-v1.json` 和媒体任务列表。视频旧 master 引用了缺失档位时只保留已验证 MP4，不宣称无效 HLS 就绪。媒体工作流仅下载排队文件。
+5. 启用新的 `Mosaic Site`，获取 DO 固定清单快照并构建、验证、部署，再写入精简列表缓存和签名确认。允许媒体低档更新自动调度站点，站点完成不会调度转码。
+6. 保留 `dist/data/posts.json` 与 Worker 旧 `site-data/posts.json` 读取适配一个发布周期，确认所有列表消费者切换后再移除兼容入口。
 
-- 管理后台重构为 ES Module 零构建 SPA（v0.9），本地 Express 后台（`admin/`）已移除
-- 统计改为 Durable Object（视图/点赞/停留时长），历史 `site-data/stats.json` 自动迁移
-- 媒体上传改为预签名直传（浏览器 → R2），Worker 直传仅作 ≤100MB 兜底
-- 构建引入媒体 checksum 缓存 + 产物清单：内容未变时压缩秒级跳过
-- 新增：构建进度上报、批量文章统计、分类/标签删除、文章分页、回收站、生产健康检查
-- 新增环境变量：`PROXY_SECRET`（IP 透传）、`DEV_MODE`（本地开发）、`VIDEO_CACHE_CONTROL`（CI 缓存头）
+`infrastructure.yml`、`media.yml`、`pipeline.yml` 使用独立并发组，取消设置为 false。同一分支操作串行；GitHub 仅保留一个待执行并发 run，DO outbox 和租约到期会补调未完成媒体任务。
 
-## 升级步骤
+生产默认启用 `REQUIRE_MEDIA_MIGRATION`。未完成导入时，站点 begin 返回 503 并保留上一部署；不要通过关闭保护来跳过迁移。
 
-### 1. 拉取最新代码
+## 清单与回退
 
-```bash
-git pull origin main
-npm install
-```
+当前清单位于可配置 `media.manifestKey`；每次修改另写 `site-data/media-manifests/{revision}.json`。DO 保留最近成功部署，包括 Git SHA、清单版本和时间。正在构建及保留部署引用的产物不能被后台或媒体清理删除。
 
-`mosaic.config.json` 无需手工迁移：缺少的键由代码默认值兜底，Admin 后台保存配置为深合并，不会丢字段。
+回退时先停止新的媒体调度/取消对应任务，在 Pages 选择上一成功部署，并使用该部署记录的清单快照和源码 SHA 做后续重建。不要把旧 master 写回新 generation，也不要直接删除当前清单。需要恢复旧流程时恢复旧 Git SHA/workflow，保留 JOBS 命名空间和 STATS 数据；清单、原文件和上一部署均保留。
 
-### 2. 配置 Secrets
+迁移失败不写完成标记，下次媒体工作流重新核验与幂等导入。自动重试耗尽的文件可在后台逐一重试；配置变化和同名替换会撤销旧任务，旧回调不能重新发布。
 
-按 [SETUP.md](SETUP.md) 第 4.2 / 6.1 节设置：
+## 本次交付边界
 
-- Worker Secrets：`ADMIN_PASSWORD`、`JWT_SECRET`、`GITHUB_TOKEN`、`CF_ACCOUNT_ID`、`R2_ACCESS_KEY`、`R2_SECRET_KEY`、`PROXY_SECRET`
-- 两个 Pages 项目 Secret：`PROXY_SECRET`（与 Worker 一致）
-- GitHub Actions Secrets：`R2_ACCESS_KEY`、`R2_SECRET_KEY`、`R2_ENDPOINT`、`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`
-
-### 3. 部署
-
-```bash
-cd worker && npx wrangler deploy
-cd .. && npx wrangler pages deploy cloud-admin --project-name mosaic-admin
-```
-
-### 4. 媒体清单缓存首次引导
-
-压缩脚本的 checksum 文件已升级到 v2（新增产物清单）。首次构建会自动触发一次全量重建并写入清单，之后增量生效——首次构建会比平时慢，属预期。
-
-### 5. 统计迁移
-
-旧统计在 R2 `site-data/stats.json`。首次访问统计接口时，Durable Object 会自动读取并迁移该文件，无需手工操作；此后以 DO 存储为主、stats.json 仅作备份。
-
-### 6. 移除本地后台
-
-`admin/`（本地 Express 后台）已从仓库移除，请改用云后台 `cloud-admin`（部署于 `mosaic-admin.xsanye.cn`）。
-
-### 7. 媒体域 CORS（推荐）
-
-媒体域 CORS Transform Rule 已在 `xsanye.cn` zone 配置（Modify Response Header 强制 `Access-Control-Allow-Origin: *`），CI 视频缓存头已恢复为 `public, max-age=86400`。若你的 zone 尚未配置，按 [SETUP.md](SETUP.md) 6.2 节添加。
-
-## 验证清单
-
-- [ ] `/api/health` 返回 ok
-- [ ] Admin 登录成功，仪表盘显示正确文章/分类/标签统计
-- [ ] 上传一张图片 + 一个视频，构建后前台正常展示（HLS 可播放）
-- [ ] 页面浏览量在重复访问后递增（DO 统计生效）
-- [ ] `node tests/check-site.mjs` 通过
-
-## 回滚
-
-- 代码回滚：`git revert <commit>` 后推送到 `main` 触发重建
-- Worker：`npx wrangler rollback`
-- Pages：Cloudflare Dashboard → Pages → Deployments 选择历史版本
-
-## 常见问题
-
-- **构建比预期慢**：媒体变更或首次 v2 引导属正常；内容未变仍慢请检查 checksum 缓存是否恢复（见 [operations.md](operations.md)）
-- **视频无法播放**：确认媒体域 CORS（桶级或 Transform Rule）与 `PROXY_SECRET` 配置一致
-- **登录 503**：`JWT_SECRET` 未配置，Worker fail-closed（见 [operations.md](operations.md)）
+代码、工作流、离线测试与部署脚本在 `codex/project-refactor` 上交付。生产 Secret 配置、迁移核验及线上流程切换必须按上述兼容顺序执行；本地验证不会读生产凭据或上传用户媒体。未跟踪宣传视频目录与备份脚本不纳入本次业务提交。

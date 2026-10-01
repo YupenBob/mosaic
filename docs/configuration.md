@@ -1,143 +1,55 @@
-# Mosaic 配置参考
+# 配置指南
 
-站点配置集中在根目录 `mosaic.config.json`，可以在 Admin → 站点设置中可视化编辑（保存为深合并，不会丢字段）。以下字段以当前代码为准。
+`mosaic.config.json` 为站点配置，`shared/config.mjs` 为 Node 与 Worker 共用的默认值、兼容映射和校验。合并对象、替换数组；禁止原型键。Secret 不写入配置文件。
 
-## 站点
+## 主要配置
 
-| 字段 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `title` | string | `"Mosaic"` | 站点名称 |
-| `subtitle` | string | `""` | 副标题 |
-| `description` | string | `""` | SEO 描述 |
-| `url` | string | `""` | 站点绝对地址（RSS/Sitemap/OG 用） |
-| `apiBase` | string | `""` | Worker API 地址（前台 track 上报用） |
-| `mediaBase` | string | `""` | R2 媒体直连域名 |
-| `language` | string | `"zh-CN"` | 界面语言（`zh-CN`/`en`） |
-| `author.name` / `author.email` | string | `""` | RSS 作者信息 |
-| `dateFormat` | string | `"YYYY-MM-DD"` | 日期格式 |
-| `favicon` | string | `"/assets/logo.svg"` | 站点图标（可后台上传到 `site-data/favicon.*`） |
-| `headerNav` | array | `[]` | 自定义导航 `[{ "label": "...", "url": "..." }]` |
-| `footerText` | string | `""` | 自定义页脚文字 |
-
-## 布局与卡片
-
-| 字段 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `pageSize` | number | `50` | 首页每页文章数 |
-| `gallerySingleThreshold` | number | `5` | 少于等于该数量时画廊单列大图 |
-| `coverAspectMin` / `coverAspectMax` | number | `0.5625` / `999` | 封面宽高比限制 |
-| `cardShowTags` / `cardShowStats` | boolean | `true` | 卡片显示标签 / 统计 |
-| `searchMinChars` | number | `2` | 触发搜索的最少字符 |
-
-## 媒体处理
-
-| 字段 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `imageQuality` | object | `{"480p":75,"720p":80,"1080p":85}` | WebP 画质 |
-| `videoQuality.crf` | number | `23` | FFmpeg CRF（越小画质越好体积越大） |
-| `videoQuality.preset` | string | `"veryfast"` | FFmpeg preset（越快耗时越短） |
-| `videoQuality.maxHeight` | number | `1080` | 转码顶格档位（2160=4K、1080=1080p…） |
-| `videoQuality.uploadAfterTiers` | number | `1` | 每转完 n 个清晰度上传一批（1=每档即传，5=全部完成再传） |
-| `enableVideoCompression` | boolean | `true` | 视频转码总开关 |
-| `enableBusuanzi` | boolean | `true` | 不蒜子第三方计数（与 Mosaic 实时统计并存显示） |
-
-音乐固定转码 MP3 128k/320k，无需额外配置。
-
-## 构建
-
-| 字段 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `build.timeoutMinutes` | number | `90` | 单次构建超时（10–360）。后台触发生效；push 自动构建固定 90 |
-
-视频转码按档位升序（240p→4K）边转边传，并带断点续传与时间预算保护（85% 超时后跳过剩余高档位，下次构建续传补齐），详见 [operations.md](operations.md)。
-
-## 媒体源
-
-| 字段 | 说明 |
-| --- | --- |
-| `mediaSource.type` | `"r2"` |
-| `mediaSource.bucket` | R2 桶名（`mosaic-media`） |
-| `mediaSource.endpoint` | R2 S3 端点（GitHub Secrets 提供，可留空） |
-
-## 主题
-
-| 字段 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `theme` | string | `"auto"` | `auto`/`light`/`dark` |
-
-主题令牌由 `themes/default/theme.json` 定义。
-
-## 插件
-
-| 插件 | 说明 |
-| --- | --- |
-| `compress-images` | sharp WebP 压缩 |
-| `compress-videos` | FFmpeg 视频转码 |
-| `generate-feed` | RSS/Atom 生成 |
-| `generate-sitemap` | Sitemap 生成 |
-
-设置 `"enabled": false` 可关闭。
-
-## 组件
-
-| 组件 | 说明 |
-| --- | --- |
-| `gallery` | 图片画廊（缩放/懒加载） |
-| `video` | HLS 视频播放器 |
-| `comments` | Giscus 评论（需配置 giscus 字段） |
-| `search` | 前端全文搜索 |
-| `likes` | 点赞按钮 |
-| `stats` | 浏览/停留统计 |
-
-音乐播放器默认启用，不在 `components` 中开关。
-
-## 评论（Giscus）
-
-`giscus.repo` / `giscus.repoId` / `giscus.category` / `giscus.categoryId`，并在 `components.comments.enabled` 置 `true`。
-
-## 环境变量
-
-### GitHub Actions Secrets（仓库 Settings → Secrets）
-
-| 变量 | 用途 |
-| --- | --- |
-| `R2_ACCESS_KEY` / `R2_SECRET_KEY` / `R2_ENDPOINT` | rclone / SDK 访问 R2 |
-| `CLOUDFLARE_API_TOKEN` | 部署 Pages |
-| `CLOUDFLARE_ACCOUNT_ID` | CF 账户 ID |
-
-### Worker Secrets（`wrangler secret put`）
-
-| 变量 | 用途 |
-| --- | --- |
-| `ADMIN_PASSWORD` | 管理员密码（登录） |
-| `JWT_SECRET` | JWT 签名密钥（必填，缺失即 fail-closed） |
-| `GITHUB_TOKEN` | GitHub API 令牌（Contents + Actions 写权限） |
-| `CF_ACCOUNT_ID` | CF 账户 ID（预签名 URL 用） |
-| `R2_ACCESS_KEY` / `R2_SECRET_KEY` | R2 S3 凭证（预签名用） |
-| `PROXY_SECRET` | Pages→Worker IP 透传签名（与两个 Pages 项目 Secret 一致） |
-
-### 可选
-
-| 变量 | 位置 | 说明 |
+| 字段 | 默认值 | 用途 |
 | --- | --- | --- |
-| `DEV_MODE` | Worker | 未配置 ADMIN_PASSWORD 时显式允许无鉴权（仅本地开发） |
-| `VIDEO_CACHE_CONTROL` | CI | 视频上传器的缓存头（当前 `public, max-age=86400`；CORS Transform Rule 已生效，1 天保守 TTL，稳定后可拉长） |
-| `CHECKSUMS_FILE` | 构建 | 覆盖媒体 checksum 文件路径（默认 `dist/.media-checksums.json`） |
-| `R2_PUBLIC_URL` | 构建 | 覆盖媒体直连域名（可选，默认取 `config.mediaBase`） |
+| `deployment.branch` | main | 内容、工作流和部署分支 |
+| `deployment.siteWorkflow` / `mediaWorkflow` | pipeline.yml / media.yml | 两类 workflow_dispatch |
+| `deployment.siteProject` / `adminProject` / `workerName` | mosaic / mosaic-admin / mosaic-api | 部署目标 |
+| `deployment.allowedOrigins` | 空数组 | 后台跨域白名单 |
+| `mediaSource.bucket` / `endpoint` | mosaic-media / 空 | R2 桶与 S3 endpoint |
+| `mediaBase` / `apiBase` | 空 / /api | 媒体公共地址与 API 地址；生产需配置媒体域 |
+| `build.timeoutMinutes` | 90 | 站点调度超时 |
+| `media.timeoutMinutes` | 90 | 独立媒体调度超时 |
+| `media.budgetRatio` | 0.85 | 提前保存断点的时间预算 |
+| `media.maxRetries` | 3 | 首次失败后最多自动重试次数 |
+| `media.debounceMs` / `retryMs` | 10000 / 30000 | 合并调度与重试间隔 |
+| `media.leaseMs` / `pollMs` | 120000 / 30000 | 心跳租约与调度检查 |
+| `media.retentionDays` | 30 | 未引用产物清理前保留时间 |
+| `media.deploymentHistory` / `reconcileBatchSize` | 20 / 25 | 保留部署记录数与配置补处理批大小 |
+| `media.cacheControl` | public, max-age=86400 | 版本化媒体缓存策略 |
+| `media.manifestKey` | site-data/media-manifest.json | 当前媒体清单入口 |
+| `media.image.placeholderWidth` / `placeholderQuality` | 150 / 30 | 占位 WebP 参数 |
+| `media.audio.bitrates` / `waveformBuckets` / `sampleRate` | [128k,320k] / 400 / 8000 | MP3 与波形参数 |
+| `imageQuality` | 480p:75,720p:80,1080p:85 | 图片档位质量，实际传给 Sharp |
+| `videoQuality.crf` / `preset` / `maxHeight` | 23 / veryfast / 1080 | 实际 FFmpeg 编码参数 |
+| `videoQuality.uploadAfterTiers` | 1 | 验证后分批发布视频档位 |
+| `videoQuality.fps` / `segmentSeconds` / `audioBitrate` | 30 / 6 / 128k | 视频帧率、HLS 分片、AAC 码率 |
+| `upload.concurrency` / `partConcurrency` / `partRetries` | 3 / 3 / 3 | 浏览器上传调度 |
+| `upload.multipartThreshold` / `partSize` | 100 MiB / 100 MiB | 分片阈值与片大小 |
+| `upload.presignSeconds` / `maxFileBytes` | 3600 / 5 GiB | 签名时效与文件上限 |
+| `cache.postsMs` / `configMs` | 60000 / 120000 | Worker 列表与配置缓存 |
+| `cache.diskMs` / `usageMaxAgeMs` | 300000 / 86400000 | 用量缓存与快照最长有效时间 |
+| `admin.dirtyPollMs` / `jobPollMs` | 60000 / 5000 | 后台轮询 |
+| `player.speeds` / `qualityOrder` / `hls` | 见共享默认值 | 倍速、菜单次序、HLS 缓冲和重试参数 |
+| `search.debounceMs` / `maxResults` / `searchMinChars` | 250 / 10 / 2 | 搜索交互 |
 
-## 文章 frontmatter
+图片压缩由 `plugins.compress-images.enabled` 控制，关闭时仍生成隐私处理后的原图与占位图。视频压缩由 `plugins.compress-videos.enabled` 控制，关闭时使用源编码封装并移除元数据，仍提供 HLS/MP4；不兼容 MP4 的源编码会报告任务错误。原 `enableVideoCompression` 保留兼容映射，显式 plugin 设置优先。组件 enabled、画廊 zoom/lazyLoad 及搜索开关会传给前台运行时。
 
-```yaml
----
-title: "标题"               # 必填
-date: 2026-05-01            # 必填
-category: travel            # 默认 uncategorized，支持 photography/nature 多级
-tags: [landscape, travel]   # 标签数组
-description: "摘要"          # 缺省从正文截取
-cover: cover.jpg            # 封面文件名，或 video:N / photo:N（媒体索引），留空自动检测（视频截帧 > 首张照片）
-video_mode: stacked         # stacked | playlist
-blocks: []                  # 可选：显式块顺序 [text, gallery, videos, music]（正文含占位符时以占位符为准）
----
-```
+没有显式 `media.timeoutMinutes` 时沿用旧 `build.timeoutMinutes`。处理指纹只包含对应处理器参数；改标题、缓存或部署域名不会使所有文件重新转码。
 
-`views` / `likes` / `dwell_time` 为兼容遗留字段，仅作静态兜底；实时统计以 Durable Object 为准。
+## 环境与 Secrets
+
+Node 脚本仅读取显式环境，不自动加载 `.env` 或 `worker/.dev.vars`。默认检查不访问生产凭据。Worker 本地开发由 Wrangler 加载 `.dev.vars`。
+
+- Worker Secrets：`ADMIN_PASSWORD`、`JWT_SECRET`、`GITHUB_TOKEN`、`R2_ACCESS_KEY`、`R2_SECRET_KEY`、`CF_ACCOUNT_ID`（或 `R2_ENDPOINT`）、`PIPELINE_SECRET`；保留已有 `PROXY_SECRET`。
+- Actions Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`R2_ACCESS_KEY`、`R2_SECRET_KEY`、`R2_ENDPOINT`、`PIPELINE_SECRET`。
+- Actions Variables：`API_TARGET`、`SITE_BRANCH`、`R2_BUCKET`、`ALLOWED_ORIGINS`、`MOSAIC_RUNNER`、`SITE_TIMEOUT_MINUTES`、`MEDIA_TIMEOUT_MINUTES`。未设目标时部署脚本从配置输出域名、分支、项目、桶；push 超时与 runner 必须由 Actions Variables 或工作流默认提供，因为 checkout 前无法读取配置。
+- Pages：站点与后台都设置 `API_TARGET`；IP 签名仍使用两端相同的 `PROXY_SECRET`。基础设施工作流只 PATCH `API_TARGET`，不回写或替换其它 Secret。
+- Worker Variables：`MEDIA_MANIFEST_KEY` 与配置的清单入口一致；`REQUIRE_MEDIA_MIGRATION=true` 在首次迁移前阻止站点发布。部署脚本自动输出这两个字段。
+- 本地构建：`MOSAIC_ROOT`、`MOSAIC_DIST`、`MEDIA_MANIFEST_FILE`；输出目录必须在工作区内且不能覆盖源码或内容。媒体临时目录可用 `MEDIA_WORK_DIR`。
+
+`SITE_BRANCH` 同时覆盖 Worker 内容 API 的 ref 和 Actions 调度分支。切换分支应更新基础设施配置与 Variables，再执行部署。校验命令为 `npm run validate`；后台配置更新也执行相同共享校验。

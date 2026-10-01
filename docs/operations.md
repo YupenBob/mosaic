@@ -1,97 +1,34 @@
-# Mosaic 运维与性能
+# 运维指南
 
-## 构建性能
+## 工作流
 
-### 缓存机制
+| 工作流 | 触发 | 处理范围 |
+| --- | --- | --- |
+| Mosaic Site / pipeline.yml | 内容 push、手动、DO 调度 | 取清单快照、生成、离线检查、浏览器回归、Pages 部署、缓存与确认 |
+| Mosaic Media / media.yml | DO 调度、手动 | 迁移一次、处理队列、验证并发布、清理未引用旧版本 |
+| Mosaic Infrastructure | Worker/后台 push、手动 | 共享校验、Worker dry-run、任务绑定、后台与代理环境配置 |
+| Mosaic Verify | push/PR/手动 | 无生产 Secrets 的完整离线检查、FFmpeg 合成媒体、浏览器测试 |
+| Health Check | 原有定时巡检 | 现有生产健康检查 |
 
-- 媒体 checksum 缓存：`dist/.media-checksums.json`，由 GitHub Actions `actions/cache` 存/取
-- v2 起缓存内包含**产物清单**（每视频档位、封面/照片宽高比），因此缓存命中时 `compress` 秒级跳过，`generate` 仍能正确输出 HLS 与封面
-- 构建期间 checksums 会逐档镜像到 R2 `site-data/media-checksums.json`：构建被取消/超时时，下一次构建从最后完成的档位**续传**，而不是整段视频重转
-- 缓存命中（内容未变）构建约 **3 分钟**；媒体变更时视转码量 10–20 分钟
+生产上传只在媒体 Actions 中执行。站点工作流没有 rclone、EXIF 工具、FFmpeg、checksum cache、原文件同步或媒体上传步骤。部署后仅上传小型 site-data 列表缓存。`API_TARGET`、桶、分支、超时与项目由配置/Variables 输出，密钥由 Secrets 提供。
 
-### 何时会全量重建
+## 排查
 
-- checksum 文件版本升级（如 v1→v2 的首次引导）
-- 新增/修改/删除媒体文件
-- 缓存被 GitHub 清理（7 天无访问或超 10GB）
+- pending 长时间无 run：检查任务 outbox、GitHub Actions 权限、workflow 文件名及 ref、同分支并发。调度失败不丢任务，由 alarm 重试。
+- running 租约到期：中断 runner 会在 lease 到期后进入有限重试，已发布低档不丢失。检查运行日志、FFmpeg 退出状态与 R2 上传验证。
+- failed：后台显示原始错误，解决后重试；默认首次失败之后重试三次。
+- 回调 401：核对 Worker/Actions PIPELINE_SECRET、签名原始 body 与时间戳；不要复用管理员 JWT。
+- 回调 409：租约过期或源被替换/删除，旧任务不得继续发布；检查新 taskId。
+- 已部署仍 dirty：构建开始后有新改动，或源码 SHA 没覆盖最新内容，保持提示是预期行为。
+- 媒体 CORS：R2 公共域允许站点/后台读取 HLS、MP4、MP3；上传允许 PUT 并 expose ETag，分片上传使用签名 endpoint。已有 Transform Rule/PROXY_SECRET 机制保留。
+- 代理 503：为两份 Pages Function 配置 API_TARGET，再发布。基础设施脚本按 Cloudflare PATCH 只更新 API_TARGET，不回写其它 Secret。
 
-### 构建超时与视频转码
+## 清理
 
-- `build.timeoutMinutes`（设置 → 构建）控制单次构建超时，默认 90 分钟（范围 10–360）。后台触发的构建经 `workflow_dispatch` input 传入该值（管线内 `fromJSON` 转整数，字符串会导致 job 无法启动）；push 自动构建无 inputs，固定 90 分钟
-- 视频按档位**升序**（240p→4K）转码并**边转边传**：`videoQuality.uploadAfterTiers`（默认 1 = 每档即传）控制每完成 n 档上传一批（该档 mp4/m3u8/ts 随档即传，poster/master 最后上传）
-- **时间预算保护**：已用时长达到超时值的 85%（默认 90 分钟 → 约 76 分钟）后跳过剩余高档位，用已完成档位生成 master 并继续构建部署；缺失档位由下一次构建续传补齐（续传前对 R2 做 HEAD 校验，缺失即补转）
-- 最终 `worker/scripts/upload-videos.mjs` 为 **reconcile**：对每个本地文件先 HEAD，R2 已存在即跳过、缺失才上传（幂等兜底）
+独立媒体清理扫描 processed 版本，超过 `media.retentionDays` 且没有清单、断点、正在构建或保留部署引用的对象才删除。后台孤儿清理也保护这些引用。缓存刷新重新排队，不删除在线产物。回退见 [migration.md](migration.md)。
 
-### 加速建议
+## 配置与部署
 
-- 视频转码档位受 `videoQuality.maxHeight` 控制：默认 1080p，调低（720p）可显著缩短转码
-- `videoQuality.preset` 调快（如 `ultrafast`）进一步减少耗时，体积略增
-- 视频上传已并入转码流程（随档上传），无需单独等待；reconcile 步骤只补缺失对象
+生产分支默认 main，可通过 SITE_BRANCH 覆盖；Worker 内容 GET 与写入使用同一分支。改配置后核对基础设施 Variables 与 JSON 目标。首次启用必须先部署 Worker 和 Secret，再迁移媒体，最后切换站点工作流；不要将三条初始流程同时启动。
 
-## 媒体分发
-
-### 直连 vs 代理
-
-- 图片/封面：`<img>` 不需要 CORS，直连 `mosaic-media.xsanye.cn`
-- HLS：hls.js 跨域 XHR 需要 CORS。媒体域已配置 **Modify Response Header Transform Rule**（强制 `Access-Control-Allow-Origin: *`），视频对象使用 `Cache-Control: public, max-age=86400`（1 天保守 TTL，先观察再拉长）。上传器会在每次构建时对已有对象做元数据级刷新（CopyObject REPLACE），缓存头变更自动生效。
-
-> 注意：`max-age` 打开后，同名媒体重新转码（源文件同名替换）时边缘缓存最长在 TTL 内提供旧版本。当前 1 天 TTL 已把窗口压到可接受范围；后续若拉长到年级 TTL，应配合内容指纹文件名（转码产物带源文件哈希）。
-
-### CORS 排查
-
-- 浏览器控制台出现 CORS 报错：检查桶级 CORS（`worker/r2-cors.json`）与 Transform Rule
-- 确认请求带 `Origin`（浏览器自动带）；无 Origin 的请求不返回 CORS 头属正常
-
-## Worker 运维
-
-### 部署与 Secrets
-
-```bash
-cd worker
-npx wrangler deploy
-npx wrangler secret list            # 查看已配置
-npx wrangler secret put <NAME>      # 设置：ADMIN_PASSWORD/JWT_SECRET/GITHUB_TOKEN/CF_ACCOUNT_ID/R2_ACCESS_KEY/R2_SECRET_KEY/PROXY_SECRET
-```
-
-### 健康端点与日志
-
-- `/api/health`、`/api/health/github`、`/api/health/r2`
-- 实时日志：`npx wrangler tail`
-
-### 统计（Durable Object）
-
-- 视图/点赞/停留时长由 `StatsDurableObject` 串行写入，单实例保证不丢更新
-- 首次访问自动从 R2 `site-data/stats.json` 迁移历史；此后 DO 为主、stats.json 备份
-- 若需重置统计：清空 DO 存储需谨慎，备份 stats.json 后可重建
-
-### 上传
-
-- 预签名直传：浏览器 → R2，单文件最大 5GB，1 小时有效期
-- Worker 直传兜底：≤100MB（平台请求体上限）
-- 访客 IP 信任：Pages 代理用 `PROXY_SECRET` 对 `IP:分钟桶` 做 HMAC-SHA256 签名（请求头 `X-Mosaic-Proxy-IP / X-Mosaic-Proxy-Time / X-Mosaic-Proxy-Sig`），Worker 校验签名（±2 分钟窗口），失败回退 `CF-Connecting-IP`；旧静态头方案（`X-Mosaic-Proxy` + `X-Real-IP`）兼容一个发布周期后移除。两份代理文件由 `node scripts/sync-proxy.mjs` 从 `shared/pages-proxy.mjs` 同步，勿手改 `functions/api/[[path]].js` 与 `cloud-admin/functions/api/[[path]].js`
-- 管理端点 CORS 白名单：`ALLOWED_ORIGINS`（逗号分隔，默认 `https://mosaic-admin.xsanye.cn`）；`/api/health*`、`/api/stats/*`、`/api/track/*`、`/api/media/*` 保持 `*` 开放
-- 登录限流（5 次/5 分钟）与浏览去重（10 分钟/IP）为 per-isolate 内存实现，多隔离部署下属 best-effort，不保证全局精确
-- R2 用量统计：`site-data/media-usage.json` 快照在每次上传/删除时增量更新；`/api/disk` 优先读快照（24h 内），缺失或过期时全量并行遍历并回写；批量清理（删除文章、cleanup delete、processed-cache）会使快照失效触发重建
-
-## 生产巡检
-
-- `health-check.yml` 每 6 小时运行 `check-site.mjs`，失败即 GitHub 告警
-- 可手动触发：GitHub → Actions → Production Health Check → Run workflow
-
-## 常见问题
-
-| 现象 | 排查 |
-| --- | --- |
-| 登录 503 | `JWT_SECRET` 或 `ADMIN_PASSWORD` 未配置（fail-closed） |
-| 登录 429 | 触发限流，等待 5 分钟 |
-| 视频无法播放 | 媒体域 CORS / Transform Rule；`PROXY_SECRET` 一致性 |
-| 构建慢 | 检查缓存是否命中（见上）；媒体变更属正常 |
-| 上传失败 | 大文件走预签名（>100MB 直传会 413）；确认 Worker R2 凭证 |
-| 统计不涨 | 浏览器是否带 `Origin`（正常请求都带）；DO 冷启动迁移日志 |
-
-## 升级与回滚
-
-- 代码：`git pull` → 推 `main` 触发构建；回滚用 `git revert`
-- Worker：`npx wrangler rollback`
-- Pages：Dashboard → Deployments → 选择历史版本
-- 详见 [migration.md](migration.md)
+相关官方契约：[DO alarms](https://developers.cloudflare.com/durable-objects/api/alarms/)、[Pages 项目 PATCH](https://developers.cloudflare.com/api/typescript/resources/pages/subresources/projects/methods/edit/)。

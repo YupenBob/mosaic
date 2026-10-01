@@ -66,65 +66,32 @@ It turns the whole chain — content authoring, media processing, static publish
 
 | Capability | Description |
 | --- | --- |
-| Incremental builds | Media checksum cache + manifest: compression drops from minutes to seconds on cache hits |
+| Incremental builds | Manifest-only site builds; uploads automatically schedule incremental media jobs |
 | Race-free stats | Views/likes/dwell serialized by a Durable Object |
 | Zero-cost observability | Build progress reporting, scheduled production health checks, full CI tests |
 | Secure by default | JWT + login rate limit, global per-IP track rate limit (Durable Object), upload size/type allowlist, fail-closed config, secret isolation |
 | China-friendly | Pages Functions proxy bypasses workers.dev; self-hosted fonts and Chart.js |
 
-## Architecture
+## Architecture and media processing
 
 ```mermaid
 flowchart LR
-    subgraph Authoring
-      ADMIN[Cloud Admin<br/>cloud-admin]
-      GIT[(GitHub Repo<br/>Markdown + config)]
-    end
-
-    subgraph Compute & Storage
-      ACTIONS[GitHub Actions<br/>compress / transcode / generate]
-      R2[(Cloudflare R2<br/>originals / processed / site-data)]
-      WORKER[Cloudflare Worker<br/>Hono API]
-    end
-
-    subgraph Delivery
-      PAGES[Cloudflare Pages<br/>static site + Functions proxy]
-      SITE[Visitor browser]
-    end
-
-    ADMIN -->|upload media| WORKER
-    WORKER --> R2
-    ADMIN -->|save post / trigger build| WORKER
-    WORKER --> GIT
-    GIT --> ACTIONS
-    ACTIONS --> R2
-    ACTIONS -->|deploy| PAGES
-    SITE --> PAGES
-    SITE -->|direct media| R2
-    PAGES -->|/api/*| WORKER
+  ADMIN[Cloud Admin] -->|upload confirmation| JOBS[Media Jobs Durable Object]
+  ADMIN -->|Markdown and configuration| GIT[GitHub]
+  JOBS -->|batched alarms| MEDIA[media.yml]
+  MEDIA -->|verified publication| MANIFEST[Versioned R2 manifest]
+  JOBS -->|manifest changes| SITE[pipeline.yml]
+  GIT --> SITE
+  MANIFEST -->|fixed snapshot| SITE
+  SITE --> PAGES[Cloudflare Pages]
+  BROWSER[Browser] --> PAGES
+  BROWSER --> R2[Processed media]
+  MEDIA --> R2
 ```
 
-- **Git repo**: single source of truth for content and config
-- **R2 storage**: `originals/` → `processed/` → `site-data/` (stats, dirty flag, build progress)
-- **GitHub Actions**: sync → EXIF strip → compress/transcode → generate → upload → deploy
-- **Worker API**: auth, upload (presigned + fallback), post CRUD, build trigger/progress, stats (Durable Object)
-- **Cloudflare Pages**: frontend + admin, `/api/*` proxied same-origin to the Worker
+Uploads automatically register durable media jobs. The media workflow downloads only changed files and runs separate image, video and audio processors. The site workflow reads source code, Markdown, configuration and a published manifest snapshot; it never downloads originals, invokes FFmpeg or waits for higher video tiers.
 
-## Media pipeline
-
-```mermaid
-flowchart LR
-    A[Admin drag & drop] -->|presigned direct upload| B[(R2 originals)]
-    B -->|rclone sync| C[GitHub Actions]
-    C -->|sharp / ffmpeg| D[processed assets]
-    D -->|rclone upload| E[(R2 processed)]
-    C -->|generate static site| F[Cloudflare Pages]
-    F -->|page references| E
-```
-
-- Images: WebP 480p/720p/1080p + 150px LQIP; video: multi-bitrate HLS (1080p default, 4K configurable) + MP4 fallback; music: MP3 128k/320k
-- Incremental: MD5 cache + asset manifest keeps cache-hit builds around 3 minutes
-- Privacy: EXIF stripped from originals; deterministic CORS keeps HLS playback reliable
+First uploads show a processing placeholder. Replacements keep the previous published output. Verified low video tiers go live first, higher tiers resume automatically, and every expanded HLS master has a new object key. Leases, run IDs and generations reject stale callbacks. Only the signed pipeline can acknowledge the Git SHA and manifest revision deployed successfully.
 
 ## Quick Start
 
@@ -132,7 +99,6 @@ flowchart LR
 git clone https://github.com/YupenBob/mosaic.git
 cd mosaic
 npm install
-npm run compress      # compress media (skip if no local media)
 npm run build         # generate the static site
 npm run serve         # preview at http://localhost:3000
 ```
@@ -176,7 +142,7 @@ Auth-grouped REST endpoints (see [handover.md](handover.md) and [docs/api.md](do
 ## Performance & Reliability
 
 - **Race-free stats**: Durable Object serialized writes, migrated from R2 history
-- **Build caching**: checksum cache + asset manifest; cache-hit builds ≈ 3 minutes; transcodes only on real media changes
+- **Separated processing**: content updates download/process zero originals; `posts-index.json` excludes article bodies, media arrays and waveforms. See [measurements](docs/performance.md)
 - **Direct uploads**: presigned URLs take the browser straight to R2, bypassing Worker relay and the 100MB platform limit
 - **Reliable playback**: HLS direct + deterministic CORS; ABR adapts to bandwidth and player size with retry and auto recovery
 - **Automated guards**: unit/smoke tests in the pipeline; production health check every 6 hours
@@ -185,7 +151,7 @@ Auth-grouped REST endpoints (see [handover.md](handover.md) and [docs/api.md](do
 
 ```
 ├── content/posts/            # posts (Markdown text managed by Git)
-├── scripts/                  # compress / generate / upload / build-progress
+├── scripts/                  # site/ (generation) + media/ (processing) + lib/ (shared context)
 ├── src/                      # frontend templates (EJS) and assets
 │   ├── layouts/              #   index / post / 404
 │   ├── assets/js/            #   gallery / video / music / search / filter ...
@@ -207,7 +173,7 @@ Auth-grouped REST endpoints (see [handover.md](handover.md) and [docs/api.md](do
 2. Deploy Worker: `cd worker && npx wrangler deploy`
 3. Deploy admin: `npx wrangler pages deploy cloud-admin --project-name mosaic-admin`
 4. Configure GitHub Actions secrets (R2 credentials, CF token, Worker secrets)
-5. Push to `main` → the pipeline builds, compresses, and deploys automatically
+5. Follow the [migration guide](docs/migration.md): deploy the coordinator, migrate manifests, then enable the separate workflows
 
 See **[docs/SETUP.md](docs/SETUP.md)** for details.
 

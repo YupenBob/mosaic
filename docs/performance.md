@@ -1,0 +1,31 @@
+# 性能与验收记录
+
+测量日期 2026-10-01，Windows / Node v24.13.1；CI 使用 `.nvmrc` 的 Node 22。原始结果见 [performance.json](performance.json)。
+
+| 项目 | 重构前 | 重构后 |
+| --- | ---: | ---: |
+| 相同 Markdown | 13 篇 | 13 篇 |
+| 已发布图片引用 | 7 项 | 清单中相同 7 项 |
+| 生成器 5 次中位数 | 784 ms | 1410 ms |
+| 列表下载 JSON | 20892 B（完整 posts） | 6701 B（精简索引） |
+| 原文件下载量 | 此生成器对照均为 0 | 0 B / 0 文件 |
+| FFmpeg 调用 | 此生成器对照均为 0 | 0 |
+| 列表冷读 / 再次读 | 旧正常缓存已是一份数据 | 1 次 R2 GET / 0 次 |
+| 媒体变更后的 GitHub 正文请求 | 旧统一脏状态会回退内容读取 | 0 次 |
+
+精简索引比旧完整列表减少 67.9%。兼容完整 `posts.json` 现为 28491 B，增加了媒体 ID、状态与实际档位信息；列表、搜索与后台不下载此文件。索引中没有正文、blocks、媒体数组或波形。
+
+生成器此次测量慢了约 80%，不能据此宣称生成器提速。每次构建清空输出、输出独立索引、复制拆分模块及更多清单字段均有成本。主要验收收益是站点工作流完全移除原文件同步与媒体处理，内容更新的等待时间不再随转码增长。本次没有运行旧生产全量媒体流水线，旧生产下载量及端到端耗时未测，不能由该对照推算速度倍数。
+
+## 方法与复现
+
+基线为 `f277b91076c4035ffa62506089267b4a736d2077` 的生成器，在 `.mosaic/performance-baseline` 中使用相同 Markdown。由旧 JSON 的图片引用生成本地基准清单，保持相同文章、封面、分类标签与图片数；仅用于对照，不宣称这些合成清单项已通过生产 HEAD 核验。两边进程的 PATH 为空，均无 FFmpeg 或 checksum 缓存；计时只包含 generate，排除依赖安装、品牌图生成、minify、部署与媒体工作流。每边启动五个全新 Node 进程，不丢弃第一次，取中位数。
+
+保存对应基线源码、安装其依赖并复制相同 Markdown 后运行：
+
+```powershell
+$env:BENCHMARK_DATE = '2026-10-01'
+node scripts/benchmark-site.mjs .mosaic/performance-baseline
+```
+
+命令重建 `dist/` 并写入 `docs/performance.json`。生产媒体下载量零、无 FFmpeg 和无 checksum 的构建约束由 `tests/site-smoke.mjs` 的隔离临时工作区验证；列表请求数由 `tests/list-index.mjs` 的内存 R2 与禁止 GitHub 请求验证。浏览器路由和 API 测量使用本地 fixture；生产跨域播放另做线上检查。
