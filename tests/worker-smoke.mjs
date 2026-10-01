@@ -244,6 +244,7 @@ function env(overrides = {}) {
     DEV_MODE: 'false',
     R2_PUBLIC_URL: '',
     R2_BUCKET: 'mosaic-media',
+    ALLOWED_ORIGINS: 'https://mosaic-admin.xsanye.cn',
     R2_ACCESS_KEY: 'test-access-key',
     R2_SECRET_KEY: 'test-secret-key',
     CF_ACCOUNT_ID: 'test-account',
@@ -677,7 +678,7 @@ await record('usage snapshot (disk rebuilds, uploads/deletes adjust)', async () 
 });
 
 // ── 14. Build done hook (dirty lifecycle) ──
-await record('build done hook (auth, clear on success, re-mark on failure)', async () => {
+await record('build done hook (auth, browser cannot acknowledge deployment)', async () => {
   const unauth = await call('/api/build/done', { method: 'POST', body: { success: true } });
   assert.equal(unauth.status, 401);
 
@@ -687,12 +688,12 @@ await record('build done hook (auth, clear on success, re-mark on failure)', asy
   const ok = await call('/api/build/done', { method: 'POST', token: TOKEN, body: { success: true } });
   assert.equal(ok.status, 200);
   const after = await (await call('/api/dirty', { token: TOKEN })).json();
-  assert.equal(after.count, 0, 'dirty cleared after successful build');
+  assert.equal(after.count, before.count, 'browser success reports cannot clear dirty state');
 
   const fail = await call('/api/build/done', { method: 'POST', token: TOKEN, body: { success: false } });
   assert.equal(fail.status, 200);
   const reMarked = await (await call('/api/dirty', { token: TOKEN })).json();
-  assert.ok(reMarked.count >= 1, 'dirty re-marked after failed build');
+  assert.equal(reMarked.count, before.count, 'browser failure reports cannot change dirty state');
 });
 
 // ── 15. Build cancel ──

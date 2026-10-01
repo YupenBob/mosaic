@@ -10,7 +10,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { DEFAULTS } from '../../shared/config.mjs';
 import {
   S3Client,
   HeadObjectCommand,
@@ -19,20 +19,11 @@ import {
   ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 export function envOrDev(key) {
-  if (process.env[key]) return process.env[key];
-  try {
-    const dv = fs.readFileSync(path.join(__dirname, '..', '.dev.vars'), 'utf8');
-    const m = dv.match(new RegExp('^' + key + '=(.*)$', 'm'));
-    return m ? m[1].trim() : undefined;
-  } catch {
-    return undefined;
-  }
+  return process.env[key];
 }
 
-export const DEFAULT_BUCKET = process.env.R2_BUCKET || 'mosaic-media';
+export const DEFAULT_BUCKET = process.env.R2_BUCKET || DEFAULTS.mediaSource.bucket;
 
 const CONTENT_TYPE = {
   '.m3u8': 'application/vnd.apple.mpegurl',
@@ -77,6 +68,7 @@ export function getClient() {
 }
 
 export async function uploadFile({ key, filePath, cacheControl = 'no-store', bucket = DEFAULT_BUCKET }) {
+  if (!process.env.GITHUB_RUN_ID) throw new Error('Production media uploads must run in GitHub Actions');
   const client = getClient();
   await client.send(
     new PutObjectCommand({
@@ -144,6 +136,7 @@ export async function listVideoKeys(bucket = DEFAULT_BUCKET) {
  * MetadataDirective REPLACE requires supplying the full metadata set.
  */
 export async function copyWithCacheControl({ key, cacheControl, contentType, bucket = DEFAULT_BUCKET }) {
+  if (!process.env.GITHUB_RUN_ID) throw new Error('Production media metadata updates must run in GitHub Actions');
   const client = getClient();
   // x-amz-copy-source is a header: non-ASCII / special characters must be
   // percent-encoded per path segment (slashes stay as separators).

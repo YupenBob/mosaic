@@ -6,6 +6,7 @@ export default [
     ignores: [
       'node_modules/**',
       'dist/**',
+      '**/.mosaic/**',
       'worker/.wrangler/**',
       '**/vendor/**',
       'test-results/**',

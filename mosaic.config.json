@@ -24,6 +24,15 @@
   "build": {
     "timeoutMinutes": 90
   },
+  "deployment": {
+    "branch": "main",
+    "siteWorkflow": "pipeline.yml",
+    "mediaWorkflow": "media.yml",
+    "siteProject": "mosaic",
+    "adminProject": "mosaic-admin",
+    "workerName": "mosaic-api",
+    "allowedOrigins": ["https://mosaic-admin.xsanye.cn"]
+  },
 
   "theme": "auto",
   "headerNav": [],

@@ -14,7 +14,7 @@ Admin 上传 → R2 originals/ → GitHub Actions 压缩 → R2 processed/ → C
 ```
 
 **禁止**用 Playwright、curl、Node 脚本等从本地上传文件到 R2 来绕过 pipeline bug。
-**必须**从根源修复 pipeline（pipeline.yml、compress 脚本、上传配置）。
+**必须**从根源修复 pipeline（media.yml、独立处理器、上传配置）。
 
 ### 2. 修复问题从根源，不贴膏药
 
@@ -38,8 +38,8 @@ Admin 上传 → R2 originals/ → GitHub Actions 压缩 → R2 processed/ → C
 - **内容管理**：GitHub Repo（Markdown + frontmatter）
 - **媒体存储**：Cloudflare R2（originals/ + processed/）
 - **计算层**：GitHub Actions（压缩、转码、构建）
-- **API 层**：Cloudflare Workers（认证、预签名上传、文章/配置/构建、Durable Object 统计）
+- **API 层**：Cloudflare Workers（认证、预签名上传、文章/配置/构建、独立 Stats / Jobs Durable Object）
 - **前端**：Cloudflare Pages（静态站点 + Pages Functions 代理）
 - **管理面板**：Cloudflare Pages（独立项目 mosaic-admin）
-- **媒体管线**：originals → 压缩/转码 → processed；EXIF 自动剥离；checksum 缓存 + 产物清单实现增量构建
-- **自动化**：管线内置测试，`health-check.yml` 定期巡检线上
+- **媒体管线**：originals → 压缩/转码 → processed；EXIF 自动剥离；持久化 Jobs DO + 版本化清单驱动增量处理；站点构建不下载原文件、不执行 FFmpeg
+- **自动化**：verify.yml 无凭据离线验证，`health-check.yml` 定期巡检线上

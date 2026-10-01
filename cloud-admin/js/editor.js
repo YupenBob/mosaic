@@ -16,7 +16,7 @@ let previewVisible = false;
 let previewTimer = null;
 
 function getEditorMedia() {
-  return window._editorMedia || { photos: [], videos: [], music: [] };
+  return state.editor.media || { photos: [], videos: [], music: [] };
 }
 
 // Parse the markdown body into editor blocks (mirrors scripts/blocks.mjs:
@@ -498,6 +498,15 @@ export default async function renderEditor(signal) {
       </div>
     `,
     onMount() {
+      signal.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(previewTimer);
+          clearTimeout(draftTimer);
+          state.editor.draftSnapshot = null;
+        },
+        { once: true },
+      );
       state.editorDirty = false;
       state.editorDraftKey = slug || null;
       wireEditorInputs();
@@ -505,9 +514,9 @@ export default async function renderEditor(signal) {
       renderBlocksFromBody();
       updateCoverPreview();
       if (slug) loadExistingMedia(slug);
-      window._draftSnapshot = null;
+      state.editor.draftSnapshot = null;
       if (draft) {
-        window._draftSnapshot = draft;
+        state.editor.draftSnapshot = draft;
       }
     },
   };
@@ -573,7 +582,7 @@ function wireEditorInputs() {
 }
 
 window.restoreDraft = () => {
-  const d = window._draftSnapshot;
+  const d = state.editor.draftSnapshot;
   if (!d) return;
   const set = (id, v) => {
     const el = document.getElementById(id);
@@ -594,7 +603,7 @@ window.restoreDraft = () => {
   updateCoverPreview();
   document.getElementById('draft-banner')?.remove();
   toast(t('editor.draftRestored'), 'success');
-  window._draftSnapshot = null;
+  state.editor.draftSnapshot = null;
 };
 
 window.discardDraft = () => {
@@ -602,7 +611,7 @@ window.discardDraft = () => {
     localStorage.removeItem(draftKey(state.params.slug || '__new'));
   } catch {}
   document.getElementById('draft-banner')?.remove();
-  window._draftSnapshot = null;
+  state.editor.draftSnapshot = null;
   toast(t('editor.draftDiscarded'), 'info', 2500);
 };
 
@@ -722,7 +731,7 @@ async function renderPreview() {
   const slug = getCurrentSlug();
   // Isolate standalone placeholder lines so Markdown renders the rest, then
   // swap tokens for live preview cards (same rules as scripts/blocks.mjs).
-  const media = window._editorMedia || { photos: [], videos: [], music: [] };
+  const media = state.editor.media || { photos: [], videos: [], music: [] };
   const lines = raw.split('\n');
   const cards = [];
   const protectedLines = lines.map((line, i) => {
@@ -937,7 +946,7 @@ export async function loadExistingMedia(slug) {
     const photos = data.photos || [];
     const videos = data.videos || [];
     const music = data.music || [];
-    window._editorMedia = { photos, videos, music };
+    state.editor.media = { photos, videos, music };
     let html = `<div class="editor-section-title">${t('editor.existingMedia')}</div>`;
     if (!photos.length && !videos.length && !music.length) {
       html += `<p class="media-empty">${t('editor.noMedia')}</p>`;

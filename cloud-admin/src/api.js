@@ -6,6 +6,10 @@
 const API_BASE = (typeof __API_BASE__ !== 'undefined' ? __API_BASE__ : '') || '/api';
 
 let _token = null;
+let navigationSignal = null;
+export function setNavigationSignal(signal) {
+  navigationSignal = signal;
+}
 
 /** Get or refresh auth token */
 export function getToken() {
@@ -33,12 +37,16 @@ export function setToken(t) {
 }
 
 /** Base fetch with auth header and error handling */
-async function apiFetch(path, options = {}) {
+export async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const resp = await fetch(`${API_BASE}${path}`, {
+    signal: options.signal || navigationSignal || undefined,
+    ...options,
+    headers,
+  });
 
   if (resp.status === 401) {
     // Token expired — clear and redirect to login
@@ -53,6 +61,7 @@ async function apiFetch(path, options = {}) {
     const body = await resp.json().catch(() => ({}));
     const err = new Error(body.error || `HTTP ${resp.status}`);
     err.status = resp.status;
+    err.code = body.code;
     throw err;
   }
 
@@ -101,6 +110,12 @@ export const media = {
 
   delete: (slug, file, type = 'photos') =>
     apiFetch(`/media/${encodeURIComponent(slug)}/${encodeURIComponent(file)}?type=${type}`, { method: 'DELETE' }),
+};
+export const mediaJobs = {
+  list: (options = {}) => apiFetch('/media-jobs', options),
+  get: (id) => apiFetch(`/media-jobs/${encodeURIComponent(id)}`),
+  retry: (id) => apiFetch(`/media-jobs/${encodeURIComponent(id)}/retry`, { method: 'POST' }),
+  cancel: (id) => apiFetch(`/media-jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
 };
 
 // ── Upload (direct to Worker → R2) ─
@@ -153,7 +168,7 @@ export const upload = {
 export const build = {
   status: () => apiFetch('/build/status'),
 
-  /** Report build completion: {success: true} clears the dirty flag, false re-marks it. */
+  /** Compatibility probe; deployment acknowledgement is reserved for the signed pipeline. */
   done: (body = {}) => apiFetch('/build/done', { method: 'POST', body: JSON.stringify(body) }),
 
   /** Cancel the currently running build. */

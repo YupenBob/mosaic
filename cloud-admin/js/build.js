@@ -5,6 +5,7 @@
 import { build } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
+import { mountMediaJobs } from './jobs.js';
 import {
   escHtml,
   formatTime,
@@ -95,6 +96,7 @@ export default async function renderBuild(signal) {
           <span>${t('build.streamingNote')} ${t('build.timeoutNote')}</span>
         </div>
 
+        <section class="card media-jobs" aria-labelledby="media-jobs-title"><h2 id="media-jobs-title">${t('jobs.title')}</h2><div id="media-job-list" role="status">${t('common.loading')}</div></section>
         <div class="build-summary">
           <div class="dash-big-card build-summary-card"><span class="dash-big-num">${summary.successRate}</span><span class="dash-big-label">${t('build.successRate')}</span></div>
           <div class="dash-big-card build-summary-card"><span class="dash-big-num">${summary.avgDur}</span><span class="dash-big-label">${t('build.avgDuration')}</span></div>
@@ -117,6 +119,7 @@ export default async function renderBuild(signal) {
       </div>
     `,
     onMount() {
+      mountMediaJobs(signal);
       window.setBuildTriggerStates && window.setBuildTriggerStates(initialRunning);
       let durTicker, pollTimer;
       let lastPollAt = Date.now();
@@ -179,14 +182,11 @@ export default async function renderBuild(signal) {
               if (s.conclusion === 'success') {
                 toast(t('build.terminalSuccess', { n: s.runNumber }), 'success', 6000);
                 document.title = t('build.terminalSuccess', { n: s.runNumber }) + ' — Mosaic Cloud Admin';
-                build.done({ success: true }).catch(() => {});
               } else if (s.conclusion === 'failure') {
                 toast(t('build.terminalFailed', { n: s.runNumber }), 'error', 9000);
                 document.title = t('build.terminalFailed', { n: s.runNumber }) + ' — Mosaic Cloud Admin';
-                build.done({ success: false }).catch(() => {});
               } else if (s.conclusion === 'cancelled') {
                 toast(t('build.cancelled'), 'info', 6000);
-                build.done({ success: false }).catch(() => {});
               }
               window.checkDirty && window.checkDirty();
             }
@@ -248,7 +248,7 @@ export default async function renderBuild(signal) {
         hidePipelineTip();
         clearStepHighlight();
       };
-      window.addEventListener('hashchange', cleanup, { once: true });
+      signal.addEventListener('abort', cleanup, { once: true });
     },
   };
 }
@@ -766,7 +766,6 @@ async function renderBuildDetail(signal, runId) {
       }, 5000);
       const stop = () => clearInterval(timer);
       signal.addEventListener('abort', stop, { once: true });
-      window.addEventListener('hashchange', stop, { once: true });
     },
   };
 }

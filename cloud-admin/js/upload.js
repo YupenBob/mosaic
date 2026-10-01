@@ -3,14 +3,12 @@
  * retry/cancel, thumbnails and graceful handling when the post isn't saved.
  */
 import { upload, getToken } from '../src/api.js';
+import { state } from './state.js?v=1';
 import { t } from './i18n.js?v=1';
 import { escHtml } from './ui.js?v=1';
 
-const CONCURRENCY = 3;
+const settings = () => state.config.upload || {};
 // Files above this size use resumable multipart uploads (R2 part uploads).
-const MULTIPART_THRESHOLD = 100 * 1024 * 1024;
-const MP_CONCURRENCY = 3;
-const MP_PART_RETRIES = 3;
 const MP_STATE_PREFIX = 'mosaic_mp_';
 
 function mpStateKey(slug, filename) {
@@ -98,7 +96,7 @@ export function handleUploadFiles(files) {
 
   let index = 0;
   const runners = [];
-  for (let i = 0; i < Math.min(CONCURRENCY, queue.length); i++) {
+  for (let i = 0; i < Math.min(settings().concurrency || 3, queue.length); i++) {
     runners.push(work());
   }
   Promise.all(runners).then(() => {
@@ -241,7 +239,7 @@ async function runSingle(item) {
 
 async function uploadFilePresigned(item) {
   // Large files: resumable multipart (parts upload straight to R2).
-  if (item.file.size > MULTIPART_THRESHOLD) return uploadFileMultipart(item);
+  if (item.file.size > (settings().multipartThreshold || 104857600)) return uploadFileMultipart(item);
 
   let presigned;
   try {
@@ -292,7 +290,8 @@ async function uploadFilePresigned(item) {
 }
 
 async function uploadFileMultipart(item) {
-  const { slug, filename, file } = item;
+  const { slug, file } = item;
+  const filename = file.name;
   const stored = mpLoad(slug, filename, file.size);
   let started;
   try {
@@ -336,7 +335,7 @@ async function uploadFileMultipart(item) {
 async function runParts(item, pending, partSize) {
   let idx = 0;
   const workers = [];
-  for (let i = 0; i < Math.min(MP_CONCURRENCY, pending.length); i++) workers.push(worker());
+  for (let i = 0; i < Math.min(settings().partConcurrency || 3, pending.length); i++) workers.push(worker());
   await Promise.all(workers);
 
   async function worker() {
@@ -350,7 +349,7 @@ async function runParts(item, pending, partSize) {
 
 async function uploadPartWithRetry(item, part, partSize) {
   let lastErr;
-  for (let attempt = 1; attempt <= MP_PART_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= (settings().partRetries || 3); attempt++) {
     if (item.status === 'cancelled') throw new Error('Cancelled');
     try {
       await uploadPartXhr(item, part, partSize);
@@ -436,9 +435,11 @@ function uploadFileDirect(item) {
   });
 }
 
+const wiredUploadRoots = new WeakSet();
 export function setupUploadZone() {
   const main = document.getElementById('main-content');
-  if (!main) return;
+  if (!main || wiredUploadRoots.has(main)) return;
+  wiredUploadRoots.add(main);
 
   main.addEventListener('click', (e) => {
     const zone = e.target.closest('.upload-zone');

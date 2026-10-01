@@ -45,3 +45,7 @@ export function $(selector, parent) {
 export function $$(selector, parent) {
   return Array.from((parent || document).querySelectorAll(selector));
 }
+export function resolveMediaUrl(value, base = '', slug = '') {
+  if (/^(https?:\/\/|\/)/.test(value || '')) return value;
+  return `${base}posts/${encodeURIComponent(slug)}/${value || ''}`;
+}

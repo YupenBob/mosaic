@@ -67,19 +67,18 @@ async function main() {
 
     const cmd = [
       'npx playwright test tests/frontend.spec.js',
-      // mobile viewport needs an R2-synced media manifest (CI has it; a local
-      // checkout doesn't), so it runs in the pipeline but not in local mode.
-      '--grep-invert "Worker health|mobile viewport|admin login"',
+      // Media interactions run against local fixtures in frontend-local.mjs.
+      '--grep "homepage loads|images use R2|category page stylesheet|search filters"',
       '--reporter=list',
     ].join(' ');
     const result = spawnSync(cmd, {
       cwd: ROOT,
       stdio: 'inherit',
       shell: true,
-      env: { ...process.env, SITE: `http://${HOST}:${port}`, ADMIN: 'skip' },
+      env: { ...process.env, SITE: `http://${HOST}:${port}`, ADMIN: 'skip', MOSAIC_OFFLINE: '1' },
       timeout: 10 * 60 * 1000,
     });
-    process.exit(result.status ?? 1);
+    process.exitCode = result.status ?? 1;
   } finally {
     server.kill();
   }

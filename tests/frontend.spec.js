@@ -15,6 +15,10 @@ const MEDIA = (process.env.MEDIA || 'https://mosaic-media.xsanye.cn').replace(/\
 const SKIP_ADMIN = !ADMIN || ADMIN === 'skip';
 
 test.beforeEach(async ({ page }) => {
+  if (process.env.MOSAIC_OFFLINE === '1')
+    await page.route('**/*', (route) =>
+      new URL(route.request().url()).origin === new URL(SITE).origin ? route.continue() : route.abort(),
+    );
   // Abort slow/irrelevant third-party scripts so domcontentloaded isn't blocked by CDNs
   await page.route(/(cdn\.jsdelivr\.net|busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) =>
     route.abort(),

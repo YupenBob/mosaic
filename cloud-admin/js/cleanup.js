@@ -2,15 +2,15 @@
  * Cleanup page — orphan file cleanup + processed cache cleanup with
  * indeterminate progress, copy-path actions and typed confirmation.
  */
-import { getToken } from '../src/api.js';
+import { apiFetch } from '../src/api.js';
+import { state } from './state.js?v=1';
+import { pageTimeout } from './lifecycle.js';
 import { t } from './i18n.js?v=1';
 import { escHtml, modalConfirm, copyText, fmtSize } from './ui.js?v=1';
 
 export default async function renderCleanup() {
-  const API = window.__API_BASE__ || '/api';
-  const hp = { Authorization: 'Bearer ' + (getToken() || '') };
   try {
-    const data = await fetch(API + '/cleanup', { headers: hp }).then((r) => r.json());
+    const data = await apiFetch('/cleanup');
     const orphans = data.orphans || [];
     const total = (data.totalSize / 1048576).toFixed(1);
     window._orphanCount = data.totalOrphans || 0;
@@ -83,21 +83,24 @@ window.doCleanup = () => {
     t('cleanup.confirmOrphan'),
     t('cleanup.confirmOrphanDesc', { n }),
     async () => {
-      const API = window.__API_BASE__ || '/api';
-      const hp = { Authorization: 'Bearer ' + (getToken() || '') };
+      const signal = state.pageScope?.signal;
       const btn = document.getElementById('btn-cleanup');
       if (btn) btn.style.display = 'none';
       showIndeterminate(t('cleanup.deleting'));
       try {
-        const result = await fetch(API + '/cleanup', { method: 'DELETE', headers: hp }).then((r) => r.json());
+        const result = await apiFetch('/cleanup', { method: 'DELETE', signal });
         if (result.error) {
           showResult(t('common.error') + ': ' + result.error, true);
           return;
         }
         showResult(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), false);
-        setTimeout(() => {
-          location.reload();
-        }, 1600);
+        pageTimeout(
+          () => {
+            location.reload();
+          },
+          1600,
+          signal,
+        );
       } catch (e) {
         showResult(e.message, true);
       }
@@ -111,21 +114,29 @@ window.doClearCache = () => {
     t('cleanup.confirmCache'),
     t('cleanup.confirmCacheDesc'),
     async () => {
-      const API = window.__API_BASE__ || '/api';
-      const hp = { Authorization: 'Bearer ' + (getToken() || '') };
+      const signal = state.pageScope?.signal;
       const btn = document.getElementById('btn-clear-cache');
       if (btn) btn.style.display = 'none';
       showIndeterminate(t('cleanup.deletingCache'));
       try {
-        const result = await fetch(API + '/processed-cache', { method: 'DELETE', headers: hp }).then((r) => r.json());
+        const result = await apiFetch('/processed-cache', { method: 'DELETE', signal });
         if (result.error) {
           showResult(t('common.error') + ': ' + result.error, true);
           return;
         }
-        showResult(t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }), false);
-        setTimeout(() => {
-          location.reload();
-        }, 1600);
+        showResult(
+          result.retained
+            ? t('cleanup.reprocessQueued')
+            : t('common.deleted', { count: result.deleted, size: result.freedMB + ' MB' }),
+          false,
+        );
+        pageTimeout(
+          () => {
+            location.reload();
+          },
+          1600,
+          signal,
+        );
       } catch (e) {
         showResult(e.message, true);
       }

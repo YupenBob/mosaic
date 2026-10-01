@@ -5,6 +5,8 @@
 import { isDirty, listPosts } from '../github.js';
 import { invalidateUsageSnapshot } from '../usage.js';
 import { getDiskUsage, scanOrphans } from '../shared.js';
+import { reconcileMedia } from '../services/jobs.js';
+import { getConfig } from '../services/site-config.js';
 
 export function registerAdmin(app) {
   // Dirty state query
@@ -18,7 +20,7 @@ export function registerAdmin(app) {
 
   app.get('/api/disk', async (c) => {
     try {
-      const { size: totalSize, objects: totalObjects } = await getDiskUsage(c.env);
+      const { size: totalSize, objects: totalObjects } = await getDiskUsage(c.env, await getConfig(c));
       const GB = totalSize / 1024 / 1024 / 1024;
       const cost = (GB * 0.015).toFixed(2); // R2 storage: $0.015/GB/month
       return c.json({
@@ -36,7 +38,7 @@ export function registerAdmin(app) {
 
   app.get('/api/cleanup', async (c) => {
     try {
-      const posts = await listPosts(c).catch(() => []);
+      const posts = await listPosts(c);
       const valid = new Set(posts.map((p) => p.slug));
       const { orphans } = await scanOrphans(c.env, valid, 'list');
       const total = orphans.reduce((a, o) => a + o.size, 0);
@@ -48,7 +50,7 @@ export function registerAdmin(app) {
 
   app.delete('/api/cleanup', async (c) => {
     try {
-      const posts = await listPosts(c).catch(() => []);
+      const posts = await listPosts(c);
       const valid = new Set(posts.map((p) => p.slug));
       const { deleted, freed } = await scanOrphans(c.env, valid, 'delete');
       return c.json({ deleted, freed, freedMB: (freed / 1048576).toFixed(1) });
@@ -60,6 +62,8 @@ export function registerAdmin(app) {
   // Processed cache cleanup — delete all processed/ objects from R2
   app.delete('/api/processed-cache', async (c) => {
     try {
+      if (c.env.JOBS)
+        return c.json({ ...(await reconcileMedia(c, true)), deleted: 0, freed: 0, freedMB: '0.0', retained: true });
       let deleted = 0,
         freed = 0,
         cursor;

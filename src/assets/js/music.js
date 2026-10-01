@@ -347,10 +347,10 @@ function getMiniPlayer() {
       <span class="music-mini-duration" style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-tertiary)"></span>
       <div class="music-mini-controls">
         <button class="music-mini-btn" data-music-action="loop" title="Loop mode"><i class="ri-repeat-line"></i></button>
-        <button class="music-mini-btn" data-music-action="prev"><i class="ri-skip-back-fill"></i></button>
-        <button class="music-mini-btn play-btn" data-music-action="play"><i class="ri-play-fill"></i></button>
-        <button class="music-mini-btn" data-music-action="next"><i class="ri-skip-forward-fill"></i></button>
-        <button class="music-mini-btn music-mini-close" data-music-action="close"><i class="ri-close-line"></i></button>
+        <button class="music-mini-btn" data-music-action="prev" aria-label="Previous track"><i class="ri-skip-back-fill"></i></button>
+        <button class="music-mini-btn play-btn" data-music-action="play" aria-label="Play/Pause"><i class="ri-play-fill"></i></button>
+        <button class="music-mini-btn" data-music-action="next" aria-label="Next track"><i class="ri-skip-forward-fill"></i></button>
+        <button class="music-mini-btn music-mini-close" data-music-action="close" aria-label="Close music player"><i class="ri-close-line"></i></button>
       </div>
     `;
     document.body.appendChild(el);
@@ -438,4 +438,4 @@ export function initMusicPlayer() {
 }
 
 // Expose for EJS templates to inject track data
-window.__MUSIC_TRACKS = [];
+window.__MUSIC_TRACKS ||= [];

@@ -4,6 +4,8 @@
 import { listPosts, getPost, createOrUpdatePost, deletePost, markDirty } from '../github.js';
 import { invalidateUsageSnapshot } from '../usage.js';
 import { defer } from '../shared.js';
+import { invalidateMedia } from '../services/jobs.js';
+import { protectedMediaKeys } from '../services/media-references.js';
 
 export function registerPosts(app) {
   // Posts CRUD
@@ -38,7 +40,7 @@ export function registerPosts(app) {
       const { slug, frontMatter, body, message } = await c.req.json();
       if (!slug) return c.json({ error: 'slug required', code: 'INVALID_PARAMS' }, 400);
       const result = await createOrUpdatePost(c, slug, frontMatter, body, message);
-      defer(c, () => markDirty(c.env));
+      await markDirty(c.env, result.commit?.sha || '');
       return c.json({ ok: true, slug, sha: result.content?.sha }, 201);
     } catch (e) {
       return c.json(
@@ -55,9 +57,11 @@ export function registerPosts(app) {
 
       // Delete from GitHub
       const result = await deletePost(c, slug, message);
+      await invalidateMedia(c.env, slug);
 
       // Delete from R2 (originals + processed)
       let r2Count = 0;
+      const protectedKeys = await protectedMediaKeys(c.env);
       for (const prefix of ['originals', 'processed']) {
         let cursor;
         do {
@@ -66,6 +70,7 @@ export function registerPosts(app) {
             if (cursor) opts.cursor = cursor;
             const list = await c.env.MEDIA.list(opts);
             for (const obj of list.objects || []) {
+              if (protectedKeys.has(obj.key)) continue;
               await c.env.MEDIA.delete(obj.key);
               r2Count++;
             }

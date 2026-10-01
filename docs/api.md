@@ -1,142 +1,63 @@
-# Mosaic API 参考
+# Worker API
 
-Base URL：`https://mosaic-api.xsanye.cn`（前台与后台经 Pages Functions 同源代理到 `/api/*`，无需跨域）。
+前台和后台均可使用 Pages `/api/*` 代理。受保护接口用 `Authorization: Bearer <JWT>`；登录为 `POST /api/auth/login`，body 为 `{password}`。内部流水线使用独立签名，管理员 JWT 不被接受为发布凭据。
 
-## 认证
-
-### 登录
-
-`POST /api/auth/login`
-
-```json
-{ "password": "..." }
-```
-
-返回：`{ "token": "<jwt>", "expires": 86400 }`。后续请求在 `Authorization: Bearer <token>` 头携带。
-
-安全默认：
-- `JWT_SECRET` 未配置且已设 `ADMIN_PASSWORD` → 503 fail-closed（不签发、不校验）
-- `ADMIN_PASSWORD` 未配置 → 仅当 `DEV_MODE=true` 才允许无鉴权
-- 登录失败限流：5 次失败 / 5 分钟 / IP（IP 经 Pages 代理的 `X-Real-IP` + `PROXY_SECRET` 签名识别）
-
-### 刷新
-
-`POST /api/auth/refresh` —— 携带有效 JWT 调用即成功（用于前端启动时校验）。
-
-## 公开端点（无需认证）
+## 内容与原有接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/health` | 健康检查 |
-| GET | `/api/health/github` | GitHub 真实探测（rate_limit，返回 latency/httpStatus） |
-| GET | `/api/health/r2` | R2 真实探测（head 探测，返回 latency） |
-| POST | `/api/track/view/:slug` | 浏览计数 +1（IP 去重 10 分钟） |
-| POST | `/api/track/like/:slug` | 点赞/取消点赞，body `{"action":"like"\|"unlike"}` |
-| POST | `/api/track/dwell/:slug` | 停留时长上报，body `{"seconds":N}`（上限 7200） |
+| GET | `/api/health`、`/api/health/github`、`/api/health/r2` | 健康探针 |
+| GET | `/api/posts?limit=&cursor=` | 精简文章列表；无正文和波形 |
+| GET | `/api/posts/:slug` | 编辑所需 Markdown/frontMatter/SHA |
+| POST | `/api/posts` | 创建或保存 `{slug,frontMatter,body,message}` |
+| DELETE | `/api/posts/:slug` | 删除、撤销处理任务；保护部署引用 |
+| POST | `/api/posts/:slug/duplicate` | 复制文本内容 |
+| GET / PUT | `/api/config` | 共享默认值与校验，处理参数变化自动协调任务 |
+| GET / PUT / DELETE | `/api/taxonomy` 及 category/tag 子路径 | 分类标签管理 |
+| GET | `/api/dirty` | DO 持久化变更状态 |
+| GET | `/api/stats`、`/api/stats/posts`、`/api/stats/traffic` | 后台统计 |
+| GET | `/api/stats/:slug` | 公开单篇统计 |
+| POST | `/api/track/view/:slug`、`/api/track/like/:slug`、`/api/track/dwell/:slug` | 统计写入，保留 DO 与限流 |
+| GET / DELETE | `/api/cleanup` | 孤儿清理，排除被部署引用的对象 |
+| DELETE | `/api/processed-cache` | 有 JOBS 时重新排队，返回 queued/retained；不会清空在线产物 |
 
-> 公开 track 端点有每 IP 每分钟 60 次的频率限制（超出返回 429 `TRACK_RATE_LIMITED`）。
-> Worker 中间件先挡掉单 isolate 突发，Stats Durable Object（全局单实例）再执行全局计数，
-> 跨 Worker isolate 分散的请求同样会被限制；正常访客流量远低于该阈值。
-| GET | `/api/stats/traffic` | 30 天流量聚合（byDay/byCategory/byTag/top5） |
-| GET | `/api/stats/:slug` | 单篇实时统计 `{views, likes, dwell_time}` |
-| GET | `/api/media/file/:slug/:filename` | 文件服务（向后兼容，搜索 processed + originals） |
+## 上传
 
-## 需认证端点
+| 方法 | 路径 | 输入 / 响应 |
+| --- | --- | --- |
+| POST | `/api/upload/direct/:slug/:filename` | 原始二进制 body；平台大小限制仍适用 |
+| POST | `/api/upload/presign` | `{slug,filename,contentType}` → 签名 PUT URL |
+| POST | `/api/upload/complete/:slug/:filename` | HEAD 验证上传，再登记任务 |
+| POST | `/api/upload/multipart/start` | `{slug,filename,size,contentType,uploadId?}` → 分片 URL，可恢复 |
+| POST | `/api/upload/multipart/parts` | `{slug,filename,uploadId}` → 已上传分片 |
+| POST | `/api/upload/multipart/complete` | 同上；服务端核验并组装分片，再登记任务 |
+| POST | `/api/upload/multipart/abort` | 同上，取消尚未完成的上传 |
+| GET / DELETE | `/api/media/:slug/list`、`/api/media/:slug/:file` | 后台媒体列表与删除 |
 
-### 文章
+三种上传完成响应兼容原字段并增加 `taskId`、`status`。重复确认同一源 ETag 和配置指纹返回同一 taskId 与 `duplicate:true`。分片任务保存 uploadId 作为完成收据，重复 complete 不会再次组装或登记。未完成上传不会发布清单引用。
+
+## 媒体任务
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/posts?limit=&cursor=` | 文章列表（分页；不带参数返回全部） |
-| GET | `/api/posts/:slug` | 单篇详情（frontmatter + body） |
-| POST | `/api/posts` | 新建/更新，body `{slug, frontMatter, body, message?}` |
-| POST | `/api/posts/:slug/duplicate` | 复制文章，body `{newSlug?}` |
-| DELETE | `/api/posts/:slug` | 删除文章（含 R2 originals + processed） |
+| GET | `/api/media-jobs` | 精简任务列表，无配置、租约、断点波形 |
+| GET | `/api/media-jobs/:id` | 详情、源身份、重试次数、已发布断点 |
+| POST | `/api/media-jobs/:id/retry` | 重置重试预算并重新排队 |
+| POST | `/api/media-jobs/:id/cancel` | 撤销单任务租约，不取消同批其它文件 |
+| POST | `/api/media-jobs/reconcile` | 按当前配置核验源版本，增量排队 |
 
-### 配置
+旧任务被替换或删除后重试/回调返回 409，不会恢复被删除媒体。
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/config` | 读取 `mosaic.config.json` |
-| PUT | `/api/config` | 更新（**深合并**，不会丢嵌套字段） |
+## 站点部署
 
-### 构建
+保留 `/api/build` 与 `/api/build/{status,history,run/:id,progress,cancel,done}`。`POST /api/build` 只调度站点工作流。`POST /api/build/done` 仅返回兼容确认 `acknowledged:false`，不会清空脏标记。进度绑定 runId，部署记录含 gitSha/mediaRevision。
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| POST | `/api/build` | 触发构建（workflow_dispatch，回退 push-trigger）；进行中返回 409 |
-| GET | `/api/build/status` | 最近一次运行状态（含步骤明细） |
-| GET | `/api/build/history` | 最近 10 次运行 |
-| GET | `/api/build/progress` | 管线实时进度（R2 `site-data/build-progress.json`） |
-| POST | `/api/build/done` | 构建完成回执：body `{success:true}` 清除脏标记，`false` 重新标记 |
-| POST | `/api/build/cancel` | 取消进行中的构建（需 token 有 actions:write） |
+## 内部流水线契约
 
-### 媒体
+`POST /api/internal/media/{claim,heartbeat,publish,complete,failed,import,state}`；`POST /api/internal/site/{begin,progress,done}`。
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/media/:slug/list` | 媒体列表（按扩展名分 photos/videos/music） |
-| DELETE | `/api/media/:slug/:file` | 删除单个媒体（originals + processed，分页遍历） |
-| POST | `/api/upload/presign` | 生成直传 URL，body `{slug, filename, contentType?}` → `{url, key, folder, expires}` |
-| POST | `/api/upload/complete/:slug/:filename` | 确认直传落地并标脏；对象不存在返回 404 |
-| POST | `/api/upload/multipart/start` | 大文件分片（可续传）：body `{slug, filename, size, contentType?, uploadId?}` → `{uploadId, partSize, partCount, parts[]}`；传 `uploadId` 表示续传同一上传 |
-| POST | `/api/upload/multipart/parts` | 查询已上传分片，body `{slug, filename, uploadId}` → `{parts:[{partNumber,size,etag}]}` |
-| POST | `/api/upload/multipart/complete` | 完成分片上传并标脏；无分片返回 400 |
-| POST | `/api/upload/multipart/abort` | 放弃并清理分片上传 |
-| POST | `/api/upload/direct/:slug/:filename` | Worker 直传兜底（≤100MB），body 为文件本体 |
+签名头：`X-Mosaic-Time` 为毫秒时间戳，`X-Mosaic-Signature` 为 `HMAC-SHA256(PIPELINE_SECRET, timestamp + '.' + 原始 JSON body)` 的小写十六进制。时间窗为 5 分钟。
 
-### 分类标签
+媒体 claim 返回带 token、runId、generation、source、配置和 checkpoint 的任务；后续回调都带 `{id,token,runId}`。publish 先验证对象 HEAD，再更新 `published`。complete 的 `complete:false` 表示仍有高档待续跑；failed 消耗有限重试预算。site begin 返回固定清单和构建 token，后续 done 成功只确认已覆盖的变更。
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/taxonomy` | 分类/标签统计 |
-| PUT | `/api/taxonomy/category` | 重命名分类，body `{oldName, newName}` |
-| PUT | `/api/taxonomy/tag` | 重命名标签 |
-| DELETE | `/api/taxonomy/category` | 从所有文章移除分类，body `{name}` |
-| DELETE | `/api/taxonomy/tag` | 从所有文章移除标签 |
-
-### 统计与运维
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/stats` | 站点统计（文章/分类/标签数量） |
-| GET | `/api/stats/posts` | 批量文章实时统计（60s 缓存） |
-| GET | `/api/disk` | R2 用量与费用估算（60s 缓存，并行遍历） |
-| GET | `/api/cleanup` | 扫描孤儿文件 |
-| DELETE | `/api/cleanup` | 删除孤儿文件 |
-| DELETE | `/api/processed-cache` | 清空 processed/ 缓存 |
-| GET | `/api/dirty` | 未构建变更计数 |
-| GET | `/api/trash` | 回收站（stub，返回空数组） |
-
-## 错误格式
-
-```json
-{ "error": "Human readable message", "code": "MACHINE_CODE" }
-```
-
-常见错误码：`AUTH_REQUIRED` / `AUTH_EXPIRED` / `AUTH_RATE_LIMITED` / `CONFIG_ERROR` / `NOT_FOUND` / `INVALID_PARAMS` / `PAYLOAD_TOO_LARGE` / `GITHUB_ERROR` / `R2_ERROR` / `BUILD_RUNNING` / `SLUG_CONFLICT`。
-
-## 预签名上传示例
-
-```bash
-# 1. 登录拿 token
-TOKEN=$(curl -s -X POST https://mosaic-api.xsanye.cn/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"password":"..."}' | jq -r .token)
-
-# 2. 获取直传 URL
-URL=$(curl -s -X POST https://mosaic-api.xsanye.cn/api/upload/presign \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"slug":"my-post","filename":"clip.mp4"}' | jq -r .url)
-
-# 3. 直连 R2 上传（不经 Worker 中转）
-curl -X PUT "$URL" --data-binary @clip.mp4
-
-# 4. 确认并标脏
-curl -s -X POST https://mosaic-api.xsanye.cn/api/upload/complete/my-post/clip.mp4 \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-## 脏标记（X-Dirty）
-
-所有 `/api/*` 响应带 `X-Dirty: <count>|<lastISO>` 头（存在未构建变更时）。写操作（文章/配置/上传）自动标脏，构建触发后清除。Admin 前端据此显示黄色横幅。
+旧部署、旧租约、旧源版本和错误签名不能覆盖新状态。内部接口禁止使用后台登录 token 代替流水线签名。

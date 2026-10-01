@@ -23,6 +23,7 @@ function videoControlsHTML(multiSrc, showNext, total) {
 }
 
 function videoElementHTML(vid) {
+  if (vid.pending) return pendingHTML(vid);
   var multiSrc = !!(vid.sources);
   var hasHLS = !!(vid.hls);
   var h = '<div class="video-player-overlay"><button class="video-big-play" aria-label="Play"><i class="ri-play-fill"></i></button></div>';
@@ -61,7 +62,7 @@ function renderVideos(vids, mode) {
     vids.forEach(function(vid, i) {
       html += '<div class="video-container" data-video-index="' + i + '"' + (i > 0 ? ' style="display:none"' : '') + '>';
       html += videoElementHTML(vid);
-      html += videoControlsHTML(!!vid.sources, false, vids.length);
+      html += (vid.pending ? '' : videoControlsHTML(!!vid.sources, false, vids.length));
       html += '</div>';
     });
     html += '</div>';
@@ -70,7 +71,7 @@ function renderVideos(vids, mode) {
     vids.forEach(function(vid, i) {
       html += '<div class="video-container" data-video-index="' + i + '" data-total="' + vids.length + '">';
       html += videoElementHTML(vid);
-      html += videoControlsHTML(!!vid.sources, true, vids.length);
+      html += (vid.pending ? '' : videoControlsHTML(!!vid.sources, true, vids.length));
       html += '</div>';
     });
   }
@@ -79,6 +80,8 @@ function renderVideos(vids, mode) {
   return html;
 }
 
+function pendingHTML(media) { return '<div class="media-pending" role="status">' + (site.language === 'zh-CN' ? '媒体处理中：' : 'Processing media: ') + escHtml(media.file || '') + '</div>'; }
+
 function renderGallery(photos, threshold) {
   if (!photos || photos.length === 0) return '';
   var single = threshold && photos.length <= threshold;
@@ -86,6 +89,7 @@ function renderGallery(photos, threshold) {
   var h = '<section class="gallery-section">';
   h += '<div class="' + cls + '" data-total="' + photos.length + '">';
   photos.forEach(function(p, idx) {
+    if (p.pending) { h += pendingHTML(p); return; }
     // Two-stage blur-up: src is the tiny LQIP placeholder, sharp image swaps
     // in via gallery.js after it decodes. No srcset here — srcset would make
     // the browser skip the placeholder entirely (loading it directly).
@@ -133,6 +137,7 @@ function renderMusicBlock(tracks) {
   }
   h += '<div class="music-track-list">';
   tracks.forEach(function(track, i) {
+    if (track.pending) { h += pendingHTML(track); return; }
     var cover = track.cover
       ? '<span class="music-track-cover"><img src="' + escAttr(track.cover) + '" alt="" loading="lazy" /></span>'
       : '<span class="music-track-cover music-track-cover-fallback"><i class="ri-music-2-line"></i></span>';
@@ -155,7 +160,7 @@ function renderBlock(block) {
   if (block.type === 'video') {
     var v = block.video;
     return '<section class="video-section"><div class="video-container" data-video-index="0" data-total="1">' +
-      videoElementHTML(v) + videoControlsHTML(!!v.sources, false, 1) +
+      videoElementHTML(v) + (v.pending ? '' : videoControlsHTML(!!v.sources, false, 1)) +
       '</div></section>';
   }
   if (block.type === 'music') return renderMusicBlock(block.tracks);
@@ -212,6 +217,7 @@ function renderBlock(block) {
   <% if (site.enableBusuanzi) { %>
   <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
   <% } %>
+<script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality }).replace(/</g, '\\u003c') %>;</script>
 </head>
 <body data-page="post" data-slug="<%= post.slug %>" data-category="<%= post.category || '' %>" data-tags="<%= (post.tags || []).join(',') %>" data-post-type="<%= post.type || 'text' %>">
 

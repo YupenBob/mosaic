@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-01",
+  "node": "v24.13.1",
+  "contentPosts": 13,
+  "manifestRevision": 1,
+  "manifestAssets": 7,
+  "legacyGeneratorMs": [1994, 766, 736, 784, 1154],
+  "currentGeneratorMs": [1645, 1061, 1365, 1410, 1434],
+  "legacyMedianMs": 784,
+  "currentMedianMs": 1410,
+  "legacyPostsBytes": 20892,
+  "indexBytes": 6701,
+  "compatPostsBytes": 28491,
+  "originalDownloads": 0,
+  "originalBytes": 0,
+  "ffmpegCalls": 0,
+  "checksumCache": false,
+  "listCacheReads": 1,
+  "listRepeatedReads": 0,
+  "mediaOnlyGitHubRequests": 0
+}

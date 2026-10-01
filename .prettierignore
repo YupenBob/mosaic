@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.mosaic/
 worker/.wrangler/
 test-results/
 .playwright-cli/
@@ -9,7 +10,7 @@ package-lock.json
 **/vendor/
 *.md
 .github/
-shared/
+shared/pages-proxy.mjs
 functions/api/
 cloud-admin/functions/api/
-video/
+/video/

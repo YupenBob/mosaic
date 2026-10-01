@@ -3,35 +3,28 @@
  * (m3u8/ts/mp4) so the edge never serves stale CORS-less cached responses.
  *
  * Usage: node scripts/r2-metadata.mjs [--dry-run]
- * Credentials are read from ../.dev.vars (R2_ACCESS_KEY/R2_SECRET_KEY/CF_ACCOUNT_ID).
+ * Credentials must be explicit environment variables; production runs only in Actions.
  */
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import {
-  S3Client,
-  PutObjectCommand,
-  CopyObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
+import { loadContext } from '../../scripts/lib/context.mjs';
+import { S3Client, CopyObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const devVars = fs.readFileSync(path.join(__dirname, '..', '.dev.vars'), 'utf8');
-const get = (k) => (devVars.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1]?.trim();
+const { config } = loadContext();
+const get = (key) => process.env[key];
+if (!process.env.GITHUB_RUN_ID) throw new Error('Production metadata maintenance must run in Actions');
 const dryRun = process.argv.includes('--dry-run');
 const cacheArg = process.argv.find((a) => a.startsWith('--cache-control='));
-const TARGET_CACHE = cacheArg ? cacheArg.split('=')[1] : process.env.VIDEO_CACHE_CONTROL || 'no-store';
+const TARGET_CACHE = cacheArg
+  ? cacheArg.slice('--cache-control='.length)
+  : process.env.VIDEO_CACHE_CONTROL || config.media.cacheControl;
 const encPath = (key) => key.split('/').map(encodeURIComponent).join('/');
 
 const client = new S3Client({
   region: 'auto',
-  endpoint: `https://${get('CF_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
+  endpoint: get('R2_ENDPOINT') || `https://${get('CF_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
   credentials: { accessKeyId: get('R2_ACCESS_KEY'), secretAccessKey: get('R2_SECRET_KEY') },
   forcePathStyle: true,
 });
-const BUCKET = 'mosaic-media';
+const BUCKET = config.mediaSource.bucket;
 
 async function listAll(prefix) {
   const keys = [];
@@ -53,26 +46,6 @@ async function head(key) {
     return null;
   }
 }
-
-// ── self-test: copy metadata replace works on R2 ──
-const TEST = 'processed/codex-meta-test/videos/probe.ts';
-await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: TEST, Body: 'probe' }));
-await client.send(
-  new CopyObjectCommand({
-    Bucket: BUCKET,
-    Key: TEST,
-    CopySource: `${encodeURIComponent(BUCKET)}/${encPath(TEST)}`,
-    MetadataDirective: 'REPLACE',
-    CacheControl: TARGET_CACHE,
-  }),
-);
-const h = await head(TEST);
-await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: TEST }));
-if (h?.CacheControl !== TARGET_CACHE) {
-  console.error('CopyObject metadata replace FAILED:', h?.CacheControl);
-  process.exit(1);
-}
-console.log('CopyObject metadata replace OK');
 
 // ── migrate processed video objects ──
 const keys = (await listAll('processed/')).filter((k) => /\/videos\/.+\.(m3u8|ts|mp4)$/i.test(k));

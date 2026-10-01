@@ -1,141 +1,66 @@
-# Mosaic v1.0 架构
+# Mosaic 架构
 
-## 总览
+内容存于 Git，原文件与处理产物存于 R2；Node.js / EJS 生成静态站点，Hono Worker 提供内容、上传、统计与任务接口。前台和后台保持原生 ES Module，无框架迁移。
 
-Mosaic 是一个**媒体优先**的纯静态站点框架：内容在 Git、媒体在 Cloudflare R2、计算在 GitHub Actions、展示在 Cloudflare Pages、管理在零构建的云后台。所有设计以"未来成百上千用户开箱即用"为出发点。
+## 模块边界
+
+| 层 | 模块 | 职责 |
+| --- | --- | --- |
+| 共享契约 | `shared/config.mjs`、`shared/media-manifest.mjs` | 默认值、兼容映射、校验、媒体身份与配置指纹 |
+| 站点 | `scripts/site/{posts,media,indexes,render,generate}.mjs` | Markdown 解析、清单映射、复用分类标签索引、缓存 EJS 模板、清空输出 |
+| 媒体 | `scripts/media/{images,videos,audio}.mjs` | 隐私处理、压缩、波形和音乐元数据 |
+| 媒体执行 | `scripts/media/{run,storage,process}.mjs` | 单文件下载、流式哈希、租约心跳、存储与进程管理 |
+| Worker 服务 | `worker/src/services/` | GitHub 内容、配置、工作流、发布状态、媒体登记与引用保护 |
+| Worker 路由 | `worker/src/routes/` | 鉴权、参数、响应与服务编排 |
+| 后台 | `cloud-admin/js/{router,lifecycle,editor,upload,jobs,build}.js` | 路由、退出清理、编辑、上传、媒体任务和部署状态 |
+| 视频前台 | `src/assets/js/video/{engine,controls,player,playlist,registry}.js` | HLS、控制面板、播放器、播放列表与实例管理 |
+
+`StatsDurableObject` 的类名、绑定、命名空间与 v1 迁移保留。新增 `JobsDurableObject` 使用独立 JOBS 绑定和 `v2-media-jobs` 迁移；统计数据不会被新任务状态覆盖。
+
+## 两条计算链路
 
 ```mermaid
-flowchart LR
-    subgraph 创作端
-      ADMIN[云管理后台<br/>cloud-admin]
-      GIT[(GitHub 仓库<br/>Markdown + 配置)]
-    end
-
-    subgraph 计算与存储
-      ACTIONS[GitHub Actions<br/>压缩 / 转码 / 生成]
-      R2[(Cloudflare R2<br/>originals / processed / site-data)]
-      WORKER[Cloudflare Worker<br/>Hono API]
-    end
-
-    subgraph 展示端
-      PAGES[Cloudflare Pages<br/>静态站点 + Functions 代理]
-      SITE[访客浏览器]
-    end
-
-    ADMIN -->|上传媒体| WORKER
-    WORKER --> R2
-    ADMIN -->|保存文章/触发构建| WORKER
-    WORKER --> GIT
-    GIT --> ACTIONS
-    ACTIONS --> R2
-    ACTIONS -->|部署| PAGES
-    SITE --> PAGES
-    SITE -->|媒体直连| R2
-    PAGES -->|/api/*| WORKER
+sequenceDiagram
+  participant U as 上传客户端
+  participant W as Worker
+  participant D as Jobs DO
+  participant M as 媒体工作流
+  participant S as 站点工作流
+  U->>W: 确认原文件上传
+  W->>D: 登记 source ETag + 配置指纹
+  D-->>W: taskId + pending
+  D->>M: alarm 合并 workflow_dispatch
+  M->>D: claim / heartbeat
+  M->>M: 下载一个文件、处理、上传、HEAD 验证
+  M->>D: publish 已就绪档位
+  D->>S: 合并站点更新
+  S->>D: begin(Git SHA, runId)
+  D-->>S: 固定清单快照 + 构建租约
+  S->>S: 生成、验证、部署
+  S->>D: done(租约, 部署结果)
 ```
 
-## 分层
+站点产物目录 `dist/` 每次清空。媒体工作目录位于系统临时目录或 `MEDIA_WORK_DIR`，不进入站点输出。`build-snapshot.json` 记录 Git SHA 与清单版本；模板、分类和标签索引在一次生成中复用。
 
-### 1. Git 仓库（内容层）
+## 任务与发布
 
-只存文本内容：
-- `content/posts/{slug}/index.md` —— Markdown + YAML frontmatter
-- `mosaic.config.json` —— 站点配置（可在 Admin 后台编辑）
-- `src/layouts/`、`src/assets/`、`src/data/` —— 模板、资源、i18n
-- `themes/`、`scripts/`、`worker/`、`cloud-admin/`、`tests/` —— 主题、构建、API、后台、测试
+任务状态为 pending、running、ready、failed、cancelled、superseded。上传登记在 R2 清单写入前先写 DO 存储；R2 或 GitHub 暂时不可用时，持久化 outbox 由 alarm 重试。租约到期进入有限重试，超过默认三次重试后由后台手动重试。
 
-**不存放**图片/视频/音频等二进制媒体（由 `.gitignore` 排除）。
+DO 将每个任务、媒体项与构建记录分开存储，分页恢复；状态变更与 alarm 在同一事务登记。配置变更保存补处理游标，alarm 按可配置批大小核验并排队；中断后继续，未变的处理指纹保持幂等。首次生产站点构建要求完成媒体导入，避免清单为空时覆盖旧站。
 
-### 2. Cloudflare R2（媒体层）
+源 ETag 或处理配置指纹变化会生成新的 generation 并撤销旧租约。旧产物保留在 `asset.published`，首次上传才产生占位。低档 MP4、HLS 分片、播放列表和海报全部验证后发布；新增档位使用新 master 对象，旧 master 保持不变。
 
-- `originals/{slug}/photos|videos|music/` —— 原始媒体（上传后由管线剥离 EXIF）
-- `processed/{slug}/photos|videos|music|covers/` —— 压缩产物（WebP 多档、HLS+MP4、MP3）
-- `site-data/` —— 运行时数据：`stats.json`（统计，DO 备份）、`dirty.json`（脏标记）、`posts.json`（文章列表缓存）、`build-progress.json`（构建进度）、`media-usage.json`（用量快照）、`favicon.*`
+`/api/build/done` 是旧后台兼容探针，不能确认部署。内部回调用独立 `PIPELINE_SECRET` 的 HMAC 签名与时间窗鉴权，媒体再检查 taskId/runId/token/generation。内容脏状态与媒体变更分开记录，媒体任务不会使文章列表退回 N+1 次 GitHub 正文读取。
 
-媒体由自定义域名 `mosaic-media.xsanye.cn` 直连提供（`<img>` 等不需要 CORS 的资源直连；HLS 由 Worker 代理保证确定性 CORS 或依赖桶级 CORS 配置，见 [operations.md](operations.md)）。
+## 存储契约
 
-### 3. GitHub Actions（计算层）
+- `originals/{slug}/{folder}/{filename}`：当前源文件。
+- `processed/{slug}/{folder}/{generation}/...`：版本化产物。
+- `site-data/media-manifest.json`：当前清单。
+- `site-data/media-manifests/{revision}.json`：不可变发布快照。
+- `site-data/posts-index.json`：部署后的精简列表缓存。
+- `dist/data/posts.json`：保留一个兼容发布周期的完整旧入口。
 
-`pipeline.yml` 在 push 或 workflow_dispatch 时执行：
+清理保护当前有效清单、未完成任务断点、正在构建的快照和保留的成功部署。后台“处理缓存”操作改为重新排队，已有可用产物保留到引用释放与保留期结束。
 
-1. 校验配置与 frontmatter（`npm run validate`）；恢复媒体 checksum 缓存（`actions/cache`）
-2. 同步 `originals/` → `content/posts/`，exiftool 剥离原图 EXIF
-3. `compress.js`：图片 WebP（480/720/1080 + LQIP）、视频 HLS+MP4（240p–1080p，4K 可配）、音乐 MP3（128k/320k），并把**产物清单**写回 checksums（缓存命中时跳过转码、generate 仍能拿到档位信息）
-4. `generate.js`：Markdown → 静态 HTML + RSS/Sitemap + 前端数据
-5. 测试：`npm run check`（语法 + proxy 同步 + worker/build smoke）、`npm run lint`、`npm run format:check`、Playwright 本地静态预览 E2E
-6. 上传 processed（rclone）+ 视频媒体（SDK 上传器，`Cache-Control: public, max-age=86400` + 正确 Content-Type；已有对象做元数据级缓存头刷新）
-7. 剥离后的 originals 回传 R2
-8. `minify.js`（esbuild）压缩 `dist/assets` 前端资源（保留 ESM import）；剥离 `dist` 媒体目录并拷贝 Functions
-9. `wrangler pages deploy` 部署前台
-
-另有 `health-check.yml` 每 6 小时对线上域名跑一遍 `check-site.mjs`，失败即告警。
-
-### 4. Cloudflare Pages（展示层）
-
-- 前台静态站（`mosaic.xsanye.cn`）：HTML/CSS/JS（构建时 esbuild 压缩）+ JSON 数据 + RSS/Sitemap，媒体引用 R2 URL
-- 管理后台（`mosaic-admin.xsanye.cn`）：零构建 Vanilla JS SPA
-- 两者都带 `functions/api/[[path]].js`，把 `/api/*` 同源代理到 Worker，并用 HMAC-SHA256 签名真实访客 IP（`X-Mosaic-Proxy-IP/Time/Sig`，见 [operations.md](operations.md)）；两份代理由 `shared/pages-proxy.mjs` 经 `scripts/sync-proxy.mjs` 同步生成
-
-### 5. Worker API（API 层）
-
-基于 Hono，位于 `mosaic-api.xsanye.cn`：
-
-- **认证**：JWT（`POST /api/auth/login`），`ADMIN_PASSWORD`/`JWT_SECRET` 未配置时 fail-closed；登录失败限流（5 次/5 分钟/IP）
-- **上传**：预签名直传（`/api/upload/presign` → 浏览器 PUT R2 → `/api/upload/complete` 确认并标脏）为主，`/api/upload/direct`（≤100MB）兜底
-- **内容**：文章 CRUD + 分页、配置读写（深合并）、GitHub Actions 构建触发（workflow_dispatch，回退 push-trigger）、构建状态/历史/进度
-- **统计**：视图/点赞/停留时长由 `StatsDurableObject` 串行写入（DO 存储为主，R2 stats.json 备份并迁移历史）
-- **媒体**：列表、删除（originals + processed）、向后兼容的文件服务
-- **分类标签**：统计、重命名、删除（逐篇改写 frontmatter）
-- **运维**：存储用量、孤儿清理、processed 缓存清理、脏标记、回收站 stub
-
-### 6. Cloud Admin（管理层）
-
-`cloud-admin/` 为 ES Module 化的零构建 SPA（v0.9）：仪表盘、文章管理、可视化编辑器（草稿自动保存、Markdown 预览、媒体上传）、构建中心（步骤级进度 + ETA）、站点配置、分类标签、清理与回收站，支持命令面板、快捷键、三态主题与中英双语。
-
-## 数据流
-
-### 发布流
-
-```
-Admin 上传媒体 → Worker presign → 浏览器直传 R2 originals → upload/complete 标脏
-Admin 保存文章 → Worker → GitHub 提交 content/posts/*/index.md → 标脏
-Admin 点击构建 → Worker → workflow_dispatch → GitHub Actions
-                  → 压缩/转码 → processed 回传 R2 → 生成静态站 → Pages 部署
-```
-
-### 浏览流
-
-```
-访客 → Pages 静态站 → 图片/封面直连 R2；HLS 经 Worker 代理或桶 CORS 直连
-     → 浏览量/停留时长 → Worker → StatsDurableObject → R2 stats.json 备份
-```
-
-## 文章内容模型
-
-```yaml
----
-title: "我的摄影故事"
-date: 2026-05-01
-category: photography/nature
-tags: [风光, 旅行]
-description: "一场影像之旅。"
-cover: cover.jpg            # 文件名，或 video:N / photo:N（媒体索引），留空自动检测（视频截帧 > 首张照片）
-video_mode: stacked         # stacked | playlist
-blocks: []                  # 可选：显式块顺序（正文含占位符时以占位符为准）
----
-```
-
-- 媒体类型：`photos/`、`videos/`、`music/` 三个目录，管线自动处理
-- 浏览量/点赞/停留时长**不在 frontmatter 维护**，由 DO 实时统计（frontmatter 中的 `views/likes/dwell_time` 仅为兼容遗留，构建时作为兜底显示）
-
-## 配置
-
-完整字段见 [configuration.md](configuration.md)。要点：`apiBase`（Worker API）、`mediaBase`（R2 直连域名）、`videoQuality.preset/maxHeight`（转码速度与顶格档位）、`plugins`（功能开关）、`components`（前端组件开关）、`giscus`（评论）。
-
-## 部署与运维
-
-- 本地：`npm run compress && npm run build && npm run serve`
-- Worker：`cd worker && npx wrangler deploy`
-- Admin：`npx wrangler pages deploy cloud-admin --project-name mosaic-admin`
-- 生产：push 到 `main` 由管线自动构建部署；`health-check.yml` 定期巡检
-- 详细步骤见 [SETUP.md](SETUP.md)，运行细节见 [operations.md](operations.md)
+现有 Pages IP 签名代理保持单一源文件及同步检查；目标域名必须通过 `API_TARGET` 配置。详见 [配置](configuration.md)、[迁移](migration.md)、[运维](operations.md)。

@@ -16,10 +16,22 @@ class_name = "StatsDurableObject"
 tag = "v1"
 new_sqlite_classes = ["StatsDurableObject"]
 
+[[durable_objects.bindings]]
+name = "JOBS"
+class_name = "JobsDurableObject"
+
+[[migrations]]
+tag = "v2-media-jobs"
+new_sqlite_classes = ["JobsDurableObject"]
+
 # Environment variables
 [vars]
 GITHUB_REPO = "YupenBob/mosaic"
 R2_BUCKET = "mosaic-media"
+ALLOWED_ORIGINS = "https://mosaic-admin.xsanye.cn"
+SITE_BRANCH = "main"
+MEDIA_MANIFEST_KEY = "site-data/media-manifest.json"
+REQUIRE_MEDIA_MIGRATION = "true"
 
 # Secrets (set via `wrangler secret put`)
 # ADMIN_PASSWORD
@@ -28,6 +40,7 @@ R2_BUCKET = "mosaic-media"
 # R2_ACCESS_KEY
 # R2_SECRET_KEY
 # CF_ACCOUNT_ID
+# PIPELINE_SECRET
 
 [observability]
 enabled = true

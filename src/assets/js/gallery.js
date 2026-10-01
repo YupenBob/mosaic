@@ -16,8 +16,12 @@ let state = {
   isOpen: false,
 };
 let _updateTimer = null;
+let scope, observer;
 
-export function initGallery() {
+export function initGallery(config = {}) {
+  scope?.abort();
+  observer?.disconnect();
+  scope = new AbortController();
   const items = $$('.gallery-item img, .gallery-single-item img');
   state.photos = items.map((img, i) => ({
     src480: img.dataset.src480 || img.src,
@@ -32,10 +36,22 @@ export function initGallery() {
   // Detect preferred quality
   state.currentRes = detectResolution();
 
-  setupLazyLoading();
-  items.forEach((img, i) => img.addEventListener('click', () => open(i)));
-  createOverlay();
-  document.addEventListener('keydown', handleKeyboard);
+  if (config.lazyLoad === false) items.forEach(loadThumb);
+  else setupLazyLoading();
+  if (config.zoom !== false) {
+    items.forEach((img, i) => img.addEventListener('click', () => open(i), { signal: scope.signal }));
+    createOverlay();
+    document.addEventListener('keydown', handleKeyboard, { signal: scope.signal });
+  }
+  window.addEventListener(
+    'pagehide',
+    () => {
+      clearTimeout(_updateTimer);
+      observer?.disconnect();
+      scope.abort();
+    },
+    { signal: scope.signal },
+  );
 }
 
 function detectResolution() {
@@ -57,7 +73,7 @@ function setupLazyLoading() {
     $$('.gallery-item img, .gallery-single-item img').forEach(loadThumb);
     return;
   }
-  const obs = new IntersectionObserver(
+  const obs = (observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((e) => {
         if (e.isIntersecting) {
@@ -67,7 +83,7 @@ function setupLazyLoading() {
       });
     },
     { rootMargin: '200px' },
-  );
+  ));
   $$('.gallery-item img, .gallery-single-item img').forEach((img) => obs.observe(img));
 }
 

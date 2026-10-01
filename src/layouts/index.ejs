@@ -46,6 +46,7 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"WebSite","name":"<%= site.title %>","description":"<%= site.description %>","url":"<%= site.url || '' %>"}
   </script>
+<script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality }).replace(/</g, '\\u003c') %>;</script>
 </head>
 <body data-page="list" data-category="<%= activeCategory || '' %>" data-tag="<%= activeTag || '' %>">
 

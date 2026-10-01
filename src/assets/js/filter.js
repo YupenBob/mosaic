@@ -1,7 +1,7 @@
 /**
  * Category and tag filtering for list pages
  */
-import { $, $$, formatNumber, escapeHTML } from './utils.js';
+import { $, $$, formatNumber, escapeHTML, resolveMediaUrl } from './utils.js';
 import { getPosts } from './data.js';
 
 let filterState = {
@@ -58,7 +58,9 @@ export function updateFilterState(newState) {
 export function getFilteredPosts(posts) {
   let filtered = [...posts];
   if (filterState.activeCategory) {
-    filtered = filtered.filter((p) => p.category === filterState.activeCategory);
+    filtered = filtered.filter(
+      (p) => p.category === filterState.activeCategory || p.category?.startsWith(filterState.activeCategory + '/'),
+    );
   }
   if (filterState.activeTags.size > 0) {
     filtered = filtered.filter((p) => p.tags.some((t) => filterState.activeTags.has(t)));
@@ -102,26 +104,14 @@ export function renderCards(posts) {
       const pt = (100 / aspect).toFixed(2);
       let coverHTML = '';
       if (hasCover) {
-        const src = base + 'posts/' + post.slug + '/' + post.cover;
+        const src = resolveMediaUrl(post.cover, base, post.slug);
         const srcset = post.coverSrcset
           ? ' srcset="' +
-            base +
-            'posts/' +
-            post.slug +
-            '/' +
-            post.coverSrcset['480'] +
+            resolveMediaUrl(post.coverSrcset['480'], base, post.slug) +
             ' 480w, ' +
-            base +
-            'posts/' +
-            post.slug +
-            '/' +
-            post.coverSrcset['720'] +
+            resolveMediaUrl(post.coverSrcset['720'], base, post.slug) +
             ' 720w, ' +
-            base +
-            'posts/' +
-            post.slug +
-            '/' +
-            post.coverSrcset['1080'] +
+            resolveMediaUrl(post.coverSrcset['1080'], base, post.slug) +
             ' 1080w" sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"'
           : '';
         coverHTML =

@@ -1,4 +1,5 @@
 node_modules/
+.mosaic/
 dist/
 .cache-manifest.json
 test-results/

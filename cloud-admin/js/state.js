@@ -13,4 +13,6 @@ export const state = {
   config: {},
   editorDirty: false,
   editorDraftKey: null,
+  editor: { media: { photos: [], videos: [], music: [] }, draftSnapshot: null },
+  pageScope: null,
 };
