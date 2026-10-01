@@ -231,3 +231,19 @@ assert.notEqual(newCover.taskId, oldCover.taskId);
 const coverAssets = (await coverReplacement.call('state')).manifest.assets;
 assert.equal(Object.keys(coverAssets).length, 1, 'legacy covers retain their identity when uploaded through photos');
 assert.equal(coverAssets['cover/covers/cover.jpg'].source.key, 'originals/cover/photos/cover.jpg');
+const migrationProtection = createRuntime();
+await migrationProtection.enqueue('migrate', 'photo.jpg');
+const legacyState = (await migrationProtection.call('state')).manifest;
+const legacyKey = 'processed/migrate/photos/legacy/480p.webp';
+await migrationProtection.bucket.put(legacyKey, 'old image');
+legacyState.assets['migrate/photos/photo.jpg'].published = { variants: { '480p': legacyKey } };
+legacyState.assets['migrate/photos/photo.jpg'].status = 'ready';
+const initial = createRuntime();
+await initial.bucket.put(legacyKey, 'old image');
+await initial.call('import', { manifest: legacyState, config: initial.config, previousGitSha: 'previous-site' });
+assert.equal((await initial.call('state')).deployments[0].gitSha, 'previous-site');
+await initial.call('delete', { slug: 'migrate' });
+assert.ok(
+  (await protectedMediaKeys(initial.env)).has(legacyKey),
+  'migration protects the site already deployed before the coordinator existed',
+);

@@ -38,9 +38,12 @@ export function createStorage(config, env = process.env) {
       return { etag: object.ETag?.replace(/"/g, ''), body: object.Body, text: () => object.Body.transformToString() };
     },
     async download(Key, file, etag, { signal } = {}) {
-      const object = await client.send(new GetObjectCommand({ Bucket, Key, ...(etag ? { IfMatch: etag } : {}) }), {
-        abortSignal: signal,
-      });
+      const object = await client.send(
+        new GetObjectCommand({ Bucket, Key, ...(etag ? { IfMatch: `"${etag.replace(/"/g, '')}"` } : {}) }),
+        {
+          abortSignal: signal,
+        },
+      );
       await pipeline(object.Body, fs.createWriteStream(file), { signal });
     },
     async upload(Key, file) {

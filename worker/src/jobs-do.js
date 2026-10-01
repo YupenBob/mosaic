@@ -273,7 +273,17 @@ export class JobsDurableObject {
     if (operation === 'import') {
       state.config = data.config || state.config;
       const imported = validateManifest(data.manifest);
+      const firstImport = !state.initialized;
       state.initialized = true;
+      if (firstImport && !state.deployments.length)
+        state.deployments.push({
+          runId: 'legacy-migration',
+          gitSha: data.previousGitSha || '',
+          mediaRevision: state.manifest.revision + 1,
+          success: true,
+          legacy: true,
+          finishedAt: new Date().toISOString(),
+        });
       await this.batchManifest(state, async () => {
         for (const [id, asset] of Object.entries(imported.assets)) {
           if (state.manifest.assets[id]) continue;

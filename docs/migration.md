@@ -19,6 +19,8 @@
 
 当前清单位于可配置 `media.manifestKey`；每次修改另写 `site-data/media-manifests/{revision}.json`。DO 保留最近成功部署，包括 Git SHA、清单版本和时间。正在构建及保留部署引用的产物不能被后台或媒体清理删除。
 
+首次导入另登记 legacy-migration 部署引用，保护切换前站点仍在使用的产物。迁移前可设置 Actions Variable `MIGRATION_GIT_SHA` 为备份的旧 Git SHA；没有该变量时保留引用，源码版本由外部回退记录核对。
+
 回退时先停止新的媒体调度/取消对应任务，在 Pages 选择上一成功部署，并使用该部署记录的清单快照和源码 SHA 做后续重建。不要把旧 master 写回新 generation，也不要直接删除当前清单。需要恢复旧流程时恢复旧 Git SHA/workflow，保留 JOBS 命名空间和 STATS 数据；清单、原文件和上一部署均保留。
 
 迁移失败不写完成标记，下次媒体工作流重新核验与幂等导入。自动重试耗尽的文件可在后台逐一重试；配置变化和同名替换会撤销旧任务，旧回调不能重新发布。

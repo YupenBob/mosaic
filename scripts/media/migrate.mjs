@@ -12,7 +12,7 @@ if (!(await store.head(marker))) {
   if (await store.head('site-data/media-checksums.json'))
     checksums = JSON.parse(await (await store.get('site-data/media-checksums.json')).text());
   const manifest = await migrateLegacy(store, config, checksums);
-  await request('media/import', { manifest, config });
+  await request('media/import', { manifest, config, previousGitSha: process.env.MIGRATION_GIT_SHA || '' });
   await store.putJSON(marker, { completedAt: new Date().toISOString(), assets: Object.keys(manifest.assets).length });
   console.log(`Migrated ${Object.keys(manifest.assets).length} media entries`);
 } else console.log('Legacy media migration already complete');
