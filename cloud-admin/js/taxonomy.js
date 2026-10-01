@@ -3,6 +3,8 @@
  * (opens editor prefilled) and delete (Worker endpoint, hidden when absent).
  */
 import { taxonomy } from '../src/api.js';
+import { state } from './state.js?v=1';
+import { pageTimeout } from './lifecycle.js';
 import { t } from './i18n.js?v=1';
 import { escHtml, toast, modalConfirm, modalInput, emptyState } from './ui.js?v=1';
 
@@ -17,7 +19,9 @@ export default async function renderTaxonomy(signal) {
 
   // Detect whether the DELETE endpoints are deployed (non-mutating probe)
   if (deleteSupported === null) {
-    deleteSupported = await probeDeleteSupport();
+    const supported = await probeDeleteSupport(signal);
+    if (signal.aborted) return '';
+    deleteSupported = supported;
   }
 
   const cats = tax.categories || [];
@@ -98,7 +102,7 @@ function buildCatTree(cats, prefix, depth = 0) {
     .join('');
 }
 
-async function probeDeleteSupport() {
+async function probeDeleteSupport(signal) {
   const API = window.__API_BASE__ || '/api';
   const token = localStorage.getItem('mosaic_admin_token');
   try {
@@ -106,6 +110,7 @@ async function probeDeleteSupport() {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || '') },
       body: JSON.stringify({ name: '' }),
+      signal,
     });
     return resp.status !== 404;
   } catch {
@@ -135,7 +140,7 @@ window.renameCategory = (oldName) => {
         const r = await taxonomy.renameCategory(oldName, newName);
         toast(t('common.renamed', { old: oldName, new: newName }), 'success');
         window.checkDirty && window.checkDirty();
-        if (r.renamed) setTimeout(() => location.reload(), 500);
+        if (r.renamed) pageTimeout(() => location.reload(), 500, state.pageScope?.signal);
       } catch (err) {
         toast(t('common.renameFailed') + ': ' + err.message, 'error');
       }
@@ -155,7 +160,7 @@ window.renameTag = (oldName) => {
         const r = await taxonomy.renameTag(oldName, newName);
         toast(t('common.renamed', { old: oldName, new: newName }), 'success');
         window.checkDirty && window.checkDirty();
-        if (r.renamed) setTimeout(() => location.reload(), 500);
+        if (r.renamed) pageTimeout(() => location.reload(), 500, state.pageScope?.signal);
       } catch (err) {
         toast(t('common.renameFailed') + ': ' + err.message, 'error');
       }

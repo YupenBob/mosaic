@@ -3,13 +3,15 @@
  * scheduling, the Stats Durable Object client, and parallel R2 traversal utils.
  */
 import { readUsageSnapshot, writeUsageSnapshot, invalidateUsageSnapshot } from './usage.js';
+import { protectedMediaKeys } from './services/media-references.js';
+import { DEFAULTS } from '../../shared/config.mjs';
 
 export const VERSION = '1.0.0';
 export const HEALTH_TIMEOUT_MS = 5000;
 
 // ── CORS ──
 export const PUBLIC_CORS_PREFIXES = ['/api/health', '/api/stats/', '/api/track/', '/api/media/'];
-export const DEFAULT_ALLOWED_ORIGINS = 'https://mosaic-admin.xsanye.cn';
+export const DEFAULT_ALLOWED_ORIGINS = '';
 
 export function isPublicPath(path) {
   return PUBLIC_CORS_PREFIXES.some((p) => path.startsWith(p));
@@ -68,27 +70,24 @@ async function bucketUsage(env) {
   };
 }
 
-let _diskCache = null,
-  _diskAt = 0;
-const DISK_CACHE_TTL_MS = 5 * 60 * 1000;
-const USAGE_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const diskCaches = new WeakMap();
 
-export async function getDiskUsage(env) {
-  if (_diskCache && Date.now() - _diskAt < DISK_CACHE_TTL_MS) return _diskCache;
+export async function getDiskUsage(env, config = DEFAULTS) {
+  const cached = diskCaches.get(env);
+  if (cached && Date.now() - cached.at < config.cache.diskMs) return cached.value;
   const snap = await readUsageSnapshot(env);
-  if (snap && Date.now() - (snap.updatedAt || 0) < USAGE_SNAPSHOT_MAX_AGE_MS) {
-    _diskCache = { size: snap.size, objects: snap.objects };
-    _diskAt = Date.now();
-    return _diskCache;
-  }
-  _diskCache = await bucketUsage(env);
-  _diskAt = Date.now();
+  const value =
+    snap && Date.now() - (snap.updatedAt || 0) < config.cache.usageMaxAgeMs
+      ? { size: snap.size, objects: snap.objects }
+      : await bucketUsage(env);
+  diskCaches.set(env, { at: Date.now(), value });
   // Persist the fresh totals so subsequent reads are cheap.
-  await writeUsageSnapshot(env, _diskCache.size, _diskCache.objects);
-  return _diskCache;
+  await writeUsageSnapshot(env, value.size, value.objects);
+  return value;
 }
 
 export async function scanOrphans(env, valid, mode) {
+  const protectedKeys = await protectedMediaKeys(env);
   const parts = await Promise.all(
     ['originals/', 'processed/'].map(async (prefix) => {
       let orphans = [],
@@ -101,7 +100,7 @@ export async function scanOrphans(env, valid, mode) {
         const list = await env.MEDIA.list(opts);
         for (const o of list.objects || []) {
           const slug = o.key.split('/')[1];
-          if (!slug || valid.has(slug)) continue;
+          if (!slug || valid.has(slug) || protectedKeys.has(o.key)) continue;
           if (mode === 'delete') {
             await env.MEDIA.delete(o.key);
             deleted++;

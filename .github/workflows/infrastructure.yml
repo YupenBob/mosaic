@@ -1,0 +1,44 @@
+name: Mosaic Infrastructure
+on:
+  push:
+    paths: ['worker/**', 'cloud-admin/**', 'shared/**', '.github/workflows/infrastructure.yml']
+  workflow_dispatch:
+concurrency:
+  group: mosaic-infrastructure-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  infrastructure:
+    runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
+    permissions: { contents: read }
+    env:
+      SITE_BRANCH: ${{ vars.SITE_BRANCH }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      API_TARGET: ${{ vars.API_TARGET }}
+      ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version-file: '.nvmrc', cache: npm }
+      - run: npm ci && npm ci --prefix worker
+      - name: Generate deployment configuration
+        run: node scripts/deployment-env.mjs --worker-config
+      - name: Offline validation
+        run: |
+          npm run check && npm run lint && npm run format:check
+          npx playwright install --with-deps chromium
+          npm run test:admin:local
+          npm exec --prefix worker -- wrangler deploy --config .mosaic/worker.json --dry-run
+      - name: Deploy Worker and media coordinator
+        if: github.ref_name == env.SITE_BRANCH
+        run: |
+          test -n "$PIPELINE_SECRET"
+          npm exec --prefix worker -- wrangler deploy --config .mosaic/worker.json
+          printf '%s' "$PIPELINE_SECRET" | npm exec --prefix worker -- wrangler secret put PIPELINE_SECRET --config .mosaic/worker.json
+      - name: Deploy admin
+        if: github.ref_name == env.SITE_BRANCH
+        run: |
+          node scripts/configure-pages.mjs
+          npm exec --prefix worker -- wrangler pages deploy cloud-admin --project-name "$ADMIN_PROJECT" --branch "$SITE_BRANCH"

@@ -1,9 +1,9 @@
 /**
  * Build lifecycle: trigger, status/history/progress, done, cancel.
  */
-import { dispatchBuild, getLatestRun, getRunById, getRunHistory, cancelRun, clearDirty, markDirty } from '../github.js';
+import { dispatchBuild, getLatestRun, getRunById, getRunHistory, cancelRun, isDirty } from '../github.js';
 import { verifyToken } from '../auth.js';
-import { defer } from '../shared.js';
+import { jobsRequest } from '../services/jobs.js';
 
 export function registerBuild(app) {
   // Build
@@ -18,7 +18,6 @@ export function registerBuild(app) {
         );
       }
       await dispatchBuild(c);
-      defer(c, () => clearDirty(c.env));
       return c.json({ ok: true, message: 'Build triggered' });
     } catch (e) {
       return c.json({ error: e.message, code: 'DISPATCH_ERROR' }, 502);
@@ -34,22 +33,15 @@ export function registerBuild(app) {
     }
   });
 
-  // Build completion hook — clears the dirty flag on success, re-marks it on
-  // failure, so the admin banner reflects "changes not yet deployed" correctly.
-  // Authenticated with an admin JWT (the pipeline may later pass a shared secret).
+  // Compatibility endpoint: only the authenticated pipeline can acknowledge deployment.
   app.post('/api/build/done', async (c) => {
     try {
       const authHeader = c.req.header('Authorization') || '';
       const token = authHeader.replace('Bearer ', '');
       const auth = await verifyToken(c, token);
       if (!auth.ok) return c.json({ error: 'Unauthorized', code: 'AUTH_REQUIRED' }, auth.status || 401);
-      const body = await c.req.json().catch(() => ({}));
-      if (body.success === false) {
-        await markDirty(c.env);
-        return c.json({ ok: true, dirty: true });
-      }
-      await clearDirty(c.env);
-      return c.json({ ok: true, dirty: false });
+      // Kept for older admin clients. Browser reports cannot acknowledge deployment.
+      return c.json({ ok: true, dirty: !!(await isDirty(c.env)), acknowledged: false });
     } catch (e) {
       return c.json({ error: e.message, code: 'BUILD_DONE_ERROR' }, 502);
     }
@@ -93,6 +85,15 @@ export function registerBuild(app) {
   // Live build progress reported by the pipeline (R2 site-data/build-progress.json)
   app.get('/api/build/progress', async (c) => {
     try {
+      if (c.env.JOBS) {
+        const state = await jobsRequest(c.env, 'build-state');
+        const latest = state.builds.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))[0];
+        return c.json(
+          latest
+            ? { ...latest, updatedAt: latest.updatedAt || latest.finishedAt || latest.startedAt }
+            : { stage: '', updatedAt: null },
+        );
+      }
       const obj = await c.env.MEDIA.get('site-data/build-progress.json');
       if (!obj) return c.json({ stage: '', updatedAt: null });
       const data = JSON.parse(await obj.text());

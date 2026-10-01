@@ -6,12 +6,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { loadContext } from './lib/context.mjs';
 import { transform } from 'esbuild';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..');
-const ASSETS = path.join(ROOT, 'dist', 'assets');
+const { root: ROOT, dist } = loadContext();
+const ASSETS = path.join(dist, 'assets');
 
 async function minifyFile(file) {
   const loader = path.extname(file) === '.css' ? 'css' : 'js';

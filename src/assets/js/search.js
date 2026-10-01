@@ -12,10 +12,13 @@ export function initSearch(allPosts) {
   const handleSearch = debounce((query) => {
     updateFilterState({ searchQuery: query });
 
-    if (query.length > 0) {
+    if (query.length >= (window.__MOSAIC_CONFIG?.searchMinChars || 2)) {
       import('./filter.js')
         .then(({ getFilteredPosts }) => {
-          renderSearchResults(getFilteredPosts(allPosts).slice(0, 10), query);
+          renderSearchResults(
+            getFilteredPosts(allPosts).slice(0, window.__MOSAIC_CONFIG?.search?.maxResults || 10),
+            query,
+          );
         })
         .catch(() => {});
     } else {
@@ -23,7 +26,7 @@ export function initSearch(allPosts) {
     }
 
     renderCards(allPosts);
-  }, 250);
+  }, window.__MOSAIC_CONFIG?.search?.debounceMs || 250);
 
   // Build dropdown
   searchDropdown = document.createElement('div');

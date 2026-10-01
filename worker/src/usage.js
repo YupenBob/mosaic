@@ -7,7 +7,8 @@
  * so the next read falls back to a full parallel listing and rewrites it.
  */
 const SNAPSHOT_KEY = 'site-data/media-usage.json';
-const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+import { DEFAULTS } from '../../shared/config.mjs';
+import { cacheFor } from './services/github-client.js';
 
 export async function readUsageSnapshot(env) {
   try {
@@ -40,7 +41,11 @@ export async function invalidateUsageSnapshot(env) {
 export async function adjustUsage(env, deltaSize, deltaObjects) {
   try {
     const snap = await readUsageSnapshot(env);
-    if (!snap || Date.now() - snap.updatedAt > SNAPSHOT_MAX_AGE_MS) return;
+    if (
+      !snap ||
+      Date.now() - snap.updatedAt > (cacheFor(env).config?.cache.usageMaxAgeMs ?? DEFAULTS.cache.usageMaxAgeMs)
+    )
+      return;
     await writeUsageSnapshot(env, Math.max(0, snap.size + deltaSize), Math.max(0, snap.objects + deltaObjects));
   } catch {}
 }

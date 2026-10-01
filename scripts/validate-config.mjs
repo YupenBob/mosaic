@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import matter from 'gray-matter';
+import { normalizeConfig, validateConfig } from '../shared/config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -71,6 +72,8 @@ for (const group of ['plugins', 'components']) {
     fail(`config.${group} must be an object`);
   }
 }
+
+for (const message of validateConfig(normalizeConfig(cfg))) fail(message);
 
 // ── post frontmatter ──
 if (fs.existsSync(CONTENT)) {

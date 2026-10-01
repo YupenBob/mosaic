@@ -1,0 +1,22 @@
+name: Verify Mosaic
+on: [push, pull_request, workflow_dispatch]
+permissions: { contents: read }
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version-file: '.nvmrc', cache: npm }
+      - run: npm ci && npm ci --prefix worker
+      - run: npm run check && npm run lint && npm run format:check
+      - name: Media integration (fixtures and in-memory storage)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          npm run test:media
+      - name: Browser and accessibility regression
+        run: |
+          npx playwright install --with-deps chromium webkit
+          npm run build
+          npm run test:e2e:local
+          npm run test:admin:local

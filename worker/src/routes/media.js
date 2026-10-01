@@ -29,9 +29,7 @@ export function registerMediaPublic(app) {
 
   // Upload — public (admin sends JWT in XHR)
   app.post('/api/upload/direct/:slug/:filename', async (c) => {
-    const result = await uploadDirect(c);
-    defer(c, () => markDirty(c.env));
-    return result;
+    return uploadDirect(c);
   });
 }
 

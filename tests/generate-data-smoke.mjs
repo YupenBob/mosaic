@@ -3,7 +3,7 @@
  * (the payload that drives the frontend), so regressions in generate.js are
  * caught at the data level instead of only "did it produce files".
  *
- * Run: node tests/generate-data-smoke.mjs  (wired into `npm run check`)
+ * Run: node tests/generate-data-smoke.mjs  (offline; no media processing)
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

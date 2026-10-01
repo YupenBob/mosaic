@@ -14,13 +14,12 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { loadContext } from './lib/context.mjs';
 import sharp from 'sharp';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..');
-const SRC_ASSETS = path.join(ROOT, 'src', 'assets');
-const DIST_ASSETS = path.join(ROOT, 'dist', 'assets');
+const { root: ROOT, src, dist, config } = loadContext();
+const SRC_ASSETS = path.join(src, 'assets');
+const DIST_ASSETS = path.join(dist, 'assets');
 const LOGO = path.join(SRC_ASSETS, 'logo.svg');
 
 if (!fs.existsSync(LOGO)) {
@@ -30,7 +29,6 @@ if (!fs.existsSync(LOGO)) {
 
 fs.mkdirSync(DIST_ASSETS, { recursive: true });
 
-const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'mosaic.config.json'), 'utf-8'));
 const title = config.title || 'Mosaic';
 const subtitle = config.subtitle || '';
 const host = (() => {

@@ -1,310 +1,69 @@
-name: Mosaic Pipeline
-
+name: Mosaic Site
 on:
   push:
-    branches: [main]
+    paths: ['content/**', 'src/**', 'scripts/**', 'shared/**', 'functions/**', 'mosaic.config.json', 'package*.json', '.github/workflows/pipeline.yml', '.build-trigger']
   workflow_dispatch:
     inputs:
       timeout_minutes:
-        description: 'Pipeline job timeout in minutes (10-360)'
-        required: false
+        description: Site job timeout (10-360 minutes)
         default: '90'
         type: string
-
 concurrency:
-  group: mosaic-pipeline
-  cancel-in-progress: true
-
-env:
-  NODE_VERSION: '22'
-  R2_BUCKET: mosaic-media
-
+  group: mosaic-site-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  pipeline:
-    runs-on: ubuntu-latest
-    # Media transcoding of large source videos dominates runtime (a ~900MB 4K
-    # drone clip takes ~26min for 5 tiers); give the job real headroom. The
-    # admin can tune this in Settings -> Build (Worker passes it as a dispatch
-    # input); push-triggered runs fall back to 90. dispatch inputs are strings,
-    # so convert with fromJSON — a string here makes the job fail to start.
-    timeout-minutes: ${{ fromJSON(inputs.timeout_minutes || '90') }}
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-      deployments: write
-
+  site:
+    runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: ${{ fromJSON(inputs.timeout_minutes || vars.SITE_TIMEOUT_MINUTES || '90') }}
+    permissions: { contents: read }
+    env:
+      API_TARGET: ${{ vars.API_TARGET }}
+      PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+      R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+      R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SITE_BRANCH: ${{ vars.SITE_BRANCH }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
     steps:
       - uses: actions/checkout@v5
-
-      - name: Record job start
-        run: echo "BUILD_STARTED_AT=$(date +%s)" >> $GITHUB_ENV
-
       - uses: actions/setup-node@v5
-        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
-
-      - name: Install tools
-        run: |
-          # apt on shared runners is flaky; retry before giving up
-          for i in 1 2 3 4 5; do
-            sudo apt-get update -qq && break
-            echo "apt-get update failed (attempt $i), retrying..."
-            sleep 10
-          done
-          for i in 1 2 3 4 5; do
-            command -v ffmpeg >/dev/null || sudo apt-get install -y -qq ffmpeg
-            command -v rclone >/dev/null || sudo apt-get install -y -qq rclone
-            command -v exiftool >/dev/null || sudo apt-get install -y -qq libimage-exiftool-perl
-            command -v ffmpeg >/dev/null && command -v rclone >/dev/null && command -v exiftool >/dev/null && break
-            echo "tool install incomplete (attempt $i), retrying..."
-            sleep 10
-          done
-          command -v ffmpeg >/dev/null && command -v rclone >/dev/null && command -v exiftool >/dev/null || { echo "required tools missing"; exit 1; }
-
-      - name: Install deps
-        run: npm ci || { sleep 10; npm ci; }
-
-      # compress.js streams video tiers to R2 via worker/scripts/r2-upload.mjs
-      # (@aws-sdk lives in worker/node_modules), so worker deps must exist
-      # before the compress step, not after it.
-      - name: Install worker deps
-        run: cd worker && npm ci && cd ..
-
-      - name: Validate config + frontmatter
-        run: npm run validate
-
-      - name: Restore media checksums cache
-        id: checksums-cache
-        uses: actions/cache@v5
-        with:
-          path: dist/.media-checksums.json
-          key: media-checksums-${{ github.sha }}
-          restore-keys: |
-            media-checksums-
-
-      # ── 1. Sync originals from R2 ──
-      - name: Sync media from R2
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: |
-          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
-          mkdir -p ~/.config/rclone
-          echo '[r2]' > ~/.config/rclone/rclone.conf
-          echo 'type = s3' >> ~/.config/rclone/rclone.conf
-          echo 'provider = Cloudflare' >> ~/.config/rclone/rclone.conf
-          echo "access_key_id = $R2_ACCESS_KEY" >> ~/.config/rclone/rclone.conf
-          echo "secret_access_key = $R2_SECRET_KEY" >> ~/.config/rclone/rclone.conf
-          echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
-          rclone copy r2:${R2_BUCKET}/originals/ content/posts/ --transfers 4 --retries 5 --low-level-retries 20 -v
-          echo "Synced from R2"
-
-      # ── 1b. Strip EXIF from originals (privacy: GPS etc.) ──
-      - name: Strip EXIF from originals
-        run: |
-          # Tolerate files whose extension doesn't match their content
-          # (exiftool refuses them; skip + log instead of failing the build)
-          find content/posts -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.tiff' -o -iname '*.tif' \) -exec sh -c 'exiftool -all= -overwrite_original "$1" 2>/dev/null || echo "skip(not-stripped): $1"' _ {} \;
-          echo "EXIF strip complete (skips above are non-fatal)"
-
-      # 鈹€鈹€ Build progress reporter: upload dist/build-progress.json to R2 every 5s
-      # so the admin panel can show which media file is being processed.
-      - name: Start build progress reporter
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: |
-          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
-          mkdir -p dist
-          node scripts/build-progress.mjs media
-
-      - name: Compress media
-        env:
-          NODE_ENV: production
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          R2_CHECKSUMS_SYNC: '1'
-          TIMEOUT_MINUTES: ${{ fromJSON(inputs.timeout_minutes || '90') }}
-          # Media domain CORS Transform Rule is live (ACAO: *), so video can be
-          # edge-cached again. Conservative 1-day TTL first; lengthen after
-          # observing stability (stale-window for same-name re-transcodes).
-          VIDEO_CACHE_CONTROL: 'public, max-age=86400'
-        run: node scripts/compress.js
-
-      - name: Save media checksums cache
-        uses: actions/cache/save@v5
-        with:
-          path: dist/.media-checksums.json
-          # Unique per run so concurrent same-SHA runs (push + manual dispatch)
-          # don't collide on the same key and drop the cache (which would force
-          # every build to re-transcode all media). Restore still matches via
-          # the `media-checksums-` prefix in restore-keys.
-          key: media-checksums-${{ github.sha }}-${{ github.run_id }}
-
-      - name: Progress — generate site
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: node scripts/build-progress.mjs generate || true
-
-      # ── 3. Generate site ──
+        with: { node-version-file: '.nvmrc', cache: npm }
+      - name: Install dependencies
+        run: npm ci && npm ci --prefix worker
+      - name: Read deployment configuration
+        run: node scripts/deployment-env.mjs
+      - name: Acquire published media snapshot
+        if: github.ref_name == env.SITE_BRANCH
+        run: node scripts/site/snapshot.mjs begin
       - name: Generate site
-        env:
-          NODE_ENV: production
-        run: node scripts/generate.js
-
-      - name: Progress — tests
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: node scripts/build-progress.mjs test || true
-
-      # ── 3b. Tests ──
-      - name: Run checks (syntax + smoke)
-        run: npm run check
-
-      - name: Lint + format check
+        run: npm run build
+      - name: Offline checks
+        run: npm run check && npm run lint && npm run format:check
+      - name: Browser regression
         run: |
-          npm run lint
-          npm run format:check
-
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-
-      - name: Frontend E2E (local static preview)
-        run: |
-          npx serve dist -l 3000 >/dev/null 2>&1 &
-          SERVER_PID=$!
-          sleep 3
-          SITE=http://127.0.0.1:3000 ADMIN=skip npx playwright test tests/frontend.spec.js --grep-invert "Worker health|admin login" --reporter=list
-          EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          exit $EXIT
-
-      - name: Frontend a11y scan (axe, light + dark)
-        run: |
-          npx serve dist -l 3002 >/dev/null 2>&1 &
-          SERVER_PID=$!
-          sleep 3
-          SITE=http://127.0.0.1:3002 node tests/a11y-front.mjs
-          EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          exit $EXIT
-
-      - name: Mobile HLS matrix on WebKit (device viewports)
-        run: |
-          npx playwright install --with-deps webkit
-          npx serve dist -l 3001 >/dev/null 2>&1 &
-          SERVER_PID=$!
-          sleep 3
-          SITE=http://127.0.0.1:3001 ADMIN=skip npx playwright test tests/frontend.spec.js --grep "mobile viewport" --browser=webkit --reporter=list
-          EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          exit $EXIT
-
-      - name: Progress — upload
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: node scripts/build-progress.mjs upload || true
-
-      # ── 4. Upload processed to R2 ──
-      - name: Upload to R2
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: |
-          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
-          mkdir -p ~/.config/rclone
-          echo '[r2]' > ~/.config/rclone/rclone.conf
-          echo 'type = s3' >> ~/.config/rclone/rclone.conf
-          echo 'provider = Cloudflare' >> ~/.config/rclone/rclone.conf
-          echo "access_key_id = $R2_ACCESS_KEY" >> ~/.config/rclone/rclone.conf
-          echo "secret_access_key = $R2_SECRET_KEY" >> ~/.config/rclone/rclone.conf
-          echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
-          node scripts/upload.js
-
-      # ── 4a. Upload video HLS via SDK (correct types) ──
-      # Reconcile also rewrites Cache-Control on existing objects (metadata-only
-      # CopyObject) so previously no-store videos flip to max-age in the same run.
-      - name: Upload video media
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          VIDEO_CACHE_CONTROL: 'public, max-age=86400'
-        run: |
-          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
-          node worker/scripts/upload-videos.mjs
-
-      # ── 4b. Sync stripped originals back to R2 (EXIF-free) ──
-      - name: Sync stripped originals back
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: |
-          if [ -z "$R2_ACCESS_KEY" ]; then echo "Skip - no R2 creds"; exit 0; fi
-          mkdir -p ~/.config/rclone
-          echo '[r2]' > ~/.config/rclone/rclone.conf
-          echo 'type = s3' >> ~/.config/rclone/rclone.conf
-          echo 'provider = Cloudflare' >> ~/.config/rclone/rclone.conf
-          echo "access_key_id = $R2_ACCESS_KEY" >> ~/.config/rclone/rclone.conf
-          echo "secret_access_key = $R2_SECRET_KEY" >> ~/.config/rclone/rclone.conf
-          echo "endpoint = $R2_ENDPOINT" >> ~/.config/rclone/rclone.conf
-          rclone copy content/posts/ r2:${R2_BUCKET}/originals/ \
-            --include "*/photos/**" --include "*/videos/**" --include "*/music/**" --include "*/cover.*" \
-            --checksum --transfers 4 --retries 5 --low-level-retries 20
-          echo "Originals synced back (EXIF stripped)"
-
-      - name: Progress — deploy
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: node scripts/build-progress.mjs deploy || true
-
-      # ── 4c. Minify frontend assets (after all tests so checks see source assets) ──
-      - name: Minify frontend assets
-        run: node scripts/minify.mjs
-
-      # ── 5. Strip media from dist (served from R2) ──
-      - name: Strip media from dist
-        run: |
-          echo "Removing media files from dist/ (served from R2)..."
-          find dist -type d -name media -exec rm -rf {} + 2>/dev/null || true
-          echo "Media stripped — Pages only needs HTML/CSS/JS/data"
-
-      # ── 6. Copy Functions + Deploy to CF Pages ──
-      - name: Copy Functions to dist
-        run: |
-          if [ -d "functions" ]; then
-            cp -r functions dist/
-            echo "Functions copied to dist/"
-          fi
-
+          npx playwright install --with-deps chromium webkit
+          npm run test:e2e:local
+      - name: Deploy progress
+        if: github.ref_name == env.SITE_BRANCH
+        run: node scripts/site/snapshot.mjs progress deploy
       - name: Deploy to Cloudflare Pages
+        id: deploy
+        if: github.ref_name == env.SITE_BRANCH
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Pin the CLI to the version the pipeline has been using; only the
-          # action runtime changes (Node 20 -> 24, clears the deprecation note).
           wranglerVersion: '3.114.17'
-          command: pages deploy dist/ --project-name mosaic --branch main --commit-dirty=true
-
-      - name: Finish build progress
+          command: pages deploy dist/ --project-name ${{ env.SITE_PROJECT }} --branch ${{ env.SITE_BRANCH }} --commit-dirty=true
+      - name: Publish site data cache
+        id: cache
+        if: github.ref_name == env.SITE_BRANCH
+        run: node scripts/site/upload-data.mjs
+      - name: Acknowledge deployment
+        if: always() && github.ref_name == env.SITE_BRANCH
         env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          JOB_STATUS: ${{ steps.deploy.outcome }}
+          CACHE_STATUS: ${{ steps.cache.outcome }}
         run: |
-          node scripts/build-progress.mjs done || true
+          if [ -f .mosaic/build-lease.json ]; then node scripts/site/snapshot.mjs done "$JOB_STATUS"; fi

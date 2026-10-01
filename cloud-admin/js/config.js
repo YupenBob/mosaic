@@ -79,13 +79,17 @@ export default async function renderConfig(signal) {
         }
         links.forEach((a) => a.classList.toggle('active', a.dataset.target === current));
       };
-      document.addEventListener('scroll', spy, { passive: true });
+      document.addEventListener('scroll', spy, { passive: true, signal });
       links.forEach((a) => {
-        a.addEventListener('click', (e) => {
-          e.preventDefault();
-          const el = document.getElementById('config-section-' + a.dataset.target);
-          el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+        a.addEventListener(
+          'click',
+          (e) => {
+            e.preventDefault();
+            const el = document.getElementById('config-section-' + a.dataset.target);
+            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          },
+          { signal },
+        );
       });
       spy();
       wireConfigDirty();
@@ -288,6 +292,14 @@ function mediaSection(cfg) {
 
 function buildSection(cfg) {
   return `
+    ${num('media.timeoutMinutes', t('config.mediaTimeout'), t('config.mediaTimeoutHint'), cfg)}
+    ${num('media.maxRetries', t('config.mediaRetries'), '', cfg)}
+    ${num('media.debounceMs', t('config.mediaDebounce'), '', cfg)}
+    ${num('media.retentionDays', t('config.mediaRetention'), '', cfg)}
+    ${num('upload.concurrency', t('config.uploadConcurrency'), '', cfg)}
+    ${txt('deployment.branch', t('config.deployBranch'), '', cfg)}
+    ${txt('deployment.siteProject', t('config.siteProject'), '', cfg)}
+    ${txt('deployment.adminProject', t('config.adminProject'), '', cfg)}
     <div class="config-field">
       <label class="config-label"><span>${t('config.buildTimeout')}</span><small>${t('config.buildTimeoutHint')}</small></label>
       <input type="number" class="input" data-config="build.timeoutMinutes" data-type="number" aria-label="${t('config.buildTimeout')}" value="${cfgGet(cfg, 'build.timeoutMinutes', 90)}" min="10" max="360" step="5" style="width:120px" />
@@ -302,7 +314,6 @@ function buildSection(cfg) {
 function featuresSection(cfg) {
   return `
     ${tog('enableBusuanzi', t('config.busuanzi'), t('config.busuanziHint'), cfg)}
-    ${tog('enableVideoCompression', t('config.videoCompress'), t('config.videoCompressHint'), cfg)}
     ${num('searchMinChars', t('config.searchMin'), t('config.searchMinHint'), cfg)}
     <div class="config-field" style="border-bottom:none;padding-top:14px"><label class="config-label"><span style="font-weight:600">${t('config.compSwitch')}</span><small>${t('config.compSwitchHint')}</small></label></div>
     ${tog('components.gallery.enabled', t('config.gallery'), t('config.galleryHint'), cfg)}
@@ -352,6 +363,7 @@ window.uploadFavicon = async (input) => {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': file.type || 'image/svg+xml' },
       body: file,
+      signal: state.pageScope?.signal,
     });
     if (!resp.ok) throw new Error('Upload failed');
     const mediaBase = state.mediaBase || window.__MEDIA_BASE__ || '';

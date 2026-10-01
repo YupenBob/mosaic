@@ -2,7 +2,7 @@
  * Site configuration read/write (deep-merged in github.js).
  */
 import { getConfig, updateConfig, markDirty } from '../github.js';
-import { defer } from '../shared.js';
+import { reconcileMedia } from '../services/jobs.js';
 
 export function registerConfig(app) {
   app.get('/api/config', async (c) => {
@@ -18,7 +18,8 @@ export function registerConfig(app) {
     try {
       const { message, ...config } = await c.req.json();
       const result = await updateConfig(c, config, message);
-      defer(c, () => markDirty(c.env));
+      await markDirty(c.env, result.commit?.sha || '');
+      await reconcileMedia(c);
       return c.json({ ok: true, sha: result.content?.sha });
     } catch (e) {
       return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502);

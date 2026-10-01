@@ -7,21 +7,29 @@
     "node": ">=22"
   },
   "scripts": {
-    "compress": "node scripts/compress.js",
+    "compress": "node scripts/media/run.mjs",
     "build": "node scripts/generate.js && node scripts/generate-brand-assets.js && node scripts/minify.mjs",
     "serve": "npx serve dist",
-    "check": "node --check scripts/compress.js scripts/generate.js scripts/upload.js scripts/generate-brand-assets.js scripts/build-progress.mjs scripts/sync-proxy.mjs scripts/minify.mjs scripts/validate-config.mjs scripts/media-names.mjs scripts/blocks.mjs scripts/media-utils.mjs scripts/music-meta.mjs shared/pages-proxy.mjs worker/scripts/r2-upload.mjs worker/scripts/upload-videos.mjs && node scripts/sync-proxy.mjs --check && node scripts/validate-config.mjs && node tests/blocks-smoke.mjs && node tests/upload-logic-smoke.mjs && node tests/waveform-smoke.mjs && node tests/music-meta-smoke.mjs && node tests/generate-data-smoke.mjs && node tests/worker-smoke.mjs && node tests/admin-smoke.mjs && node tests/a11y-admin.mjs && node tests/build-smoke.mjs",
+    "check": "node scripts/check.mjs && npm run validate && npm run test:unit && npm run test:site",
     "a11y:front": "node tests/a11y-front.mjs",
     "a11y:admin": "node tests/a11y-admin.mjs",
     "validate": "node scripts/validate-config.mjs",
     "minify": "node scripts/minify.mjs",
-    "test:e2e:local": "node tests/local-e2e.mjs",
+    "test:e2e:local": "node tests/local-e2e.mjs && node tests/frontend-local.mjs",
     "test:admin": "node tests/admin-smoke.mjs",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "media:process": "node scripts/media/run.mjs",
+    "media:migrate": "node scripts/media/migrate.mjs",
+    "test:unit": "node tests/blocks-smoke.mjs && node tests/upload-logic-smoke.mjs && node tests/worker-smoke.mjs && node tests/jobs-smoke.mjs && node tests/upload-jobs.mjs && node tests/config-smoke.mjs && node tests/list-index.mjs",
+    "test:site": "node tests/site-smoke.mjs",
+    "test:media": "node tests/media-integration.mjs && node tests/music-meta-smoke.mjs && node tests/waveform-smoke.mjs",
+    "test:admin:local": "node tests/admin-local.mjs",
+    "test:online": "node tests/check-site.mjs && node tests/admin-smoke.mjs && node tests/a11y-admin.mjs"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1068.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "axe-core": "^4.13.0",

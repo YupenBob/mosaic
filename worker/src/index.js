@@ -16,6 +16,8 @@ import { registerConfig } from './routes/config.js';
 import { registerTaxonomy } from './routes/taxonomy.js';
 import { registerAdmin } from './routes/admin.js';
 import { StatsDurableObject } from './stats-do.js';
+import { JobsDurableObject } from './jobs-do.js';
+import { registerInternalJobs, registerMediaJobs } from './routes/jobs.js';
 
 const app = new Hono();
 
@@ -44,6 +46,7 @@ app.post('/api/auth/login', loginHandler);
 registerHealth(app);
 registerStatsPublic(app);
 registerMediaPublic(app);
+registerInternalJobs(app);
 
 // ====== Protected routes ======
 app.use('/api/*', authMiddleware);
@@ -63,9 +66,10 @@ registerBuild(app);
 registerConfig(app);
 registerTaxonomy(app);
 registerAdmin(app);
+registerMediaJobs(app);
 
 // 404
 app.all('*', (c) => c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404));
 
 export default app;
-export { StatsDurableObject };
+export { StatsDurableObject, JobsDurableObject };

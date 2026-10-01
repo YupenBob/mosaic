@@ -21,6 +21,11 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { verifyToken } from './auth.js';
 import { adjustUsage } from './usage.js';
 import { markDirty } from './github.js';
+import { DEFAULTS } from '../../shared/config.mjs';
+import { getConfig } from './services/site-config.js';
+import { registerUpload, invalidateMedia, jobsRequest } from './services/jobs.js';
+import { folderFor, validSegment } from '../../shared/media-manifest.mjs';
+import { protectedMediaKeys } from './services/media-references.js';
 
 // Workers platform request-body limit (~100MB). Larger files must use the
 // presigned direct-to-R2 upload path.
@@ -28,17 +33,17 @@ const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 // Multipart part size bounds (R2 allows up to 10,000 parts; 5MB..1GB per part).
 const MIN_PART_BYTES = 5 * 1024 * 1024;
 const MAX_PART_BYTES = 1024 * 1024 * 1024;
-const DEFAULT_PART_BYTES = 100 * 1024 * 1024;
 const MAX_PARTS = 10000;
 
 function s3Client(c) {
   const accountId = c.env.CF_ACCOUNT_ID || '';
+  const endpoint = c.env.R2_ENDPOINT || (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : '');
   const accessKey = c.env.R2_ACCESS_KEY || '';
   const secretKey = c.env.R2_SECRET_KEY || '';
-  if (!accessKey || !secretKey || !accountId) return null;
+  if (!accessKey || !secretKey || !endpoint) return null;
   return new S3Client({
     region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    endpoint,
     credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
     forcePathStyle: true,
   });
@@ -77,9 +82,9 @@ async function signedFetch(signedUrl, method, body, extraHeaders = {}) {
   return resp;
 }
 
-async function listUploadedParts(client, bucket, key, uploadId) {
+async function listUploadedParts(client, bucket, key, uploadId, expires = DEFAULTS.upload.presignSeconds) {
   const url = await getSignedUrl(client, new ListPartsCommand({ Bucket: bucket, Key: key, UploadId: uploadId }), {
-    expiresIn: 3600,
+    expiresIn: expires,
   });
   const resp = await signedFetch(url, 'GET');
   const xml = await resp.text();
@@ -123,15 +128,13 @@ const EXT_CONTENT_TYPE = {
 };
 
 function folderForExt(ext) {
-  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) return 'photos';
-  if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) return 'videos';
-  if (['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) return 'music';
-  return 'others';
+  return folderFor(`file.${ext}`);
 }
 
 // site-data is a reserved namespace (favicon etc.): not a post slug, so it is
 // never picked up by the pipeline sync and never swept as an orphan.
 export function mediaKey(slug, filename) {
+  if (!validSegment(slug) || !validSegment(filename)) throw new Error('Invalid media name');
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   return slug === 'site-data' ? `site-data/${filename}` : `originals/${slug}/${folderForExt(ext)}/${filename}`;
 }
@@ -151,7 +154,8 @@ export async function uploadDirect(c) {
   }
 
   const length = parseInt(c.req.header('Content-Length') || '0', 10);
-  if (length > MAX_UPLOAD_BYTES) {
+  const config = await getConfig(c);
+  if (length > Math.min(MAX_UPLOAD_BYTES, config.upload.maxFileBytes)) {
     return c.json(
       { error: 'File too large (max 100MB via Worker; use presigned upload above this)', code: 'PAYLOAD_TOO_LARGE' },
       413,
@@ -166,8 +170,14 @@ export async function uploadDirect(c) {
 
   await c.env.MEDIA.put(key, c.req.raw.body, { httpMetadata: { contentType } });
   const obj = await c.env.MEDIA.head(key).catch(() => null);
-  await adjustUsage(c.env, obj?.size ?? length, 1);
-  return c.json({ ok: true, key, filename, folder: isSiteData ? 'site-data' : folder });
+  if (!obj)
+    return c.json({ error: 'Uploaded object could not be verified; retry confirmation', code: 'R2_ERROR' }, 503);
+  if (obj.size > config.upload.maxFileBytes)
+    return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
+  const task = await registerUpload(c, key, obj);
+  if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj?.size ?? length, task?.objectDelta ?? 1);
+  if (!task) await markDirty(c.env);
+  return c.json({ ok: true, key, filename, folder: isSiteData ? 'site-data' : folder, ...(task || {}) });
 }
 
 // Confirm a presigned direct upload landed in R2, then mark the site dirty.
@@ -179,9 +189,12 @@ export async function uploadComplete(c) {
   try {
     const obj = await c.env.MEDIA.head(key);
     if (!obj) return c.json({ error: 'Object not found', code: 'NOT_FOUND' }, 404);
-    await markDirty(c.env);
-    await adjustUsage(c.env, obj.size || 0, 1);
-    return c.json({ ok: true, key, size: obj.size });
+    if (obj.size > (await getConfig(c)).upload.maxFileBytes)
+      return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
+    const task = await registerUpload(c, key, obj);
+    if (!task) await markDirty(c.env);
+    if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj.size ?? 0, task?.objectDelta ?? 1);
+    return c.json({ ok: true, key, size: obj.size, ...(task || {}) });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
   }
@@ -192,6 +205,8 @@ export async function deleteMediaFile(c) {
   const slug = c.req.param('slug');
   const filename = c.req.param('file');
   if (!slug || !filename) return c.json({ error: 'slug and file required', code: 'INVALID_PARAMS' }, 400);
+  await invalidateMedia(c.env, slug, filename);
+  const protectedKeys = await protectedMediaKeys(c.env);
   let deleted = 0;
   let deletedSize = 0;
   for (const prefix of ['originals', 'processed']) {
@@ -201,7 +216,7 @@ export async function deleteMediaFile(c) {
       if (cursor) opts.cursor = cursor;
       const list = await c.env.MEDIA.list(opts);
       for (const obj of list.objects || []) {
-        if (obj.key.split('/').pop() === filename) {
+        if (obj.key.split('/').pop() === filename && !protectedKeys.has(obj.key)) {
           deletedSize += obj.size || 0;
           await c.env.MEDIA.delete(obj.key);
           deleted++;
@@ -220,6 +235,8 @@ export async function listMedia(c, mediaBaseOverride) {
   const r2Public = c.env.R2_PUBLIC_URL || mediaBaseOverride || '';
   const seen = new Set();
   const result = { photos: [], videos: [], music: [] };
+  const tasks = c.env.JOBS ? await jobsRequest(c.env, 'media-list', { slug }) : [];
+  const taskByFile = new Map(tasks.map((task) => [`${task.folder}/${task.filename}`, task]));
 
   const add = (name, size) => {
     if (seen.has(name)) return;
@@ -229,20 +246,26 @@ export async function listMedia(c, mediaBaseOverride) {
       ? `${r2Public}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(name)}`
       : `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`;
     const ext = name.split('.').pop()?.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) result.photos.push({ name, url, size });
-    else if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) result.videos.push({ name, url, size });
-    else if (['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) result.music.push({ name, url, size });
+    const task = taskByFile.get(`${folder}/${name}`);
+    const item = { name, url, size, ...(task ? { status: task.status, taskId: task.taskId } : {}) };
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) result.photos.push(item);
+    else if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) result.videos.push(item);
+    else if (['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) result.music.push(item);
   };
 
   try {
-    const list = await c.env.MEDIA.list({ prefix: `originals/${slug}/` });
-    for (const obj of list.objects || []) {
-      const name = obj.key.split('/').pop();
-      if (!name || name.startsWith('.')) continue;
-      add(name, obj.size);
-    }
+    let cursor;
+    do {
+      const list = await c.env.MEDIA.list({ prefix: `originals/${slug}/`, limit: 1000, ...(cursor ? { cursor } : {}) });
+      for (const obj of list.objects || []) {
+        const name = obj.key.split('/').pop();
+        if (!name || name.startsWith('.')) continue;
+        add(name, obj.size);
+      }
+      cursor = list.truncated ? list.cursor : null;
+    } while (cursor);
   } catch (e) {
-    /* return empty */
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 502);
   }
   return c.json(result);
 }
@@ -307,18 +330,21 @@ export async function generatePresignedUrl(c) {
     return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
   }
 
-  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const config = await getConfig(c);
+  const bucket = config.mediaSource.bucket;
   const key = mediaKey(slug, filename);
   // ContentType intentionally NOT signed so the browser may send its own
   // Content-Type without breaking the SigV4 signature match.
-  const url = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 3600 });
+  const url = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: key }), {
+    expiresIn: config.upload.presignSeconds,
+  });
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   const folder = slug === 'site-data' ? 'site-data' : folderForExt(ext);
   return c.json({
     url,
     key,
     folder,
-    expires: 3600,
+    expires: config.upload.presignSeconds,
     contentType: contentType || EXT_CONTENT_TYPE[ext] || 'application/octet-stream',
   });
 }
@@ -334,10 +360,13 @@ export async function startMultipartUpload(c) {
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
 
-  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const config = await getConfig(c);
+  const bucket = config.mediaSource.bucket;
   const key = mediaKey(slug, filename);
-  const partBytes = Math.min(MAX_PART_BYTES, Math.max(MIN_PART_BYTES, parseInt(partSize) || DEFAULT_PART_BYTES));
+  const partBytes = Math.min(MAX_PART_BYTES, Math.max(MIN_PART_BYTES, parseInt(partSize) || config.upload.partSize));
   const totalSize = Math.max(1, parseInt(size) || 0);
+  if (totalSize > config.upload.maxFileBytes)
+    return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
   const partCount = Math.min(MAX_PARTS, Math.max(1, Math.ceil(totalSize / partBytes)));
 
   try {
@@ -348,7 +377,7 @@ export async function startMultipartUpload(c) {
       const url = await getSignedUrl(
         client,
         new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType || undefined }),
-        { expiresIn: 3600 },
+        { expiresIn: config.upload.presignSeconds },
       );
       const resp = await signedFetch(url, 'POST', undefined, contentType ? { 'Content-Type': contentType } : {});
       const xml = await resp.text();
@@ -369,11 +398,19 @@ export async function startMultipartUpload(c) {
       const url = await getSignedUrl(
         client,
         new UploadPartCommand({ Bucket: bucket, Key: key, UploadId: id, PartNumber: i }),
-        { expiresIn: 3600 },
+        { expiresIn: config.upload.presignSeconds },
       );
       parts.push({ partNumber: i, url });
     }
-    return c.json({ ok: true, uploadId: id, key, partSize: partBytes, partCount, parts, expires: 3600 });
+    return c.json({
+      ok: true,
+      uploadId: id,
+      key,
+      partSize: partBytes,
+      partCount,
+      parts,
+      expires: config.upload.presignSeconds,
+    });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
   }
@@ -387,10 +424,11 @@ export async function listMultipartParts(c) {
   }
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
-  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const config = await getConfig(c);
+  const bucket = config.mediaSource.bucket;
   const key = mediaKey(slug, filename);
   try {
-    const parts = await listUploadedParts(client, bucket, key, uploadId);
+    const parts = await listUploadedParts(client, bucket, key, uploadId, config.upload.presignSeconds);
     return c.json({ ok: true, parts });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
@@ -405,10 +443,23 @@ export async function completeMultipartUpload(c) {
   }
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
-  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const config = await getConfig(c);
+  const bucket = config.mediaSource.bucket;
   const key = mediaKey(slug, filename);
   try {
-    const parts = await listUploadedParts(client, bucket, key, uploadId);
+    if (c.env.JOBS) {
+      const receipt = await jobsRequest(c.env, 'upload-receipt', { uploadId, key });
+      if (receipt)
+        return c.json({
+          ok: true,
+          key,
+          size: receipt.source.size,
+          taskId: receipt.id,
+          status: receipt.status,
+          duplicate: true,
+        });
+    }
+    const parts = await listUploadedParts(client, bucket, key, uploadId, config.upload.presignSeconds);
     if (!parts.length) return c.json({ error: 'No parts uploaded', code: 'INVALID_PARTS' }, 400);
     const url = await getSignedUrl(
       client,
@@ -420,7 +471,7 @@ export async function completeMultipartUpload(c) {
       }),
       // The presigned URL pins content-length to the SDK's own serialization;
       // xmlBody above is byte-identical, so the signature holds.
-      { expiresIn: 3600 },
+      { expiresIn: config.upload.presignSeconds },
     );
     // Byte-identical to the SDK's own serialization: the presigned URL pins
     // content-length, so a hand-built body must match exactly (XML declaration,
@@ -434,9 +485,13 @@ export async function completeMultipartUpload(c) {
       '</CompleteMultipartUpload>';
     await signedFetch(url, 'POST', xmlBody);
     const obj = await c.env.MEDIA.head(key).catch(() => null);
-    await markDirty(c.env);
-    await adjustUsage(c.env, obj?.size || 0, 1);
-    return c.json({ ok: true, key, size: obj?.size || 0 });
+    if (!obj) throw new Error('Completed multipart object is missing');
+    if (obj.size > config.upload.maxFileBytes)
+      return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
+    const task = await registerUpload(c, key, obj, { uploadId });
+    if (!task) await markDirty(c.env);
+    if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj.size ?? 0, task?.objectDelta ?? 1);
+    return c.json({ ok: true, key, size: obj.size, ...(task || {}) });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
   }
@@ -450,13 +505,14 @@ export async function abortMultipartUpload(c) {
   }
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
-  const bucket = c.env.R2_BUCKET || 'mosaic-media';
+  const config = await getConfig(c);
+  const bucket = config.mediaSource.bucket;
   const key = mediaKey(slug, filename);
   try {
     const url = await getSignedUrl(
       client,
       new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }),
-      { expiresIn: 3600 },
+      { expiresIn: config.upload.presignSeconds },
     );
     await signedFetch(url, 'DELETE');
     return c.json({ ok: true });

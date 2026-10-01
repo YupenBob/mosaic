@@ -19,7 +19,7 @@ register({
   async init() {
     if ($('.gallery-grid, .gallery-single')) {
       const { initGallery } = await import('./gallery.js');
-      initGallery();
+      initGallery(window.__MOSAIC_CONFIG?.components?.gallery || {});
     }
   },
 });
@@ -97,14 +97,14 @@ register({
   enabled: true,
   page: 'list',
   async init() {
-    const posts = await fetch(`${DATA_BASE}/posts.json?t=${Date.now()}`, { cache: 'no-cache' })
+    const posts = await fetch(`${DATA_BASE}/posts-index.json`, { cache: 'no-cache' })
       .then((r) => r.json())
       .catch(() => []);
     setPosts(posts);
     const { initFilter } = await import('./filter.js');
     initFilter(posts);
     const { initSearch } = await import('./search.js');
-    initSearch(posts);
+    if (window.__MOSAIC_CONFIG?.components?.search?.enabled !== false) initSearch(posts);
   },
 });
 
@@ -114,7 +114,7 @@ async function init() {
   const themeToggle = document.getElementById('theme-toggle');
   if (themeToggle) themeToggle.addEventListener('click', cycleTheme);
   try {
-    await loadComponents(null, pageType);
+    await loadComponents(window.__MOSAIC_CONFIG?.components || {}, pageType);
   } catch (err) {
     console.error('App init failed:', err);
     const grid = $('.card-grid');
