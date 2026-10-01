@@ -125,6 +125,14 @@ try {
     '__video__/post/clip': JSON.stringify({ tiers: ['240p'], height: 480 }),
   });
   assert.equal(migrated.assets['post/videos/clip.mp4'].published, null);
+  await legacy.bucket.put('processed/cover/covers/cover-480p.webp', 'existing cover');
+  const orphanCover = await migrateLegacy(legacy.store, legacy.config, {}, { cover: 'cover.jpg' });
+  assert.equal(orphanCover.assets['cover/covers/cover.jpg'].status, 'ready');
+  assert.equal(orphanCover.assets['cover/covers/cover.jpg'].source.available, false);
+  assert.equal(
+    orphanCover.assets['cover/covers/cover.jpg'].published.original,
+    'processed/cover/covers/cover-480p.webp',
+  );
   console.log(
     'Media integration: real image/video/audio processing, privacy, progressive publish, resume, immutable masters, upload failure and legacy object validation passed',
   );

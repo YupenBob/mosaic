@@ -1,9 +1,9 @@
 /** One-time bridge from v2 checksum manifests; every advertised object is verified. */
 import { assetId, emptyManifest, fingerprint } from '../../shared/media-manifest.mjs';
-import { processingConfig } from '../../shared/config.mjs';
+import { DEFAULTS, processingConfig } from '../../shared/config.mjs';
 import { videoBase } from '../media-names.mjs';
 import { tierListFor } from '../media-utils.mjs';
-export async function migrateLegacy(store, config, checksums = {}) {
+export async function migrateLegacy(store, config, checksums = {}, coverNames = {}) {
   const manifest = emptyManifest(),
     sources = [];
   const readJSON = async (key) => {
@@ -123,6 +123,36 @@ export async function migrateLegacy(store, config, checksums = {}) {
       configHash: await fingerprint(processingConfig(config, folder)),
       status: complete ? 'ready' : 'pending',
       published,
+    };
+  }
+  // Keep verified covers even if their original disappeared before migration.
+  for (const [slug, filename] of Object.entries(coverNames)) {
+    if (Object.values(manifest.assets).some((asset) => asset.slug === slug && asset.filename === filename)) continue;
+    const prefix = `processed/${slug}/covers/cover`,
+      variants = {};
+    for (const tier of Object.keys(DEFAULTS.imageQuality))
+      if (await store.head(`${prefix}-${tier}.webp`)) variants[tier] = `${prefix}-${tier}.webp`;
+    if (!Object.keys(variants).length) continue;
+    const placeholder = `${prefix}-10p.webp`,
+      meta = await readJSON(`${prefix}-meta.json`);
+    const id = assetId(slug, filename, 'covers');
+    manifest.assets[id] = {
+      id,
+      slug,
+      filename,
+      folder: 'covers',
+      order: filename,
+      version: 1,
+      generation: 'legacy',
+      source: { key: '', etag: '', size: 0, available: false },
+      configHash: await fingerprint(processingConfig(config, 'covers')),
+      status: 'ready',
+      published: {
+        variants,
+        original: Object.values(variants).at(-1),
+        placeholder: (await store.head(placeholder)) ? placeholder : Object.values(variants)[0],
+        aspect: meta?.aspect || Number(checksums[`__cover-meta__/${slug}`]) || 1.5,
+      },
     };
   }
   return manifest;

@@ -475,7 +475,7 @@ export class JobsDurableObject {
             await this.batchManifest(state, async () => {
               for (const id of ids) {
                 const asset = state.manifest.assets[id];
-                if (asset.status !== 'deleted') {
+                if (asset.status !== 'deleted' && asset.source.available !== false) {
                   const source = await this.env.MEDIA.head(asset.source.key);
                   if (source)
                     await this.handle(state, 'enqueue', {
