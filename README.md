@@ -190,6 +190,7 @@ video_mode: stacked           # stacked | playlist
 - [媒体指南](docs/media-guide.md)
 - [音乐指南](docs/music-guide.md)
 - [迁移指南](docs/migration.md)
+- [2026-10-01 上线与验收记录](docs/rollout-2026-10-01.md)
 - [交接文档](handover.md)
 
 ## 路线图

@@ -4,9 +4,8 @@
  * worker/.dev.vars (ADMIN_PASSWORD). Never prints the password.
  *
  * Usage: node tests/admin-smoke.mjs (or npm run test:admin)
- * Wired into `npm run check`: skips cleanly when worker/.dev.vars has no
- * ADMIN_PASSWORD (CI has no local secrets), so local checks get a real login
- * while CI stays green without credentials.
+ * Explicit online check (`npm run test:online`); default offline checks do
+ * not load production credentials. Skips when no local password is available.
  */
 import { chromium } from 'playwright';
 import fs from 'fs';
@@ -163,7 +162,7 @@ try {
   await page.evaluate(() => {
     location.hash = 'config';
   });
-  await page.waitForTimeout(4000);
+  await page.locator('.config-section').first().waitFor({ timeout: 60000 });
   const configSections = await page.locator('.config-section').count();
   console.log(`Config page loaded — sections=${configSections}`);
   if (configSections < 1) {

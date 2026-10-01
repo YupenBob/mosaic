@@ -29,3 +29,7 @@ node scripts/benchmark-site.mjs .mosaic/performance-baseline
 ```
 
 命令重建 `dist/` 并写入 `docs/performance.json`。生产媒体下载量零、无 FFmpeg 和无 checksum 的构建约束由 `tests/site-smoke.mjs` 的隔离临时工作区验证；列表请求数由 `tests/list-index.mjs` 的内存 R2 与禁止 GitHub 请求验证。浏览器路由和 API 测量使用本地 fixture；生产跨域播放另做线上检查。
+
+## 生产切换后的列表
+
+2026-10-01 上线后，同一批 13 篇文章的精简索引响应为 7480 B，切换前完整列表备份为 30019 B，减少 75.1%。索引无正文、内容块、媒体数组及波形。生产清单包含 14 项实际核验的媒体，因此不能把这组字节数与上表的 7 项图片固定样本混用。实际 HLS/MP4 播放与发布结果见 [上线记录](rollout-2026-10-01.md)。

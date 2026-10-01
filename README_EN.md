@@ -164,7 +164,7 @@ Auth-grouped REST endpoints (see [handover.md](handover.md) and [docs/api.md](do
 ├── tests/                    # E2E / smoke tests (Playwright + Node)
 ├── docs/                     # architecture / config / media / music / testing / ops
 ├── mosaic.config.json        # site config
-└── .github/workflows/        # pipeline (build/deploy) + health-check
+└── .github/workflows/        # site + media + infrastructure + verify + health-check
 ```
 
 ## Deploy
@@ -188,7 +188,10 @@ See **[docs/SETUP.md](docs/SETUP.md)** for details.
 - [Testing Guide](docs/testing.md)
 - [Operations](docs/operations.md)
 - [Migration](docs/migration.md)
+- [Production rollout and acceptance, 2026-10-01](docs/rollout-2026-10-01.md)
 - [Handover](handover.md)
+
+The refactor was merged in [PR #3](https://github.com/YupenBob/mosaic/pull/3) and deployed in infrastructure → media migration → site order. Manifest revision 1 retains 14 verified assets without re-encoding existing videos. Real mobile Chromium HLS, WebKit MP4 fallback, authenticated admin checks and all 27 sitemap URLs passed. The production list index decreased from 30019 B to 7480 B (75.1%); the isolated generator benchmark is slower and is reported separately in [performance measurements](docs/performance.md).
 
 ## Roadmap
 

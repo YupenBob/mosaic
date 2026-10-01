@@ -48,4 +48,6 @@ npm run test:admin:local
 
 回退使用上一成功 Pages 部署及其 Git SHA/清单 revision；保留 JOBS 与 STATS 命名空间，停止新媒体任务后再恢复旧流程，不删除旧 generation。
 
-详见 [架构](docs/architecture.md)、[配置](docs/configuration.md)、[API](docs/api.md)、[测试](docs/testing.md)、[性能](docs/performance.md)、[迁移](docs/migration.md)、[运维](docs/operations.md)。实际线上切换结果另记于运维记录，不能以本地测试代替生产验证。
+2026-10-01 已通过 PR #3 合入 main，并完成 Infrastructure → Media → Site 切换。线上清单 revision 1 保留 14 项 ready 媒体，旧视频未重新转码，站点签名确认后 dirty 为零；真实移动 Chromium HLS、WebKit MP4 和后台只读巡检已通过。工作流运行、部署及回退标识见 [上线记录](docs/rollout-2026-10-01.md)。
+
+详见 [架构](docs/architecture.md)、[配置](docs/configuration.md)、[API](docs/api.md)、[测试](docs/testing.md)、[性能](docs/performance.md)、[迁移](docs/migration.md)、[运维](docs/operations.md)。

@@ -32,3 +32,7 @@
 生产分支默认 main，可通过 SITE_BRANCH 覆盖；Worker 内容 GET 与写入使用同一分支。改配置后核对基础设施 Variables 与 JSON 目标。首次启用必须先部署 Worker 和 Secret，再迁移媒体，最后切换站点工作流；不要将三条初始流程同时启动。
 
 相关官方契约：[DO alarms](https://developers.cloudflare.com/durable-objects/api/alarms/)、[Pages 项目 PATCH](https://developers.cloudflare.com/api/typescript/resources/pages/subresources/projects/methods/edit/)。
+
+## 上线记录
+
+[2026-10-01 全项目重构与媒体解耦上线](rollout-2026-10-01.md)：工作流运行、清单核验、真实移动端播放、后台验收、部署及回退标识。
