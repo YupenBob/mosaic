@@ -60,3 +60,5 @@ Node 脚本仅读取显式环境，不自动加载 `.env` 或 `worker/.dev.vars`
 - 本地构建：`MOSAIC_ROOT`、`MOSAIC_DIST`、`MEDIA_MANIFEST_FILE`；输出目录必须在工作区内且不能覆盖源码或内容。媒体临时目录可用 `MEDIA_WORK_DIR`。
 
 `SITE_BRANCH` 同时覆盖 Worker 内容 API 的 ref 和 Actions 调度分支。切换分支应更新基础设施配置与 Variables，再执行部署。校验命令为 `npm run validate`；后台配置更新也执行相同共享校验。
+
+后台部署暂存目录默认 .mosaic/admin-dist，可用 ADMIN_DIST 覆盖为工作区内安全输出目录；scripts/stage-admin.mjs 不覆盖源码。资源版本由内容计算，不需要手动设置。

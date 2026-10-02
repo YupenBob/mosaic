@@ -22,7 +22,7 @@
     "format:check": "prettier --check .",
     "media:process": "node scripts/media/run.mjs",
     "media:migrate": "node scripts/media/migrate.mjs",
-    "test:unit": "node tests/blocks-smoke.mjs && node tests/upload-logic-smoke.mjs && node tests/worker-smoke.mjs && node tests/jobs-smoke.mjs && node tests/upload-jobs.mjs && node tests/config-smoke.mjs && node tests/list-index.mjs && node tests/admin-client.mjs && node tests/media-list.mjs && node tests/likes-logic.mjs",
+    "test:unit": "node tests/blocks-smoke.mjs && node tests/upload-logic-smoke.mjs && node tests/worker-smoke.mjs && node tests/jobs-smoke.mjs && node tests/upload-jobs.mjs && node tests/config-smoke.mjs && node tests/list-index.mjs && node tests/admin-client.mjs && node tests/media-list.mjs && node tests/likes-logic.mjs && node tests/published-assets.mjs",
     "test:site": "node tests/site-smoke.mjs",
     "test:media": "node tests/media-integration.mjs && node tests/music-meta-smoke.mjs && node tests/waveform-smoke.mjs",
     "test:admin:local": "node tests/admin-local.mjs && node tests/admin-experience.mjs",

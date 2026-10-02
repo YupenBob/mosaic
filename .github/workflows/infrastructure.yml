@@ -30,6 +30,7 @@ jobs:
           npm run check && npm run lint && npm run format:check
           npx playwright install --with-deps chromium
           npm run test:admin:local
+          node scripts/stage-admin.mjs
           npm exec --prefix worker -- wrangler deploy --config .mosaic/worker.json --dry-run
       - name: Deploy Worker and media coordinator
         if: github.ref_name == env.SITE_BRANCH
@@ -41,4 +42,4 @@ jobs:
         if: github.ref_name == env.SITE_BRANCH
         run: |
           node scripts/configure-pages.mjs
-          npm exec --prefix worker -- wrangler pages deploy cloud-admin --project-name "$ADMIN_PROJECT" --branch "$SITE_BRANCH"
+          npm exec --prefix worker -- wrangler pages deploy .mosaic/admin-dist --project-name "$ADMIN_PROJECT" --branch "$SITE_BRANCH"

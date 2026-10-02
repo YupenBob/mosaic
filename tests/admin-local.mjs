@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { stageAdmin } from '../scripts/lib/published-assets.mjs';
 import { chromium } from 'playwright';
 import { ROOT } from '../scripts/lib/context.mjs';
 import { normalizeConfig } from '../shared/config.mjs';
 import { serveDirectory } from './helpers/static-server.mjs';
-const server = await serveDirectory(path.join(ROOT, 'cloud-admin'));
+const staged = fs.mkdtempSync(path.join(os.tmpdir(), 'mosaic-admin-'));
+stageAdmin(path.join(ROOT, 'cloud-admin'), path.join(staged, 'dist'), staged);
+const server = await serveDirectory(path.join(staged, 'dist'));
 const browser = await chromium.launch({ headless: true });
 const requests = [],
   errors = [];
@@ -132,4 +137,5 @@ try {
 } finally {
   await browser.close();
   await server.close();
+  fs.rmSync(staged, { recursive: true, force: true });
 }

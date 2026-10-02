@@ -8,6 +8,7 @@ import { chromium, webkit } from 'playwright';
 import { ROOT, loadContext } from '../scripts/lib/context.mjs';
 import { generateSite } from '../scripts/site/generate.mjs';
 import { emptyManifest } from '../shared/media-manifest.mjs';
+import { stampApp } from '../scripts/lib/published-assets.mjs';
 
 // Use actual HTTP servers: Playwright routing disables the cache and concealed the production failure.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mosaic-experience-'));
@@ -91,7 +92,7 @@ const siteServer = http.createServer((req, res) => {
     });
     res.end(fs.readFileSync(file));
   };
-  if (url.pathname === '/assets/js/app.js' && appDelay) setTimeout(send, appDelay);
+  if (/\/assets\/js\/app(?:\.[a-f0-9]+)?\.js$/.test(url.pathname) && appDelay) setTimeout(send, appDelay);
   else send();
 });
 const siteUrl = await listen(siteServer);
@@ -143,6 +144,7 @@ try {
     minify: true,
     target: 'es2020',
   });
+  const publishedApp = stampApp(path.join(root, 'dist'));
   for (const engine of [webkit, chromium]) {
     const browser = await engine.launch({ headless: true });
     try {
@@ -233,7 +235,7 @@ try {
           .filter((r) => r.name.includes('/assets/js/') && !r.name.includes('/vendor/'))
           .map((r) => new URL(r.name).pathname),
       );
-      assert.deepEqual(modules, ['/assets/js/app.js'], 'published app has one module request');
+      assert.deepEqual(modules, ['/assets/js/' + publishedApp], 'published app has one versioned module request');
       console.log(`${engine.name()}: click before delayed scripts is replayed; one app request`);
       if (engine === chromium) {
         await page.goto(`${siteUrl}/posts/fallback/`, { waitUntil: 'domcontentloaded' });

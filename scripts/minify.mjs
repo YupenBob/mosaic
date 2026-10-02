@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadContext } from './lib/context.mjs';
 import { transform, build } from 'esbuild';
+import { stampApp } from './lib/published-assets.mjs';
 
 const { root: ROOT, dist } = loadContext();
 const ASSETS = path.join(dist, 'assets');
@@ -42,3 +43,4 @@ await build({
   target: 'es2020',
 });
 console.log('Minify complete');
+console.log('Published app:', stampApp(dist));
