@@ -59,3 +59,5 @@ npm run test:admin:local
 后台现在部署 .mosaic/admin-dist；先执行 node scripts/stage-admin.mjs，生成单个后台 ESM 入口及内容版本。前台发布文件名包含内容哈希。不要绕过此步骤部署源码，否则会重新引入模块下载链和 4 小时旧缓存。HLS 默认从最低已发布档开始自动升档，player.hls.startLevel 可覆盖，手动清晰度优先；这些策略不使媒体重新编码。
 
 2026-10-03 追加修复已通过 PR #5 上线，代码为 b565dd0、清单 revision 9。线上同浏览器跨部署缓存、暖重载和最低档首片均核验；main 的 Verify/Infrastructure/Site 全部成功。实际部署与回退 ID、网络样本及真机 Safari/iOS 的验证限制见体验记录和测量 JSON。
+
+同日 PR #6（d075f80）修复仪表盘接口乱序返回后的标题、图表、站点链接和入门提示；后台已部署并核验真实流量图与图表清理。前台沿用 b565dd0，媒体清单保持 revision 9。部署、验证运行与同浏览器更新记录见体验文档的仪表盘章节。

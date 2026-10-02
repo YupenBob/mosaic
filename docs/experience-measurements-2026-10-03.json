@@ -34,15 +34,18 @@
     "ci": [
       {
         "name": "Verify Mosaic",
-        "id": 37031775457
+        "id": 37031775457,
+        "result": "success"
       },
       {
         "name": "Mosaic Infrastructure",
-        "id": 37031775913
+        "id": 37031775913,
+        "result": "success"
       },
       {
         "name": "Mosaic Site",
-        "id": 37031775840
+        "id": 37031775840,
+        "result": "success"
       }
     ]
   },
@@ -439,5 +442,97 @@
     "The retained browser kept old CSS and modules across deployment; the after sample is not a fully cold context.",
     "Video samples use the same my-post content and manifest revision.",
     "Windows WebKit real MP4 and mocked HLS controls were tested locally; physical Safari/iOS was not tested."
-  ]
+  ],
+  "dashboard": {
+    "releaseSha": "d075f80fb86968ae42ace3e6b27cf51938f432eb",
+    "adminDeployment": {
+      "name": "mosaic-admin",
+      "id": "80f1f7fc-70db-4b5d-927a-8811a001e98e",
+      "sha": "d075f80fb86968ae42ace3e6b27cf51938f432eb"
+    },
+    "retainedBrowser": {
+      "before": {
+        "phase": "before rollout, cold",
+        "actionsMs": 7393,
+        "scripts": [
+          {
+            "path": "/js/admin.js?v=0a0ade8e66dd4916",
+            "start": 5267,
+            "end": 6481,
+            "bytes": 52052
+          }
+        ],
+        "dashboard": {
+          "subtitle": "加载中…",
+          "traffic": false,
+          "charts": 0
+        }
+      },
+      "after": {
+        "phase": "after rollout, same browser with old cached modules",
+        "actionsMs": 4504,
+        "scripts": [
+          {
+            "path": "/js/admin.js?v=5d819d2c34160ea9",
+            "start": 735,
+            "end": 4150,
+            "bytes": 52257
+          }
+        ],
+        "dashboard": {
+          "subtitle": "所有系统正常",
+          "traffic": true,
+          "charts": 3
+        }
+      },
+      "warm": {
+        "phase": "after rollout, warm",
+        "actionsMs": 1379,
+        "scripts": [
+          {
+            "path": "/js/admin.js?v=5d819d2c34160ea9",
+            "start": 518,
+            "end": 518,
+            "bytes": 0
+          }
+        ],
+        "dashboard": {
+          "subtitle": "所有系统正常",
+          "traffic": true,
+          "charts": 3
+        }
+      },
+      "errors": []
+    },
+    "live": {
+      "actionsMs": 4029,
+      "configRequests": 1,
+      "dashboard": {
+        "subtitle": "所有系统正常",
+        "trafficValues": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 4],
+        "charts": 3,
+        "siteLink": "https://mosaic.xsanye.cn/"
+      },
+      "postsRows": 14,
+      "mediaRows": 1,
+      "historyRows": 10,
+      "detailSteps": 16,
+      "brokenCovers": [],
+      "pageErrors": [],
+      "contentMutations": []
+    },
+    "ci": [
+      {
+        "name": "Verify Mosaic",
+        "id": 37035050320,
+        "result": "success"
+      },
+      {
+        "name": "Mosaic Infrastructure",
+        "id": 37035050059,
+        "result": "success"
+      }
+    ]
+  },
+  "updatedAt": "2026-10-02T16:51:39.532Z"
 }
