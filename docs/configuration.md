@@ -46,7 +46,7 @@
 
 没有显式 `media.timeoutMinutes` 时沿用旧 `build.timeoutMinutes`。处理指纹只包含对应处理器参数；改标题、缓存或部署域名不会使所有文件重新转码。
 
-HLS 默认 `autoStartLoad:false`、`startFragPrefetch:false`，点击播放才开始分片下载；`manifestLoadingTimeOut` 默认 10000ms。播放请求命名空间不是随机时间戳，同一版本仍可缓存。变更这些播放或后台策略不会触发转码。
+HLS 默认 `autoStartLoad:false`、`startFragPrefetch:false`，点击播放才开始分片下载；`manifestLoadingTimeOut` 默认 10000ms。`player.hls.startLevel` 默认 0，从最低已发布档开始后自动升档；可设为其他非负档位索引或 -1（由 HLS 自动估算）。用户手动选择且仍可用的清晰度优先。引擎直接读取统一 HLS 配置，不再覆盖启动档位。播放请求命名空间不是随机时间戳，同一版本仍可缓存。变更这些播放或后台策略不会触发转码。
 
 ## 环境与 Secrets
 

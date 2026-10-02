@@ -23,6 +23,18 @@ try {
   assert.equal(stageAdmin(source, output, root), first, 'identical source reuses cache keys');
   fs.appendFileSync(path.join(source, 'js/state.js'), '\n// changed');
   assert.notEqual(stageAdmin(source, output, root), first, 'dependency edits invalidate the whole graph');
+  fs.writeFileSync(
+    path.join(source, 'js/admin.js'),
+    "import { state } from './state.js?v=1'; window.fixtureState = state;",
+  );
+  fs.writeFileSync(path.join(source, 'index.html'), '<script type="module" src="js/admin.js"></script>');
+  const bundledVersion = stageAdmin(source, output, root);
+  const bundled = fs.readFileSync(path.join(output, 'js/admin.js'), 'utf8');
+  assert.ok(bundled.includes('fixtureState'), 'admin entry includes its dependencies');
+  assert.ok(!bundled.includes('from '), 'admin entry has no module waterfall');
+  assert.ok(fs.readFileSync(path.join(output, 'index.html'), 'utf8').includes('?v=' + bundledVersion));
+  assert.ok(fs.readFileSync(path.join(source, 'js/admin.js'), 'utf8').includes('import '), 'source remains modular');
+  assert.equal(stageAdmin(source, output, root), bundledVersion, 'identical compiled graph reuses its version');
   assert.throws(() => stageAdmin(source, root, root), /Unsafe/);
   fs.mkdirSync(path.join(output, 'assets/js'), { recursive: true });
   fs.writeFileSync(path.join(output, 'assets/js/app.js'), 'console.log(1)');

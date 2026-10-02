@@ -8,7 +8,7 @@ import { ROOT } from '../scripts/lib/context.mjs';
 import { normalizeConfig } from '../shared/config.mjs';
 import { serveDirectory } from './helpers/static-server.mjs';
 const staged = fs.mkdtempSync(path.join(os.tmpdir(), 'mosaic-admin-experience-'));
-const version = stageAdmin(path.join(ROOT, 'cloud-admin'), path.join(staged, 'dist'), staged);
+stageAdmin(path.join(ROOT, 'cloud-admin'), path.join(staged, 'dist'), staged);
 const server = await serveDirectory(path.join(staged, 'dist'));
 const browser = await chromium.launch({ headless: true });
 const requests = [],
@@ -139,6 +139,16 @@ try {
   assert.ok(shellMs < 1200, 'dashboard actions render before slow statistics');
   await page.locator('[data-metrics-retry]').waitFor();
   assert.equal(requests.filter((r) => r === '/config').length, 1, 'startup shares configuration request');
+  assert.equal(
+    await page.evaluate(
+      () =>
+        performance
+          .getEntriesByType('resource')
+          .filter((r) => /\/(js|src)\//.test(r.name) && !r.name.includes('/vendor/')).length,
+    ),
+    1,
+    'published admin loads one application module',
+  );
   console.log(`Admin slow service: actions available in ${shellMs}ms; failed metrics allow retry; one config request`);
   await page.evaluate(() => (location.hash = 'posts'));
   await page.locator('#post-search').waitFor();
@@ -175,10 +185,12 @@ try {
   await page.locator('[onclick="pickCover(\'video:1\')"]').click();
   assert.equal(await page.locator('#fm-cover').inputValue(), 'video:1');
   assert.equal(await page.locator('#cover-preview img').getAttribute('src'), server.url + '/poster-b.jpg');
-  assert.equal(
-    await page.evaluate(async (version) => (await import('/js/state.js?v=' + version)).state.editorDirty, version),
-    true,
-  );
+  await page.evaluate(() => (location.hash = 'posts'));
+  await page.locator('.modal-overlay').waitFor({ state: 'visible' });
+  assert.ok((await page.evaluate(() => location.hash)).startsWith('#editor'), 'cover edit activates unsaved guard');
+  await page.locator('.modal-overlay .btn-secondary').click();
+  await page.locator('.modal-overlay').waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('#fm-cover').inputValue(), 'video:1', 'cancel keeps the chosen cover');
   await page
     .locator('#editor-media-input')
     .setInputFiles({ name: 'clip.mp4', mimeType: 'video/mp4', buffer: Buffer.alloc(100) });
@@ -210,10 +222,8 @@ try {
     .locator('#editor-media-input')
     .setInputFiles({ name: 'direct.mp4', mimeType: 'video/mp4', buffer: Buffer.alloc(100) });
   await page.waitForFunction(() => !!document.querySelector('[data-task-id="direct-job"]'));
-  await page.evaluate(async (version) => {
-    (await import('/js/state.js?v=' + version)).state.editorDirty = false;
-    location.hash = 'posts';
-  }, version);
+  await page.evaluate(() => (location.hash = 'posts'));
+  await page.locator('.modal-overlay .btn-primary').click();
   await page.locator('#post-search').waitFor();
   await wait(250);
   const polls = requests.filter((r) => r.startsWith('/media-jobs/') && !r.endsWith('/retry')).length;

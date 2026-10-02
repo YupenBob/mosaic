@@ -24,7 +24,7 @@ Markdown 写故事，照片 / 视频 / 音乐做主角。
 
 Mosaic 是一个**多媒体优先的静态站点框架**：像 Hexo 一样用 Markdown 写作，但不是"挂 MP4 的博客"——照片画廊、多码率 HLS 视频、音乐播放器生来就是平台的主角。
 
-它把"内容创作 → 媒体处理 → 静态发布 → 数据统计"整条链路做成一个可复用的框架：内容在 Git，媒体在 Cloudflare R2，计算在 GitHub Actions，展示在 Cloudflare Pages，管理在一个零构建的云后台。**未来成百上千用户开箱即用**是每一处设计的出发点。
+它把"内容创作 → 媒体处理 → 静态发布 → 数据统计"整条链路做成一个可复用的框架：内容在 Git，媒体在 Cloudflare R2，计算在 GitHub Actions，展示在 Cloudflare Pages，管理在原生 JS 云后台。**未来成百上千用户开箱即用**是每一处设计的出发点。
 
 ## 特性一览
 
@@ -55,7 +55,7 @@ Mosaic 是一个**多媒体优先的静态站点框架**：像 Hexo 一样用 Ma
 
 | 能力 | 说明 |
 | --- | --- |
-| 零构建 SPA | 纯 Vanilla JS，ES Module 化，无框架、无打包步骤 |
+| 原生 JS SPA | 模块化源码，发布时生成带内容版本的单个 ESM 入口 |
 | 仪表盘 | 流量曲线、分类/标签真实统计、热门文章、存储用量、系统健康 |
 | 构建中心 | 独立媒体任务与站点部署进度、重试/取消、失败详情 |
 | 编辑器 | Markdown 实时预览、自动保存草稿、封面上传、媒体拖拽上传（并发 + 重试） |
@@ -165,7 +165,7 @@ video_mode: stacked           # stacked | playlist
 ├── worker/                   # Cloudflare Worker API（Hono + DO）
 │   ├── src/                  #   index / auth / github / r2 / stats-do
 │   └── scripts/              #   元数据迁移与 SDK 视频上传器
-├── cloud-admin/              # 云管理后台（零构建 Vanilla JS SPA）
+├── cloud-admin/              # 云管理后台（模块化 Vanilla JS SPA 源码）
 ├── functions/                # 前台 Pages Functions 代理
 ├── tests/                    # E2E / 冒烟测试（Playwright + Node）
 ├── docs/                     # 架构 / 配置 / 媒体 / 音乐 / 迁移 / 搭建文档
@@ -177,7 +177,7 @@ video_mode: stacked           # stacked | playlist
 
 1. 配置 Cloudflare（R2 桶 + Pages 项目 + Worker）
 2. 部署 Worker：`cd worker && npx wrangler deploy`
-3. 部署管理后台：`npx wrangler pages deploy cloud-admin --project-name mosaic-admin`
+3. 打包并部署管理后台：`node scripts/stage-admin.mjs`，然后 `npx wrangler pages deploy .mosaic/admin-dist --project-name mosaic-admin`（项目名按配置调整）
 4. 配置 GitHub Actions Secrets（R2 凭证、CF 令牌、Worker Secrets）
 5. 按 [迁移指南](docs/migration.md) 先部署任务 Worker、迁移清单，再启用独立工作流；纯内容 push 只构建站点
 

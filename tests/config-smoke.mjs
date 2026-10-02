@@ -19,6 +19,10 @@ assert.equal(
 );
 assert.deepEqual(validateConfig(config), []);
 assert.ok(validateConfig(normalizeConfig({ videoQuality: { crf: -1 } })).length);
+assert.equal(config.player.hls.startLevel, 0);
+assert.ok(validateConfig(normalizeConfig({ player: { hls: { startLevel: -2 } } })).length);
+assert.ok(validateConfig(normalizeConfig({ player: { hls: { startLevel: 0.5 } } })).length);
+assert.deepEqual(validateConfig(normalizeConfig({ player: { hls: { startLevel: -1 } } })), []);
 assert.throws(() => normalizeConfig(JSON.parse('{"__proto__":{"polluted":true}}')));
 assert.throws(() => assetId('../post', 'clip.mp4'));
 const first = normalizeConfig({ title: 'A' }),
@@ -31,5 +35,10 @@ assert.equal(
 assert.notEqual(
   await fingerprint(processingConfig(first, 'videos')),
   await fingerprint(processingConfig(normalizeConfig({ videoQuality: { crf: 30 } }), 'videos')),
+);
+assert.equal(
+  await fingerprint(processingConfig(first, 'videos')),
+  await fingerprint(processingConfig(normalizeConfig({ player: { hls: { startLevel: 1 } } }), 'videos')),
+  'playback startup changes must not invalidate encoding',
 );
 console.log('Config smoke: defaults, overrides, legacy fields, isolation and processor fingerprints passed');

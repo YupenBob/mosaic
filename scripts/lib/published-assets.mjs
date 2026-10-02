@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { buildSync } from 'esbuild';
 export function filesIn(directory) {
   return fs
     .readdirSync(directory, { withFileTypes: true })
@@ -34,11 +35,25 @@ export function stageAdmin(source, output, workspace) {
   const inputs = filesIn(source).filter(
     (file) => /\.(js|css|html)$/.test(file) && !file.includes(path.sep + 'functions' + path.sep),
   );
+  const entry = path.join(source, 'js/admin.js');
+  const bundle = fs.existsSync(entry)
+    ? buildSync({
+        entryPoints: [entry],
+        bundle: true,
+        write: false,
+        format: 'esm',
+        minify: true,
+        target: 'es2020',
+        logLevel: 'silent',
+      }).outputFiles[0].text
+    : null;
   const hash = crypto.createHash('sha256');
   for (const file of inputs) hash.update(path.relative(source, file)).update(fs.readFileSync(file));
+  if (bundle) hash.update(bundle);
   const version = hash.digest('hex').slice(0, 16);
   fs.rmSync(target, { recursive: true, force: true });
   fs.cpSync(source, target, { recursive: true });
+  if (bundle) fs.writeFileSync(path.join(target, 'js/admin.js'), bundle);
   for (const file of filesIn(target)) {
     if (
       !/\.(js|html)$/.test(file) ||
