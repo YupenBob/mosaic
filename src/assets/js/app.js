@@ -5,6 +5,8 @@ import { $ } from './utils.js';
 import { setPosts, initI18n } from './data.js';
 import { register, loadComponents } from './components.js';
 import { initTheme, cycleTheme } from './theme.js';
+import { initFilter } from './filter.js';
+import { initSearch } from './search.js';
 
 const DATA_BASE = document.querySelector('meta[name="data-base"]')?.content || '/data';
 
@@ -55,6 +57,8 @@ register({
   async init() {
     if ($('.like-button')) {
       const apiBase = document.querySelector('meta[name="api-base"]')?.content;
+      const { initLikes } = await import('./likes.js');
+      const updateLikes = initLikes({ apiBase });
       const slug = document.body.dataset.slug;
       // Pull live view/like counts from the Worker and patch the SSR numbers
       if (slug && apiBase) {
@@ -66,17 +70,12 @@ register({
             if (v && d.views != null) v.textContent = d.views;
             const l = document.getElementById('like-count-display');
             if (l && d.likes != null) l.textContent = d.likes;
-            const likeBtn = document.querySelector('.like-button');
-            if (likeBtn && d.likes != null) likeBtn.dataset.count = d.likes;
-            const lc = likeBtn?.querySelector('.like-count');
-            if (lc && likeBtn && !likeBtn.classList.contains('liked') && d.likes != null) lc.textContent = d.likes;
+            updateLikes?.(d.likes);
           }
         } catch {
           /* keep SSR fallback */
         }
       }
-      const { initLikes } = await import('./likes.js');
-      initLikes({ apiBase });
     }
   },
 });
@@ -97,16 +96,36 @@ register({
   enabled: true,
   page: 'list',
   async init() {
-    const posts = await fetch(`${DATA_BASE}/posts-index.json`, { cache: 'no-cache' })
-      .then((r) => r.json())
-      .catch(() => []);
+    const input = document.querySelector('.search-input');
+    let pendingQuery = input?.value || '';
+    const capture = () => {
+      pendingQuery = input.value;
+    };
+    input?.addEventListener('input', capture);
+    let posts;
+    try {
+      const response = await fetch(`${DATA_BASE}/posts-index.json`);
+      if (!response.ok) throw new Error(`Index HTTP ${response.status}`);
+      posts = await response.json();
+    } catch {
+      input?.removeEventListener('input', capture);
+      if (input) input.placeholder = tFallback();
+      return;
+    }
     setPosts(posts);
-    const { initFilter } = await import('./filter.js');
     initFilter(posts);
-    const { initSearch } = await import('./search.js');
-    if (window.__MOSAIC_CONFIG?.components?.search?.enabled !== false) initSearch(posts);
+    input?.removeEventListener('input', capture);
+    if (window.__MOSAIC_CONFIG?.components?.search?.enabled !== false) {
+      initSearch(posts);
+      if (pendingQuery) input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    document.documentElement.dataset.interactive = 'ready';
   },
 });
+
+function tFallback() {
+  return window.__LANG === 'en' ? 'Search unavailable — reload to retry' : '搜索暂不可用，请刷新重试';
+}
 
 async function init() {
   const pageType = document.body.dataset.page || 'list';

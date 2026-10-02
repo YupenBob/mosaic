@@ -4,34 +4,109 @@
 import { posts as postsApi, stats, health, disk, config, build, taxonomy } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
-import { escHtml, formatTime, quick, loadLib, emptyState } from './ui.js?v=1';
+import { escHtml, formatTime, loadLib, emptyState } from './ui.js?v=1';
 
 const CHART_URL = 'js/vendor/chart.umd.min.js';
 
-export default async function renderDashboard(signal) {
-  const [dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg, taxData] = await Promise.all([
-    quick(() => stats.dashboard(), { posts: '...', categories: '...', tags: '...' }),
-    quick(() => health.check(), { status: 'error' }),
-    quick(() => stats.traffic(), { total: '...', byDay: [], byCategory: [], byTag: [], top5: [] }, 20000),
-    quick(() => health.github(), { status: 'error' }),
-    quick(() => health.r2(), { status: 'error' }),
-    quick(() => disk.usage(), { sizeMB: '...', objects: '...', cost: '...' }),
-    quick(() => config.get(), {}),
-    quick(() => taxonomy.get(), { categories: [], tags: [] }),
-  ]);
-  if (signal.aborted) return '';
+export default function renderDashboard(signal) {
+  const model = {
+    dashData: { posts: '...', categories: '...', tags: '...' },
+    healthData: {},
+    healthGithub: {},
+    healthR2: {},
+    trafficData: { total: '...', byDay: [], top5: [] },
+    diskData: { sizeMB: '...', objects: '...', cost: '...' },
+    cfg: state.config || {},
+    taxData: { categories: [], tags: [] },
+    postList: [],
+    bs: null,
+  };
+  return {
+    html: renderSnapshot(model, signal).html.replace(
+      '<div class="dash-health-bar"',
+      '<div class="dash-load-errors" role="status"></div><div class="dash-health-bar"',
+    ),
+    onMount() {
+      const update = (key, value) => {
+        if (signal.aborted) return;
+        model[key] = value;
+        const snapshot = renderSnapshot(model, signal),
+          template = document.createElement('template');
+        template.innerHTML = snapshot.html;
+        for (const selector of ['.dash-health-bar', '.dash-cards', '.dash-bottom']) {
+          const target = document.querySelector(selector),
+            next = template.content.querySelector(selector);
+          if (target && next) target.innerHTML = next.innerHTML;
+        }
+        if (key === 'trafficData' || key === 'taxData') snapshot.onMount().catch(() => {});
+      };
+      const failures = new Map();
+      const showFailures = () => {
+        const region = document.querySelector('.dash-load-errors');
+        if (region)
+          region.innerHTML = failures.size
+            ? `<p>${t('common.partialError')} <button type="button" class="btn btn-secondary btn-sm" data-metrics-retry>${t('common.refresh')}</button></p>`
+            : '';
+      };
+      const run = (key, request) =>
+        request()
+          .then((value) => {
+            failures.delete(key);
+            showFailures();
+            update(key, value);
+          })
+          .catch(() => {
+            if (!signal.aborted) {
+              failures.set(key, request);
+              showFailures();
+            }
+          });
+      for (const [key, request] of Object.entries({
+        dashData: () => stats.dashboard(),
+        healthData: () => health.check(),
+        trafficData: () => stats.traffic(),
+        healthGithub: () => health.github(),
+        healthR2: () => health.r2(),
+        diskData: () => disk.usage(),
+        cfg: () => config.get(),
+        taxData: () => taxonomy.get(),
+        postList: async () => (await postsApi.list()).posts || [],
+        bs: () => build.status(),
+      }))
+        run(key, request);
+      document.querySelector('.dash-load-errors')?.addEventListener(
+        'click',
+        (event) => {
+          if (!event.target.closest('[data-metrics-retry]')) return;
+          for (const [key, request] of failures) run(key, request);
+        },
+        { signal },
+      );
+      signal.addEventListener(
+        'abort',
+        () => {
+          document
+            .querySelectorAll('.dash-charts canvas')
+            .forEach((canvas) => window.Chart?.getChart(canvas)?.destroy());
+        },
+        { once: true },
+      );
+    },
+  };
+}
 
+function renderSnapshot(
+  { dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg, taxData, postList, bs },
+  signal,
+) {
   if (cfg.mediaBase) state.mediaBase = cfg.mediaBase;
-  state.config = cfg;
-  state.siteUrl = cfg.url || '';
+  state.siteUrl = cfg.url || state.siteUrl || '';
   const today = new Date().toISOString().slice(0, 10);
   const todayViews = (trafficData.byDay || []).find((d) => d.date === today)?.count || 0;
   const weekViews = (trafficData.byDay || []).slice(-7).reduce((s, d) => s + d.count, 0);
 
   // Recent activity
   const activities = [];
-  const postResult = await quick(() => postsApi.list(), { posts: [] }, 20000);
-  const postList = postResult.posts || postResult || [];
   postList.slice(0, 5).forEach((p) => {
     if (p.date)
       activities.push({
@@ -40,31 +115,34 @@ export default async function renderDashboard(signal) {
         time: p.date,
       });
   });
-  try {
-    const bs = await quick(() => build.status().catch(() => null), null, 5000);
-    if (bs && bs.createdAt) {
-      activities.push({
-        icon: 'ri-tools-line',
-        text: 'Build #' + (bs.runNumber || '?') + ' ' + (bs.conclusion || bs.status),
-        time: bs.createdAt,
-      });
-    }
-  } catch {}
+  if (bs?.createdAt)
+    activities.push({
+      icon: 'ri-tools-line',
+      text: 'Build #' + (bs.runNumber || '?') + ' ' + (bs.conclusion || bs.status),
+      time: bs.createdAt,
+    });
   activities.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
 
   const healthItems = [
     {
       name: t('dashboard.healthWorker'),
-      status: healthData.status === 'ok' ? 'ok' : 'down',
+      status: healthData.status ? (healthData.status === 'ok' ? 'ok' : 'down') : 'pending',
       latency: healthData.latency,
     },
     {
       name: t('dashboard.healthGithub'),
-      status: healthGithub.status === 'ok' ? 'ok' : 'down',
+      status: healthGithub.status ? (healthGithub.status === 'ok' ? 'ok' : 'down') : 'pending',
       latency: healthGithub.latency,
     },
-    { name: t('dashboard.healthR2'), status: healthR2.status === 'ok' ? 'ok' : 'down', latency: healthR2.latency },
-    { name: t('dashboard.healthPages'), status: healthData.status === 'ok' ? 'ok' : 'down' },
+    {
+      name: t('dashboard.healthR2'),
+      status: healthR2.status ? (healthR2.status === 'ok' ? 'ok' : 'down') : 'pending',
+      latency: healthR2.latency,
+    },
+    {
+      name: t('dashboard.healthPages'),
+      status: healthData.status ? (healthData.status === 'ok' ? 'ok' : 'down') : 'pending',
+    },
   ];
   const allHealthy = healthItems.every((h) => h.status === 'ok');
 
@@ -97,7 +175,7 @@ export default async function renderDashboard(signal) {
         <div class="page-header">
           <div>
             <h1>${t('dashboard.title')}</h1>
-            <p class="page-subtitle">${allHealthy ? t('dashboard.healthy') : t('dashboard.issues')}</p>
+            <p class="page-subtitle">${healthItems.some((h) => h.status === 'pending') ? t('common.loading') : allHealthy ? t('dashboard.healthy') : t('dashboard.issues')}</p>
           </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary btn-sm" onclick="location.reload()"><i class="ri-refresh-line"></i> ${t('dashboard.refresh')}</button>
@@ -112,7 +190,7 @@ export default async function renderDashboard(signal) {
             .map(
               (h) => `
             <div class="dash-health-item">
-              <span class="dash-health-dot ${h.status === 'ok' ? 'healthy' : 'down'}"></span>
+              <span class="dash-health-dot ${h.status === 'ok' ? 'healthy' : h.status === 'down' ? 'down' : ''}"></span>
               <span class="dash-health-name">${h.name}</span>
               <span class="dash-health-info">${h.status === 'ok' ? t('common.ok') + (h.latency != null ? ` · ${h.latency}ms` : '') : '—'}</span>
             </div>`,
@@ -245,6 +323,7 @@ function makeChart(id, type, labels, data, colors) {
     c && c.startsWith('var(')
       ? getComputedStyle(document.documentElement).getPropertyValue(c.slice(4, -1)).trim() || '#4361ee'
       : c;
+  window.Chart.getChart(canvas)?.destroy();
   new window.Chart(canvas, {
     type,
     data: {

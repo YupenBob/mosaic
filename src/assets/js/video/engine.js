@@ -1,4 +1,5 @@
 /** HLS setup, adaptive levels and recovery. */
+import { playbackUrl } from './request.js';
 export function initHls(hlsSource, log) {
   if (this.isHLS && hlsSource && typeof window.Hls !== 'undefined' && window.Hls.isSupported?.() !== false) {
     // Pre-set sources so quality menu shows immediately
@@ -25,14 +26,18 @@ export function initHls(hlsSource, log) {
         backBufferLength: 30,
         startLevel: -1,
         enableWorker: true,
-        startFragPrefetch: true,
+        autoStartLoad: false,
+        startFragPrefetch: false,
         capLevelToPlayerSize: true,
         abrEwmaDefaultEstimate: defaultEstimate,
         fragLoadingMaxRetry: 6,
         fragLoadingTimeOut: 60000,
-        manifestLoadingTimeOut: 60000,
+        manifestLoadingTimeOut: 10000,
         levelLoadingTimeOut: 60000,
         ...window.__MOSAIC_CONFIG?.player?.hls,
+        xhrSetup(xhr, url) {
+          xhr.open('GET', playbackUrl(url), true);
+        },
       });
       log('info', 'HLS init: loading ' + hlsSource.src);
       this.hls.loadSource(hlsSource.src);
@@ -111,6 +116,10 @@ export function initHls(hlsSource, log) {
         if (!self.hls || self.lifecycle?.signal.aborted) return;
         log('error', 'HLS error: ' + data.type + ' - ' + (data.details || ''));
         if (data.fatal) {
+          if (/manifestLoad|manifestParsing/.test(data.details || '')) {
+            self.destroyHls();
+            return;
+          }
           self._fatalCount = (self._fatalCount || 0) + 1;
           log('error', 'HLS FATAL ' + data.type + ' (attempt ' + self._fatalCount + ')');
           try {

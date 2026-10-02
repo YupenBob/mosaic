@@ -11,6 +11,7 @@ import {
   build,
   config as configApi,
   setNavigationSignal,
+  configureClient,
 } from '../src/api.js';
 import { t, setLang, onLangChange } from './i18n.js?v=1';
 import { initTheme, cycleTheme } from './theme.js?v=1';
@@ -55,10 +56,16 @@ window.mosaicLogin = async () => {
     document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    state.config = await configApi.get();
     setupUploadZone();
     startPollers();
     onHashChange();
+    configApi
+      .get()
+      .then((cfg) => {
+        state.config = cfg;
+        configureClient(cfg.admin);
+      })
+      .catch(() => {});
   } catch (err) {
     errorEl.style.display = 'block';
     errorEl.textContent = t('login.error') + ': ' + (err.message || '');
@@ -146,26 +153,22 @@ function startPollers() {
   pollBuildStatus();
   loadSiteUrl();
   _dirtyPollTimer = setInterval(window.checkDirty, state.config.admin?.dirtyPollMs || 60000);
-  _buildPollTimer = setInterval(pollBuildStatus, state.config.admin?.jobPollMs || 5000);
 }
 
 async function loadSiteUrl() {
+  if (state.config.url) state.siteUrl = state.config.url;
   if (state.siteUrl) {
     const btn = document.getElementById('topbar-site-btn');
     if (btn) btn.href = state.siteUrl;
     return;
   }
   try {
-    const API = window.__API_BASE__ || '/api';
-    const resp = await fetch(API + '/config', { headers: { Authorization: 'Bearer ' + (getToken() || '') } });
-    if (resp.ok) {
-      const cfg = await resp.json();
-      if (cfg.url) {
-        state.siteUrl = cfg.url;
-        state.mediaBase = cfg.mediaBase || state.mediaBase;
-        const btn = document.getElementById('topbar-site-btn');
-        if (btn) btn.href = cfg.url;
-      }
+    const cfg = await configApi.get({ signal: null });
+    if (cfg.url) {
+      state.siteUrl = cfg.url;
+      state.mediaBase = cfg.mediaBase || state.mediaBase;
+      const btn = document.getElementById('topbar-site-btn');
+      if (btn) btn.href = cfg.url;
     }
   } catch {}
 }
@@ -185,7 +188,7 @@ async function pollBuildStatus() {
   const dot = document.getElementById('topbar-build-dot');
   if (!dot) return;
   try {
-    const s = await build.status().catch(() => null);
+    const s = await build.status({ signal: null }).catch(() => null);
     const running = !!(s && (s.status === 'in_progress' || s.status === 'queued'));
     _buildRunning = running;
     _currentBuildRun = running ? s : null;
@@ -214,7 +217,20 @@ async function pollBuildStatus() {
       dot.title = '';
       window.setBuildTriggerStates && window.setBuildTriggerStates(false);
     }
-  } catch {}
+  } catch {
+  } finally {
+    if (getToken() && state.authStatus === 'ok') {
+      clearTimeout(_buildPollTimer);
+      _buildPollTimer = setTimeout(
+        pollBuildStatus,
+        document.hidden
+          ? state.config.admin?.hiddenPollMs || 60000
+          : _buildRunning
+            ? state.config.admin?.jobPollMs || 5000
+            : state.config.admin?.idlePollMs || 30000,
+      );
+    }
+  }
 }
 
 // ── Global build trigger ───────────────────
@@ -663,10 +679,16 @@ async function init() {
     hideLoading();
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    state.config = await configApi.get();
     setupUploadZone();
     startPollers();
     onHashChange();
+    configApi
+      .get()
+      .then((cfg) => {
+        state.config = cfg;
+        configureClient(cfg.admin);
+      })
+      .catch(() => {});
   } else {
     hideLoading();
     document.getElementById('login-screen').style.display = 'flex';

@@ -2,7 +2,7 @@
  * Editor page — three-pane post editor with Markdown preview, autosave
  * drafts, cover picker, stats section and the media panel.
  */
-import { posts as postsApi, media as mediaApi } from '../src/api.js';
+import { posts as postsApi, media as mediaApi, mediaJobs } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, modalConfirm, loadLib, openModal, closeModal } from './ui.js?v=1';
@@ -101,14 +101,16 @@ function mediaBlockHtml(b, media) {
     const items = media.photos || [];
     const thumbs = items
       .slice(0, 8)
-      .map((f) => `<img src="${escHtml(f.url || '')}" alt="" loading="lazy" />`)
+      .map((f) => `<img src="${escHtml(f.previewUrl || f.url || '')}" alt="" loading="lazy" />`)
       .join('');
     const more = items.length > 8 ? `<span class="fm-media-more">+${items.length - 8}</span>` : '';
     return items.length ? `<div class="fm-media-gallery">${thumbs}${more}</div>` : `<p class="muted">0</p>`;
   }
   if (b.type === 'photo') {
     const item = (media.photos || [])[b.index];
-    return item ? `<img class="fm-media-single" src="${escHtml(item.url || '')}" alt="" loading="lazy" />` : '';
+    return item
+      ? `<img class="fm-media-single" src="${escHtml(item.previewUrl || item.url || '')}" alt="" loading="lazy" />`
+      : '';
   }
   if (b.type === 'videos')
     return mediaRows(
@@ -183,6 +185,15 @@ function renderBlocksFromBody() {
   if (!container || !ta) return;
   editorBlocks = parseBodyBlocks(ta.value);
   renderBlocksInto(container);
+}
+
+function refreshBlockMedia() {
+  // Background media updates must preserve the active text node, cursor and undo history.
+  document.querySelectorAll('#fm-blocks .fm-media-block').forEach((element) => {
+    const block = editorBlocks[Number(element.dataset.index)];
+    if (block) element.querySelector('.fm-block-media').innerHTML = mediaBlockHtml(block, getEditorMedia());
+  });
+  schedulePreview();
 }
 
 function commitBlocks() {
@@ -503,11 +514,13 @@ export default async function renderEditor(signal) {
         () => {
           clearTimeout(previewTimer);
           clearTimeout(draftTimer);
+          clearTimeout(mediaRefreshTimer);
           state.editor.draftSnapshot = null;
         },
         { once: true },
       );
       state.editorDirty = false;
+      state.editor.media = { photos: [], videos: [], music: [] };
       state.editorDraftKey = slug || null;
       wireEditorInputs();
       wireBodyDnD();
@@ -790,7 +803,7 @@ function buildPlaceholderCard(raw, media) {
     const items = media.photos || [];
     const thumbs = items
       .slice(0, 5)
-      .map((f) => `<img src="${escHtml(f.url || '')}" alt="" />`)
+      .map((f) => `<img src="${escHtml(f.previewUrl || f.url || '')}" alt="" />`)
       .join('');
     const more = items.length > 5 ? `<span class="ph-card-more">+${items.length - 5}</span>` : '';
     return placeholderCard(
@@ -809,7 +822,7 @@ function buildPlaceholderCard(raw, media) {
       'ri-image-line',
       t('editor.placeholderGallery'),
       escHtml(item.name),
-      `<div class="ph-card-thumbs"><img src="${escHtml(item.url || '')}" alt="" /></div>`,
+      `<div class="ph-card-thumbs"><img src="${escHtml(item.previewUrl || item.url || '')}" alt="" /></div>`,
     );
   }
   if (kind === 'videos') {
@@ -830,10 +843,15 @@ export function updateCoverPreview() {
   const el = document.getElementById('cover-preview');
   const val = document.getElementById('fm-cover')?.value || '';
   if (!el) return;
-  if (val && !val.startsWith('video:') && !val.startsWith('photo:')) {
-    const slug = getCurrentSlug();
+  const media = state.editor.media || { photos: [], videos: [] };
+  const match = /^(video|photo):(\d+)$/.exec(val);
+  const selected = match
+    ? media[match[1] === 'video' ? 'videos' : 'photos'][Number(match[2])]
+    : [...(media.covers || []), ...media.photos].find((item) => item.name === val);
+  const url = selected?.previewUrl || selected?.url || (/^(https?:\/\/|\/)/.test(val) ? val : '');
+  if (url) {
     el.style.display = 'block';
-    el.innerHTML = `<img src="${escHtml(state.mediaBase)}/originals/${encodeURIComponent(slug)}/${encodeURIComponent(val)}" alt="cover" onerror="this.closest('.cover-preview').style.display='none'" />`;
+    el.innerHTML = `<img src="${escHtml(url)}" alt="cover" />`;
   } else {
     el.style.display = 'none';
     el.innerHTML = '';
@@ -853,7 +871,7 @@ window.openCoverPicker = async () => {
     toast(t('editor.loadError'), 'error');
     return;
   }
-  const photos = data.photos || [];
+  const photos = [...(data.photos || []), ...(data.covers || [])];
   const videos = data.videos || [];
   let content = '';
   if (!photos.length && !videos.length) {
@@ -866,7 +884,7 @@ window.openCoverPicker = async () => {
           .map(
             (f) => `
           <div class="media-cell" onclick="pickCover('${escHtml(f.name)}')" title="${escHtml(f.name)}" style="cursor:pointer">
-            <img src="${escHtml(f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />
+            <img src="${escHtml(f.previewUrl || f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />
             <div class="media-cell-name">${escHtml(f.name)}</div>
           </div>`,
           )
@@ -878,8 +896,8 @@ window.openCoverPicker = async () => {
         `<div class="editor-section-title" style="margin:10px 0 6px">${t('editor.cover')} — ${t('editor.upload')}</div><div class="media-grid" style="grid-template-columns:repeat(4,1fr)">` +
         videos
           .map(
-            (f) => `
-          <div class="media-cell" onclick="pickCover('video:0')" title="${escHtml(f.name)}">
+            (f, index) => `
+          <div class="media-cell" onclick="pickCover('video:${index}')" title="${escHtml(f.name)}">
             <div class="media-cell-icon"><i class="ri-video-line"></i></div>
             <div class="media-cell-name">${escHtml(f.name)}</div>
           </div>`,
@@ -894,6 +912,7 @@ window.openCoverPicker = async () => {
 window.pickCover = (name) => {
   const input = document.getElementById('fm-cover');
   if (input) input.value = name;
+  state.editorDirty = true;
   updateCoverPreview();
   closeModal();
   toast(t('editor.coverPicked'), 'success', 2000);
@@ -913,7 +932,7 @@ function mediaCell(type, f, i, slug) {
   const ph = type === 'photo' ? `{{photo:${i}}}` : type === 'video' ? `{{video:${i}}}` : '{{music}}';
   const inner =
     type === 'photo'
-      ? `<img src="${escHtml(f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />`
+      ? `<img src="${escHtml(f.previewUrl || f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />`
       : `<div class="media-cell-icon"><i class="ri-${type === 'video' ? 'video' : 'music'}-line"></i></div>`;
   const click =
     type === 'photo'
@@ -923,6 +942,8 @@ function mediaCell(type, f, i, slug) {
     <div class="media-cell" ${click} draggable="true" data-ph="${escHtml(ph)}" title="${escHtml(f.name)} — ${t('editor.dragInsertHint')}">
       ${inner}
       <div class="media-cell-name">${escHtml(f.name)}</div>
+      ${f.status ? `<span class="media-cell-status">${escHtml(t('jobs.' + f.status))}${f.published && f.status !== 'ready' ? ' · ' + t('jobs.previous') : ''}</span>` : ''}
+      ${f.taskId && ['failed', 'cancelled'].includes(f.status) ? `<button type="button" class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.retryEditorMedia('${escHtml(f.taskId)}')">${t('jobs.retry')}</button>` : ''}
       <button type="button" class="media-cell-insert" onclick="event.stopPropagation();window.insertPlaceholder('${escHtml(ph)}')" title="${t('editor.insert')}" aria-label="${t('editor.insert')} ${escHtml(f.name)}"><i class="ri-corner-down-left-line"></i></button>
       <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','${type}s')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line"></i></button>
     </div>`;
@@ -938,17 +959,21 @@ function mediaGroup(title, count, insertPh, cellsHtml) {
 }
 
 export async function loadExistingMedia(slug) {
+  clearTimeout(mediaRefreshTimer);
   const el = document.getElementById('existing-media');
   if (!el) return;
-  el.innerHTML = `<p class="media-empty">${t('editor.loadMedia')}</p>`;
+  if (!el.querySelector('.media-grid')) el.innerHTML = `<p class="media-empty">${t('editor.loadMedia')}</p>`;
+  const signal = state.pageScope?.signal;
   try {
     const data = await mediaApi.list(slug);
+    if (signal?.aborted || !el.isConnected || slug !== getCurrentSlug()) return;
     const photos = data.photos || [];
     const videos = data.videos || [];
     const music = data.music || [];
-    state.editor.media = { photos, videos, music };
+    const covers = data.covers || [];
+    state.editor.media = { photos, videos, music, covers };
     let html = `<div class="editor-section-title">${t('editor.existingMedia')}</div>`;
-    if (!photos.length && !videos.length && !music.length) {
+    if (!photos.length && !videos.length && !music.length && !covers.length) {
       html += `<p class="media-empty">${t('editor.noMedia')}</p>`;
     } else {
       if (photos.length) {
@@ -975,15 +1000,40 @@ export async function loadExistingMedia(slug) {
           `<div class="media-grid" style="margin-top:8px">${music.map((f, i) => mediaCell('music', f, i, slug)).join('')}</div>`,
         );
       }
+      if (covers.length)
+        html += `<div class="editor-section-title">${t('editor.cover')}</div><div class="media-grid">${covers.map((f) => `<button type="button" class="media-cell" onclick="window.pickCover('${escHtml(f.name)}')"><img src="${escHtml(f.previewUrl || f.url)}" alt="${escHtml(f.name)}" loading="lazy" /><span class="media-cell-name">${escHtml(f.name)}</span></button>`).join('')}</div>`;
     }
     el.innerHTML = html;
-    renderBlocksFromBody();
+    updateCoverPreview();
+    if (el.dataset.loaded) refreshBlockMedia();
+    else renderBlocksFromBody();
+    el.dataset.loaded = 'true';
+    if (
+      [...photos, ...videos, ...music, ...covers].some((item) =>
+        ['pending', 'running', 'processing'].includes(item.status),
+      )
+    ) {
+      clearTimeout(mediaRefreshTimer);
+      mediaRefreshTimer = setTimeout(() => {
+        if (!signal?.aborted) loadExistingMedia(slug);
+      }, state.config.admin?.jobPollMs || 5000);
+    }
   } catch {
+    if (signal?.aborted || !el.isConnected) return;
     el.innerHTML = `<p class="media-empty">${t('editor.loadError')}</p>`;
   }
 }
 
 window.loadExistingMedia = loadExistingMedia;
+let mediaRefreshTimer;
+window.retryEditorMedia = async (id) => {
+  try {
+    await mediaJobs.retry(id);
+    await loadExistingMedia(getCurrentSlug());
+  } catch (error) {
+    toast(error.message, 'error');
+  }
+};
 
 window.doDeleteMedia = (slug, file, type) => {
   modalConfirm(t('editor.mediaDeleteConfirm', { file }), '', async () => {

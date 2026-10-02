@@ -49,8 +49,9 @@ export function readPosts(context, manifest) {
         description:
           data.description ||
           content
-            .slice(0, 200)
+            .replace(/\{\{(?:gallery|videos|music(?::\d+)?|video:\d+|photo:\d+)\}\}/g, '')
             .replace(/[#*`\[\]()\n]/g, '')
+            .slice(0, 200)
             .trim(),
         videoMode,
         cover,

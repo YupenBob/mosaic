@@ -206,3 +206,5 @@ The refactor was merged in [PR #3](https://github.com/YupenBob/mosaic/pull/3) an
 ## License
 
 [MIT](LICENSE) © Mosaic Contributors
+
+Interaction improvements: a single published app bundle, dashboard actions independent of slow metrics, durable upload receipts and confirmation-only retries. Video uses CORS requests, on-demand segments and stable resume keys. See the [experience investigation](docs/experience-2026-10-02.md).

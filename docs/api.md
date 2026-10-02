@@ -61,3 +61,7 @@
 媒体 claim 返回带 token、runId、generation、source、配置和 checkpoint 的任务；后续回调都带 `{id,token,runId}`。publish 先验证对象 HEAD，再更新 `published`。complete 的 `complete:false` 表示仍有高档待续跑；failed 消耗有限重试预算。site begin 返回固定清单和构建 token，后续 done 成功只确认已覆盖的变更。
 
 旧部署、旧租约、旧源版本和错误签名不能覆盖新状态。内部接口禁止使用后台登录 token 代替流水线签名。
+
+## 编辑器媒体列表
+
+`GET /api/media/:slug/list` 返回 `photos/videos/music/covers`。条目兼容 `name/url/size` 并增加 `id/order/status/taskId/published/previewUrl`。`url` 使用实际源对象键，源文件不可用时回退已发布预览；`previewUrl` 取清单中的图片小档、视频海报或音频封面。孤立旧封面保留在 `covers`，不占用 `photo:N`；各列表与构建复用排序约定，不包含波形或任务租约。客户端上传 PUT 成功后若完成确认失败，应重试完成接口，避免重传文件。

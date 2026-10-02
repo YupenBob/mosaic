@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { emptyManifest, validateManifest, mediaUrl } from '../../shared/media-manifest.mjs';
+import { emptyManifest, validateManifest, mediaUrl, compareMediaOrder } from '../../shared/media-manifest.mjs';
 export function loadManifest(file) {
   return fs.existsSync(file) ? validateManifest(JSON.parse(fs.readFileSync(file, 'utf8'))) : emptyManifest();
 }
@@ -7,11 +7,7 @@ export function resolveMedia(manifest, slug, site) {
   const result = { photos: [], videos: [], music: [], covers: [] };
   const entries = Object.values(manifest.assets)
     .filter((entry) => entry.slug === slug && entry.status !== 'deleted')
-    .sort((a, b) =>
-      typeof a.order === 'number' && typeof b.order === 'number'
-        ? a.order - b.order
-        : String(a.order ?? a.filename).localeCompare(String(b.order ?? b.filename), 'en'),
-    );
+    .sort(compareMediaOrder);
   const url = (key) => mediaUrl(key, site.mediaBase);
   for (const entry of entries) {
     const output = entry.published;

@@ -162,7 +162,23 @@ export class JobsDurableObject {
     if (operation === 'media-list')
       return Object.values(state.manifest.assets)
         .filter((asset) => asset.slug === data.slug && asset.status !== 'deleted')
-        .map(({ filename, folder, status, jobId }) => ({ filename, folder, status, taskId: jobId }));
+        .map(({ id, filename, folder, status, jobId, source, published, order }) => ({
+          id,
+          filename,
+          folder,
+          status,
+          taskId: jobId,
+          order,
+          sourceKey: source?.key || '',
+          sourceAvailable: source?.available !== false,
+          previewKey:
+            published?.poster ||
+            published?.variants?.['480p'] ||
+            Object.values(published?.variants || {})[0] ||
+            published?.cover ||
+            '',
+          published: !!published,
+        }));
     if (operation === 'reconcile') {
       state.config = data.config;
       state.reconcile = { after: '', force: data.force || state.reconcile?.force || false };

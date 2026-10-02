@@ -7,6 +7,17 @@ const API_BASE = (typeof __API_BASE__ !== 'undefined' ? __API_BASE__ : '') || '/
 
 let _token = null;
 let navigationSignal = null;
+const readCache = new Map(),
+  inFlight = new Map();
+let policy = {},
+  cacheRevision = 0;
+export function configureClient(config = {}) {
+  policy = config;
+}
+function invalidateReads() {
+  cacheRevision++;
+  readCache.clear();
+}
 export function setNavigationSignal(signal) {
   navigationSignal = signal;
 }
@@ -24,6 +35,11 @@ export function getToken() {
 }
 
 export function setToken(t) {
+  if (_token !== t) {
+    invalidateReads();
+    for (const entry of inFlight.values()) entry.controller.abort();
+    inFlight.clear();
+  }
   _token = t;
   if (t) {
     try {
@@ -37,13 +53,13 @@ export function setToken(t) {
 }
 
 /** Base fetch with auth header and error handling */
-export async function apiFetch(path, options = {}) {
+async function performFetch(path, options = {}) {
   const token = getToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const resp = await fetch(`${API_BASE}${path}`, {
-    signal: options.signal || navigationSignal || undefined,
+    signal: Object.hasOwn(options, 'signal') ? options.signal || undefined : navigationSignal || undefined,
     ...options,
     headers,
   });
@@ -73,6 +89,91 @@ export async function apiFetch(path, options = {}) {
   }
 
   return resp.json();
+}
+
+/** Shared reads have independent consumers: leaving one page cannot cancel another's request. */
+export function apiFetch(path, options = {}) {
+  const method = options.method || 'GET';
+  if (method !== 'GET') {
+    const controller = new AbortController();
+    const parent = Object.hasOwn(options, 'signal') ? options.signal : navigationSignal;
+    const abort = () => controller.abort(parent.reason);
+    if (parent?.aborted) return Promise.reject(parent.reason);
+    parent?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(
+      () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+      policy.requestTimeoutMs ?? 15000,
+    );
+    return performFetch(path, { ...options, signal: controller.signal })
+      .then((value) => {
+        invalidateReads();
+        return value;
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        parent?.removeEventListener('abort', abort);
+      });
+  }
+  const signal = Object.hasOwn(options, 'signal') ? options.signal : navigationSignal;
+  if (signal?.aborted) return Promise.reject(signal.reason);
+  const ttl = path.startsWith('/build/')
+    ? (policy.buildCacheMs ?? 3000)
+    : /^(\/config|\/taxonomy|\/stats(?:\/.*)?|\/posts(?:\?.*)?)$/.test(path)
+      ? (policy.cacheMs ?? 15000)
+      : 0;
+  const cached = readCache.get(path);
+  if (cached && cached.expires > Date.now()) return Promise.resolve(structuredClone(cached.value));
+  let entry = inFlight.get(path);
+  if (!entry) {
+    const controller = new AbortController(),
+      revision = cacheRevision,
+      token = getToken();
+    entry = { controller, users: 0, done: false };
+    const timer = setTimeout(
+      () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+      policy.requestTimeoutMs ?? 15000,
+    );
+    entry.promise = performFetch(path, { ...options, signal: controller.signal })
+      .then((value) => {
+        if (ttl && revision === cacheRevision && token === getToken())
+          readCache.set(path, { value, expires: Date.now() + ttl });
+        return value;
+      })
+      .finally(() => {
+        entry.done = true;
+        clearTimeout(timer);
+        if (inFlight.get(path) === entry) inFlight.delete(path);
+      });
+    inFlight.set(path, entry);
+  }
+  return new Promise((resolve, reject) => {
+    entry.users++;
+    let finished = false;
+    const detach = () => {
+      if (finished) return false;
+      finished = true;
+      signal?.removeEventListener('abort', abort);
+      entry.users--;
+      return true;
+    };
+    const abort = () => {
+      if (!detach()) return;
+      reject(signal.reason);
+      if (!entry.users && !entry.done) {
+        entry.controller.abort();
+        if (inFlight.get(path) === entry) inFlight.delete(path);
+      }
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+    entry.promise.then(
+      (value) => {
+        if (detach()) resolve(structuredClone(value));
+      },
+      (error) => {
+        if (detach()) reject(error);
+      },
+    );
+  });
 }
 
 // ── Auth ───────────────────────────────────
@@ -150,6 +251,7 @@ export const upload = {
     }),
   multipartComplete: (slug, filename, uploadId) =>
     apiFetch('/upload/multipart/complete', {
+      signal: null,
       method: 'POST',
       body: JSON.stringify({ slug, filename, uploadId }),
     }),
@@ -161,12 +263,15 @@ export const upload = {
 
   /** Confirm a presigned upload landed in R2 (marks the site dirty) */
   complete: (slug, filename) =>
-    apiFetch(`/upload/complete/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`, { method: 'POST' }),
+    apiFetch(`/upload/complete/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`, {
+      method: 'POST',
+      signal: null,
+    }),
 };
 
 // ── Build ──────────────────────────────────
 export const build = {
-  status: () => apiFetch('/build/status'),
+  status: (options = {}) => apiFetch('/build/status', options),
 
   /** Compatibility probe; deployment acknowledgement is reserved for the signed pipeline. */
   done: (body = {}) => apiFetch('/build/done', { method: 'POST', body: JSON.stringify(body) }),
@@ -193,7 +298,7 @@ export const stats = {
 
 // ── Config ─────────────────────────────────
 export const config = {
-  get: () => apiFetch('/config'),
+  get: (options = {}) => apiFetch('/config', options),
 
   update: (data) => apiFetch('/config', { method: 'PUT', body: JSON.stringify(data) }),
 };

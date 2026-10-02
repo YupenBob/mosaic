@@ -51,3 +51,7 @@ npm run test:admin:local
 2026-10-01 已通过 PR #3 合入 main，并完成 Infrastructure → Media → Site 切换。线上清单 revision 1 保留 14 项 ready 媒体，旧视频未重新转码，站点签名确认后 dirty 为零；真实移动 Chromium HLS、WebKit MP4 和后台只读巡检已通过。工作流运行、部署及回退标识见 [上线记录](docs/rollout-2026-10-01.md)。
 
 详见 [架构](docs/architecture.md)、[配置](docs/configuration.md)、[API](docs/api.md)、[测试](docs/testing.md)、[性能](docs/performance.md)、[迁移](docs/migration.md)、[运维](docs/operations.md)。
+
+## 2026-10-02 体验修复
+
+见 [体验排查与验证](docs/experience-2026-10-02.md)。新增缓存开启的真实 HLS/MP4 测试，以及慢后台、上传确认失败、任务重试、封面和编辑光标用例；命令已并入现有 CI。媒体处理、清单和站点发布契约保持兼容，播放策略不进入媒体处理指纹。

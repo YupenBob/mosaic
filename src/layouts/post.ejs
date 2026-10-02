@@ -1,6 +1,10 @@
 <%
 /* Post detail page */
 const pageDataTitle = post.title + ' - ' + site.title;
+function playbackUrl(url) {
+  if (!url || !site.player?.requestVersion) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'mosaic-cors=' + encodeURIComponent(site.player.requestVersion);
+}
 
 function videoControlsHTML(multiSrc, showNext, total) {
   var h = '<div class="video-controls">';
@@ -26,28 +30,29 @@ function videoElementHTML(vid) {
   if (vid.pending) return pendingHTML(vid);
   var multiSrc = !!(vid.sources);
   var hasHLS = !!(vid.hls);
+  var videoStyle = ' style="aspect-ratio:' + (vid.aspect || site.player.defaultAspect) + '"';
   var h = '<div class="video-player-overlay"><button class="video-big-play" aria-label="Play"><i class="ri-play-fill"></i></button></div>';
   if (hasHLS) {
-    h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element" data-hls="true">';
-    h += '<source src="' + vid.hls + '" type="application/x-mpegURL" />';
+    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.hls) + '" poster="' + (vid.poster || '') + '" class="video-element" data-hls="true">';
+    h += '<source src="' + playbackUrl(vid.hls) + '" type="application/x-mpegURL" />';
     // MP4 tier fallbacks (only consumed if hls.js hits an unrecoverable fatal
     // error, so playback degrades to a file instead of dying).
     if (vid.sources) {
       var hlsResKeys = Object.keys(vid.sources).sort().reverse();
       for (var hr = 0; hr < hlsResKeys.length; hr++) {
-        h += '<source data-res="' + hlsResKeys[hr] + '" src="' + vid.sources[hlsResKeys[hr]] + '" type="video/mp4" />';
+        h += '<source data-res="' + hlsResKeys[hr] + '" src="' + playbackUrl(vid.sources[hlsResKeys[hr]]) + '" type="video/mp4" />';
       }
     }
     h += '</video>';
   } else if (multiSrc) {
-    h += '<video preload="metadata" poster="' + (vid.poster || '') + '" class="video-element">';
+    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.file) + '" poster="' + (vid.poster || '') + '" class="video-element">';
     var resKeys = Object.keys(vid.sources).sort().reverse();
     for (var r = 0; r < resKeys.length; r++) {
-      h += '<source data-res="' + resKeys[r] + '" src="' + vid.sources[resKeys[r]] + '" type="video/mp4" />';
+      h += '<source data-res="' + resKeys[r] + '" src="' + playbackUrl(vid.sources[resKeys[r]]) + '" type="video/mp4" />';
     }
     h += '</video>';
   } else if (vid.src) {
-    h += '<video preload="metadata" poster="' + (vid.poster || '') + '" src="' + vid.src + '" class="video-element"></video>';
+    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.src) + '" poster="' + (vid.poster || '') + '" src="' + playbackUrl(vid.src) + '" class="video-element"></video>';
   }
   return h;
 }
@@ -218,6 +223,17 @@ function renderBlock(block) {
   <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
   <% } %>
 <script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality }).replace(/</g, '\\u003c') %>;</script>
+<script>
+document.addEventListener('click', function(event) {
+  var button = event.target.closest('.video-big-play,.vc-play');
+  var container = button && button.closest('.video-container');
+  if (container && container.dataset.playerReady !== 'true') {
+    container.dataset.pendingPlay = 'true';
+    container.classList.add('buffering');
+    container.setAttribute('aria-busy', 'true');
+  }
+}, true);
+</script>
 </head>
 <body data-page="post" data-slug="<%= post.slug %>" data-category="<%= post.category || '' %>" data-tags="<%= (post.tags || []).join(',') %>" data-post-type="<%= post.type || 'text' %>">
 
@@ -368,10 +384,6 @@ function renderBlock(block) {
 </footer>
 
 <script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= lang || 'zh-CN' %>';</script>
-<script type="module">
-import { initI18n } from '<%= rp %>assets/js/data.js';
-initI18n(<%- JSON.stringify(i18n || {}) %>, '<%= lang || 'zh-CN' %>');
-</script>
   <script src="<%= rp %>assets/vendor/hls.min.js"></script>
   <script src="<%= rp %>assets/vendor/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>

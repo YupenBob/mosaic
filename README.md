@@ -206,3 +206,5 @@ video_mode: stacked           # stacked | playlist
 ## 协议
 
 [MIT](LICENSE) © Mosaic Contributors
+
+实际交互优化：前台发布单一脚本包；后台操作无需等待统计，上传回执保留任务状态，确认失败可直接重试。视频使用 CORS 请求、按需分片和稳定断点恢复。详见 [体验排查与验证](docs/experience-2026-10-02.md)。

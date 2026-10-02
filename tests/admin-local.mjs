@@ -108,6 +108,11 @@ try {
         location.hash = value;
       }, route);
       await page.waitForTimeout(350);
+      await page.locator('#main-content .page-anim').first().waitFor();
+      await page.evaluate(async () => {
+        const element = document.querySelector('#main-content .page-anim');
+        await Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => {})));
+      });
       await page.addScriptTag({ path: path.join(ROOT, 'node_modules/axe-core/axe.min.js') });
       const violations = await page.evaluate(async () =>
         (await window.axe.run(document)).violations.map((item) => ({

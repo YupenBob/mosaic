@@ -2423,6 +2423,12 @@ body.sidebar-collapsed .nav-badge {
   cursor: pointer;
   font-size: 12px;
 }
+.media-cell-status {
+  display: block;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
 .media-cell:hover .media-cell-del {
   display: inline-flex;
 }

@@ -11,6 +11,7 @@ const CHUNK = 100;
 let renderedCount = 0;
 
 export default async function renderPosts(signal) {
+  const statistics = statsApi.posts();
   const result = await postsApi.list();
   if (signal.aborted) return '';
   const postsData = result.posts || result || [];
@@ -18,12 +19,7 @@ export default async function renderPosts(signal) {
   renderedCount = Math.min(CHUNK, postsData.length);
 
   // Best-effort per-post stats for card view (degrade silently)
-  let postStats = {};
-  try {
-    const r = await statsApi.posts();
-    postStats = r.stats || {};
-  } catch {}
-  state.postStats = postStats;
+  state.postStats ||= {};
   if (signal.aborted) return '';
 
   const catOptions = buildCatOptions(postsData);
@@ -95,6 +91,15 @@ export default async function renderPosts(signal) {
     onMount() {
       const savedView = localStorage.getItem('mosaic_posts_view') || 'table';
       window.switchPostsView(savedView, true);
+      statistics.then((result) => {
+        if (signal.aborted) return;
+        state.postStats = result.stats || {};
+        const table = document.querySelector('#posts-table tbody'),
+          grid = document.querySelector('.admin-card-grid');
+        if (table) table.innerHTML = postsData.slice(0, renderedCount).map(rowHtml).join('');
+        if (grid) grid.innerHTML = postsData.slice(0, renderedCount).map(cardHtml).join('');
+        window.switchPostsView(document.querySelector('.view-toggle-btn.active')?.dataset.view || savedView, true);
+      });
     },
   };
 }
@@ -132,7 +137,7 @@ function cardHtml(p) {
        data-search="${escHtml(((p.title || '') + ' ' + (p.category || '') + ' ' + (p.tags || []).join(' ')).toLowerCase())}" data-cat="${escHtml(p.category || '')}">
       ${
         hasCover
-          ? `<div class="admin-card-cover"><img src="${escHtml(state.mediaBase)}/processed/${encodeURIComponent(p.slug)}/covers/cover-480p.webp" alt="${escHtml(p.title || p.slug)}" loading="lazy" onerror="this.closest('.admin-card-cover').classList.add('admin-card-cover-empty');this.style.display='none'" /></div>`
+          ? `<div class="admin-card-cover"><img src="${escHtml(p.coverSrcset?.['480'] || (/^(https?:\/\/|\/)/.test(p.cover) ? p.cover : '/api/media/file/' + encodeURIComponent(p.slug) + '/' + encodeURIComponent(p.cover)))}" alt="${escHtml(p.title || p.slug)}" loading="lazy" onerror="this.closest('.admin-card-cover').classList.add('admin-card-cover-empty');this.style.display='none'" /></div>`
           : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:30px;color:var(--color-text-tertiary)"></i></div>'
       }
       <div class="admin-card-body">
@@ -194,30 +199,27 @@ window.switchPostsView = (view, silent) => {
   if (!silent) localStorage.setItem('mosaic_posts_view', view);
   const q = document.getElementById('post-search')?.value || '';
   const c = document.getElementById('post-cat-filter')?.value || '';
-  if (q) window.filterPosts(q);
+  window.filterPosts(q);
   if (c) window.filterPostsByCat(c);
 };
 
 window.filterPosts = (query) => {
   const q = query.toLowerCase();
+  const cat = document.getElementById('post-cat-filter')?.value || '';
   let count = 0;
   document.querySelectorAll('#posts-table tbody tr, .admin-post-card').forEach((el) => {
-    const show = !q || (el.dataset.search || '').includes(q);
+    const show =
+      (!q || (el.dataset.search || '').includes(q)) &&
+      (!cat || el.dataset.cat === cat || el.dataset.cat?.startsWith(cat + '/'));
     el.style.display = show ? '' : 'none';
     if (show) count++;
   });
   const mc = document.getElementById('post-match-count');
-  if (mc) mc.textContent = q ? t('posts.matchCount', { count }) : '';
+  if (mc) mc.textContent = q || cat ? t('posts.matchCount', { count: count / 2 }) : '';
 };
 
-window.filterPostsByCat = (cat) => {
-  document.querySelectorAll('#posts-table tbody tr, .admin-post-card').forEach((el) => {
-    if (!cat) {
-      el.style.display = '';
-      return;
-    }
-    el.style.display = (el.dataset.cat || '') === cat ? '' : 'none';
-  });
+window.filterPostsByCat = () => {
+  window.filterPosts(document.getElementById('post-search')?.value || '');
 };
 
 window.debouncedFilterPosts = debounce((v) => window.filterPosts(v), 200);

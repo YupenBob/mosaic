@@ -34,12 +34,19 @@
 | `cache.postsMs` / `configMs` | 60000 / 120000 | Worker 列表与配置缓存 |
 | `cache.diskMs` / `usageMaxAgeMs` | 300000 / 86400000 | 用量缓存与快照最长有效时间 |
 | `admin.dirtyPollMs` / `jobPollMs` | 60000 / 5000 | 后台轮询 |
+| `admin.idlePollMs` / `hiddenPollMs` | 30000 / 60000 | 无活动构建与隐藏标签页的轮询间隔 |
+| `admin.requestTimeoutMs` | 15000 | API 读取、保存与上传确认的等待上限；不限制文件传输 |
+| `admin.cacheMs` / `buildCacheMs` | 15000 / 3000 | 浏览器共享读取缓存；写入或换账号后失效 |
+| `player.requestVersion` | cors-v1 | 稳定播放请求命名空间，绕开旧无 Origin 的浏览器缓存；设空字符串关闭 |
+| `player.defaultAspect` | 16/9 | 缺失媒体比例时预留的视频尺寸 |
 | `player.speeds` / `qualityOrder` / `hls` | 见共享默认值 | 倍速、菜单次序、HLS 缓冲和重试参数 |
 | `search.debounceMs` / `maxResults` / `searchMinChars` | 250 / 10 / 2 | 搜索交互 |
 
 图片压缩由 `plugins.compress-images.enabled` 控制，关闭时仍生成隐私处理后的原图与占位图。视频压缩由 `plugins.compress-videos.enabled` 控制，关闭时使用源编码封装并移除元数据，仍提供 HLS/MP4；不兼容 MP4 的源编码会报告任务错误。原 `enableVideoCompression` 保留兼容映射，显式 plugin 设置优先。组件 enabled、画廊 zoom/lazyLoad 及搜索开关会传给前台运行时。
 
 没有显式 `media.timeoutMinutes` 时沿用旧 `build.timeoutMinutes`。处理指纹只包含对应处理器参数；改标题、缓存或部署域名不会使所有文件重新转码。
+
+HLS 默认 `autoStartLoad:false`、`startFragPrefetch:false`，点击播放才开始分片下载；`manifestLoadingTimeOut` 默认 10000ms。播放请求命名空间不是随机时间戳，同一版本仍可缓存。变更这些播放或后台策略不会触发转码。
 
 ## 环境与 Secrets
 

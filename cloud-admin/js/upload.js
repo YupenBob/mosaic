@@ -2,7 +2,7 @@
  * Upload flow — concurrent (2 at a time) presigned uploads with per-file
  * retry/cancel, thumbnails and graceful handling when the post isn't saved.
  */
-import { upload, getToken } from '../src/api.js';
+import { upload, mediaJobs, getToken } from '../src/api.js';
 import { state } from './state.js?v=1';
 import { t } from './i18n.js?v=1';
 import { escHtml } from './ui.js?v=1';
@@ -90,6 +90,15 @@ export function handleUploadFiles(files) {
       done: false,
     };
     item.el = renderItem(item);
+    state.pageScope?.signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(item.pollTimer);
+        if (['pending', 'uploading'].includes(item.status)) cancelItem(item);
+        if (item.thumbUrl) URL.revokeObjectURL(item.thumbUrl);
+      },
+      { once: true },
+    );
     progressEl.appendChild(item.el);
     return item;
   });
@@ -120,13 +129,10 @@ export function handleUploadFiles(files) {
     item.status = 'uploading';
     setState(item, 'uploading', '0%');
     try {
-      const ok = await uploadFilePresigned(item);
-      if (!ok && item.status !== 'cancelled') await uploadFileDirect(item);
+      let receipt = item.confirm ? await item.confirm() : await uploadFilePresigned(item);
+      if (!receipt && item.status !== 'cancelled') receipt = await uploadFileDirect(item);
       if (item.status === 'cancelled') return;
-      item.status = 'done';
-      item.done = true;
-      item.el.classList.add('upload-done');
-      setState(item, 'done', t('editor.done'));
+      finishUpload(item, receipt);
     } catch (err) {
       if (item.status === 'cancelled') return;
       item.status = 'error';
@@ -142,7 +148,8 @@ function renderItem(item) {
   let thumb = '';
   if (item.kind === 'image') {
     try {
-      thumb = `<img src="${URL.createObjectURL(item.file)}" alt="" />`;
+      item.thumbUrl = URL.createObjectURL(item.file);
+      thumb = `<img src="${item.thumbUrl}" alt="" />`;
     } catch {}
   }
   el.innerHTML = `
@@ -170,7 +177,7 @@ function setState(item, status, text) {
   const metaEl = item.el.querySelector('.upload-item-meta');
   const retryBtn = item.el.querySelector('.upload-item-actions .icon-btn:first-child');
   const cancelBtn = item.el.querySelector('.upload-item-actions .icon-btn:last-child');
-  if (fill) fill.style.width = status === 'uploading' ? '100%' : '0%';
+  if (fill) fill.style.width = status === 'done' ? '100%' : '0%';
   if (statusEl) {
     if (status === 'done') statusEl.innerHTML = '<i class="ri-check-line" style="color:var(--color-success)"></i>';
     else if (status === 'error') statusEl.innerHTML = '<i class="ri-close-line" style="color:var(--color-danger)"></i>';
@@ -185,7 +192,50 @@ function setState(item, status, text) {
   if (cancelBtn) cancelBtn.style.display = status === 'done' || status === 'cancelled' ? 'none' : '';
 }
 
+function finishUpload(item, receipt) {
+  item.confirm = null;
+  item.status = 'done';
+  item.done = true;
+  item.taskId = receipt?.taskId;
+  item.el.classList.add('upload-done');
+  setState(item, 'done', t('editor.done'));
+  if (item.taskId) {
+    item.el.dataset.taskId = item.taskId;
+    watchTask(item);
+  }
+}
+
+async function watchTask(item) {
+  if (!item.el.isConnected || item.status === 'cancelled') return;
+  const signal = state.pageScope?.signal;
+  try {
+    const job = await mediaJobs.get(item.taskId);
+    if (signal?.aborted || !item.el.isConnected) return;
+    const label = t('jobs.' + job.status);
+    item.el.querySelector('.upload-item-meta').textContent =
+      t('jobs.uploaded') +
+      ' · ' +
+      label +
+      (job.current ? ' · ' + job.current : '') +
+      (job.error ? ' · ' + job.error : '');
+    item.taskFailed = ['failed', 'cancelled'].includes(job.status);
+    item.el.querySelector('.upload-item-actions .icon-btn:first-child').style.display = item.taskFailed ? '' : 'none';
+    item.el.querySelector('.upload-item-actions .icon-btn:last-child').style.display = ['pending', 'running'].includes(
+      job.status,
+    )
+      ? ''
+      : 'none';
+    if (!['pending', 'running'].includes(job.status)) return;
+  } catch (error) {
+    if (signal?.aborted) return;
+    item.el.querySelector('.upload-item-meta').textContent = t('jobs.uploaded') + ' · ' + error.message;
+  }
+  item.pollTimer = setTimeout(() => watchTask(item), state.config.admin?.jobPollMs || 5000);
+}
+
 function progressUI(item, pct) {
+  pct = Math.max(item.progress || 0, Math.min(99, pct));
+  item.progress = pct;
   const fill = item.el.querySelector('.upload-item-fill');
   const statusEl = item.el.querySelector('.upload-item-status');
   if (fill) fill.style.width = pct + '%';
@@ -193,6 +243,8 @@ function progressUI(item, pct) {
 }
 
 function cancelItem(item) {
+  clearTimeout(item.pollTimer);
+  if (item.taskId && item.status === 'done') mediaJobs.cancel(item.taskId).catch(() => {});
   item.status = 'cancelled';
   if (item._xhrs && item._xhrs.size) {
     for (const xhr of item._xhrs) xhr.abort();
@@ -205,12 +257,23 @@ function cancelItem(item) {
 }
 
 function retryItem(item) {
+  if (item.taskFailed) {
+    mediaJobs
+      .retry(item.taskId)
+      .then(() => {
+        item.taskFailed = false;
+        watchTask(item);
+      })
+      .catch((error) => setState(item, 'error', error.message));
+    return;
+  }
   item.status = 'pending';
   item.el.classList.remove('upload-error');
   const fill = item.el.querySelector('.upload-item-fill');
   const statusEl = item.el.querySelector('.upload-item-status');
   const metaEl = item.el.querySelector('.upload-item-meta');
   if (fill) fill.style.width = '0%';
+  item.progress = 0;
   if (statusEl) statusEl.textContent = '0%';
   if (metaEl) metaEl.innerHTML = `<span>${fileSize(item.file.size)}</span>`;
   runSingle(item);
@@ -220,13 +283,10 @@ async function runSingle(item) {
   item.status = 'uploading';
   setState(item, 'uploading', '0%');
   try {
-    const ok = await uploadFilePresigned(item);
-    if (!ok && item.status !== 'cancelled') await uploadFileDirect(item);
+    let receipt = item.confirm ? await item.confirm() : await uploadFilePresigned(item);
+    if (!receipt && item.status !== 'cancelled') receipt = await uploadFileDirect(item);
     if (item.status === 'cancelled') return;
-    item.status = 'done';
-    item.done = true;
-    item.el.classList.add('upload-done');
-    setState(item, 'done', t('editor.done'));
+    finishUpload(item, receipt);
     window.checkDirty && window.checkDirty();
     window.loadExistingMedia && window.loadExistingMedia(item.slug);
   } catch (err) {
@@ -252,7 +312,7 @@ async function uploadFilePresigned(item) {
   xhr.open('PUT', presigned.url);
   xhr.setRequestHeader('Content-Type', item.file.type || 'application/octet-stream');
   xhr.timeout = 600000;
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable && item.status !== 'cancelled') progressUI(item, Math.round((e.loaded / e.total) * 100));
     });
@@ -263,12 +323,9 @@ async function uploadFilePresigned(item) {
         return;
       }
       if (xhr.status >= 200 && xhr.status < 300) {
-        // Confirm the object landed + mark the site dirty. If confirmation
-        // fails the upload is NOT silently swallowed — fall back to direct.
-        upload
-          .complete(item.slug, item.file.name)
-          .then(() => resolve(true))
-          .catch(() => resolve(false));
+        // A retry confirms the existing object; it must not upload the whole file again.
+        item.confirm = () => upload.complete(item.slug, item.file.name);
+        item.confirm().then(resolve, reject);
       } else {
         resolve(false); // fall back to direct
       }
@@ -314,7 +371,11 @@ async function uploadFileMultipart(item) {
     const res = await upload.multipartParts(slug, filename, uploadId).catch(() => ({ parts: [] }));
     doneSet = new Set((res.parts || []).map((p) => p.partNumber));
   }
-  item._mpDoneBytes = doneSet.size * partSize;
+  item._mpDoneBytes = [...doneSet].reduce(
+    (sum, number) => sum + Math.min(partSize, file.size - (number - 1) * partSize),
+    0,
+  );
+  item._partBytes = new Map();
   progressUI(item, Math.min(99, Math.round((item._mpDoneBytes / file.size) * 100)));
   const pending = parts.filter((p) => !doneSet.has(p.partNumber));
 
@@ -327,9 +388,14 @@ async function uploadFileMultipart(item) {
     }
     throw err;
   }
-  await upload.multipartComplete(slug, filename, uploadId);
+  item.confirm = async () => {
+    const receipt = await upload.multipartComplete(slug, filename, uploadId);
+    mpClear(slug, filename);
+    return receipt;
+  };
+  const receipt = await item.confirm();
   mpClear(slug, filename);
-  return true;
+  return receipt;
 }
 
 async function runParts(item, pending, partSize) {
@@ -353,7 +419,8 @@ async function uploadPartWithRetry(item, part, partSize) {
     if (item.status === 'cancelled') throw new Error('Cancelled');
     try {
       await uploadPartXhr(item, part, partSize);
-      item._mpDoneBytes += partSize;
+      item._mpDoneBytes += Math.min(partSize, item.file.size - (part.partNumber - 1) * partSize);
+      item._partBytes.delete(part.partNumber);
       progressUI(item, Math.min(99, Math.round((item._mpDoneBytes / item.file.size) * 100)));
       return;
     } catch (e) {
@@ -375,7 +442,13 @@ function uploadPartXhr(item, part, partSize) {
     xhr.timeout = 600000;
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable && item.status !== 'cancelled') {
-        progressUI(item, Math.min(99, Math.round(((item._mpDoneBytes + e.loaded) / item.file.size) * 100)));
+        item._partBytes.set(part.partNumber, e.loaded);
+        progressUI(
+          item,
+          Math.round(
+            ((item._mpDoneBytes + [...item._partBytes.values()].reduce((a, b) => a + b, 0)) / item.file.size) * 100,
+          ),
+        );
       }
     });
     const done = () => {
@@ -419,8 +492,13 @@ function uploadFileDirect(item) {
     });
     xhr.addEventListener('load', () => {
       item.controller = null;
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else if (xhr.status === 413) reject(new Error('文件超过 100MB 且预签名上传失败，无法兜底'));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error('Invalid upload acknowledgement'));
+        }
+      } else if (xhr.status === 413) reject(new Error('文件超过 100MB 且预签名上传失败，无法兜底'));
       else reject(new Error('HTTP ' + xhr.status));
     });
     xhr.addEventListener('error', () => {

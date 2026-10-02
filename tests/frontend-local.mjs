@@ -149,7 +149,9 @@ try {
           hls = element._hls;
         for (let i = 0; i < 3; i++) hls.handlers.hlsError(null, { fatal: true, type: 'networkError' });
       });
-      await page.waitForFunction(() => document.querySelector('.video-element').src.endsWith('clip.mp4'));
+      await page.waitForFunction(() =>
+        new URL(document.querySelector('.video-element').src).pathname.endsWith('clip.mp4'),
+      );
       await page.locator('.pl-item').nth(1).click();
       assert.equal(await page.locator('.pl-item.active').getAttribute('data-index'), '1');
       assert.ok(
