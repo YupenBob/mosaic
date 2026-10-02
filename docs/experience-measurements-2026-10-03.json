@@ -1,0 +1,443 @@
+{
+  "recordedAt": "2026-10-02T16:15:49.576Z",
+  "environment": {
+    "os": "Windows",
+    "browser": "Playwright Chromium",
+    "requestInterception": false,
+    "videoViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "adminViewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "release": {
+    "sha": "b565dd028f7a722f14f36d827c4fa2d6496a5f9d",
+    "mediaRevision": 9,
+    "posts": 14,
+    "indexBytes": 7880,
+    "dirty": 0,
+    "projects": [
+      {
+        "name": "mosaic",
+        "id": "4b8bcada-8a0c-49e6-a5b4-149581621e93",
+        "sha": "b565dd028f7a722f14f36d827c4fa2d6496a5f9d"
+      },
+      {
+        "name": "mosaic-admin",
+        "id": "9501f065-aec8-41a3-b660-863452b58052",
+        "sha": "b565dd028f7a722f14f36d827c4fa2d6496a5f9d"
+      }
+    ],
+    "ci": [
+      {
+        "name": "Verify Mosaic",
+        "id": 37031775457
+      },
+      {
+        "name": "Mosaic Infrastructure",
+        "id": 37031775913
+      },
+      {
+        "name": "Mosaic Site",
+        "id": 37031775840
+      }
+    ]
+  },
+  "admin": {
+    "coldBeforeMs": [5507, 11623],
+    "coldAfterMs": [2614],
+    "configRequests": 1,
+    "retainedBrowser": {
+      "before": {
+        "phase": "before rollout, cold",
+        "actionsMs": 7293,
+        "scripts": [
+          {
+            "path": "/js/admin.js?v=a00ab6867035a0a0",
+            "start": 2549,
+            "end": 3232,
+            "bytes": 6236
+          },
+          {
+            "path": "/src/api.js?v=a00ab6867035a0a0",
+            "start": 3271,
+            "end": 4548,
+            "bytes": 3695
+          },
+          {
+            "path": "/js/theme.js?v=a00ab6867035a0a0",
+            "start": 3271,
+            "end": 3763,
+            "bytes": 1082
+          },
+          {
+            "path": "/js/i18n.js?v=a00ab6867035a0a0",
+            "start": 3271,
+            "end": 4548,
+            "bytes": 13721
+          },
+          {
+            "path": "/js/state.js?v=a00ab6867035a0a0",
+            "start": 3271,
+            "end": 4548,
+            "bytes": 632
+          },
+          {
+            "path": "/js/ui.js?v=a00ab6867035a0a0",
+            "start": 3271,
+            "end": 4548,
+            "bytes": 4256
+          },
+          {
+            "path": "/js/upload.js?v=a00ab6867035a0a0",
+            "start": 3271,
+            "end": 4549,
+            "bytes": 5715
+          },
+          {
+            "path": "/js/router.js?v=a00ab6867035a0a0",
+            "start": 3272,
+            "end": 4549,
+            "bytes": 2220
+          },
+          {
+            "path": "/js/editor.js?v=a00ab6867035a0a0",
+            "start": 3272,
+            "end": 4549,
+            "bytes": 11476
+          },
+          {
+            "path": "/js/lifecycle.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 4811,
+            "bytes": 661
+          },
+          {
+            "path": "/js/dashboard.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 5078,
+            "bytes": 5172
+          },
+          {
+            "path": "/js/build.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 5342,
+            "bytes": 9741
+          },
+          {
+            "path": "/js/posts.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 5343,
+            "bytes": 4339
+          },
+          {
+            "path": "/js/config.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 5344,
+            "bytes": 5756
+          },
+          {
+            "path": "/js/trash.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 5343,
+            "bytes": 1460
+          },
+          {
+            "path": "/js/taxonomy.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 5344,
+            "bytes": 2866
+          },
+          {
+            "path": "/js/cleanup.js?v=a00ab6867035a0a0",
+            "start": 4553,
+            "end": 5345,
+            "bytes": 2216
+          },
+          {
+            "path": "/js/jobs.js?v=a00ab6867035a0a0",
+            "start": 5347,
+            "end": 6337,
+            "bytes": 1125
+          }
+        ]
+      },
+      "after": {
+        "phase": "after rollout, same browser with old cached modules",
+        "actionsMs": 6023,
+        "scripts": [
+          {
+            "path": "/js/admin.js?v=0a0ade8e66dd4916",
+            "start": 445,
+            "end": 5146,
+            "bytes": 52052
+          }
+        ]
+      },
+      "warm": {
+        "phase": "after rollout, warm",
+        "actionsMs": 826,
+        "scripts": [
+          {
+            "path": "/js/admin.js?v=0a0ade8e66dd4916",
+            "start": 447,
+            "end": 447,
+            "bytes": 0
+          }
+        ]
+      },
+      "errors": []
+    }
+  },
+  "video": {
+    "contentUnchanged": true,
+    "manifestRevisionBefore": 9,
+    "manifestRevisionAfter": 9,
+    "before": {
+      "slug": "my-post",
+      "samples": [
+        {
+          "phase": "cold before click",
+          "scripts": [
+            {
+              "path": "/assets/js/app.86c6c9a4f2d3ba30.js",
+              "start": 1905,
+              "end": 2531,
+              "transferBytes": 16835
+            }
+          ],
+          "segments": [],
+          "videos": [
+            {
+              "time": 0,
+              "ready": 0,
+              "paused": true,
+              "levels": 0,
+              "error": null
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "phase": "cold playing",
+          "scripts": [
+            {
+              "path": "/assets/js/app.86c6c9a4f2d3ba30.js",
+              "start": 1905,
+              "end": 2531,
+              "transferBytes": 16835
+            }
+          ],
+          "segments": [
+            "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/480p-00000.ts?mosaic-cors=cors-v1"
+          ],
+          "videos": [
+            {
+              "time": 1.011498,
+              "ready": 4,
+              "paused": false,
+              "levels": 4,
+              "error": null
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "phase": "warm before click, legacy URLs preheated",
+          "scripts": [
+            {
+              "path": "/assets/js/app.86c6c9a4f2d3ba30.js",
+              "start": 493,
+              "end": 493,
+              "transferBytes": 0
+            }
+          ],
+          "segments": [],
+          "videos": [
+            {
+              "time": 1.014292,
+              "ready": 0,
+              "paused": true,
+              "levels": 4,
+              "error": null
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "phase": "warm playing",
+          "scripts": [
+            {
+              "path": "/assets/js/app.86c6c9a4f2d3ba30.js",
+              "start": 493,
+              "end": 493,
+              "transferBytes": 0
+            }
+          ],
+          "segments": [
+            "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/480p-00000.ts?mosaic-cors=cors-v1",
+            "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p-00000.ts?mosaic-cors=cors-v1"
+          ],
+          "videos": [
+            {
+              "time": 1.1785,
+              "ready": 4,
+              "paused": false,
+              "levels": 4,
+              "error": null
+            }
+          ],
+          "overflow": false
+        }
+      ],
+      "coldControlsMs": 4412,
+      "coldClickToTime1Ms": 8188,
+      "preheated": [
+        {
+          "path": "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/master-240p-360p-480p-720p.m3u8",
+          "type": "opaque"
+        },
+        {
+          "path": "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p.m3u8",
+          "type": "opaque"
+        },
+        {
+          "path": "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p-00000.ts",
+          "type": "opaque"
+        }
+      ],
+      "errors": [],
+      "mediaFailures": []
+    },
+    "after": {
+      "slug": "my-post",
+      "samples": [
+        {
+          "phase": "cold before click",
+          "scripts": [
+            {
+              "path": "/assets/js/app.00f5b4234eaa7c87.js",
+              "start": 1514,
+              "end": 2947,
+              "transferBytes": 16735
+            }
+          ],
+          "segments": [],
+          "videos": [
+            {
+              "time": 0,
+              "ready": 0,
+              "paused": true,
+              "levels": 0,
+              "error": null
+            }
+          ],
+          "overflow": false,
+          "startLevel": 0
+        },
+        {
+          "phase": "cold playing",
+          "scripts": [
+            {
+              "path": "/assets/js/app.00f5b4234eaa7c87.js",
+              "start": 1514,
+              "end": 2947,
+              "transferBytes": 16735
+            }
+          ],
+          "segments": [
+            "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p-00000.ts?mosaic-cors=cors-v1"
+          ],
+          "videos": [
+            {
+              "time": 1.016002,
+              "ready": 4,
+              "paused": false,
+              "levels": 4,
+              "error": null
+            }
+          ],
+          "overflow": false,
+          "startLevel": 0
+        },
+        {
+          "phase": "warm before click, legacy URLs preheated",
+          "scripts": [
+            {
+              "path": "/assets/js/app.00f5b4234eaa7c87.js",
+              "start": 326,
+              "end": 326,
+              "transferBytes": 0
+            }
+          ],
+          "segments": [],
+          "videos": [
+            {
+              "time": 1.019674,
+              "ready": 0,
+              "paused": true,
+              "levels": 4,
+              "error": null
+            }
+          ],
+          "overflow": false,
+          "startLevel": 0
+        },
+        {
+          "phase": "warm playing",
+          "scripts": [
+            {
+              "path": "/assets/js/app.00f5b4234eaa7c87.js",
+              "start": 326,
+              "end": 326,
+              "transferBytes": 0
+            }
+          ],
+          "segments": [
+            "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p-00000.ts?mosaic-cors=cors-v1",
+            "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p-00001.ts?mosaic-cors=cors-v1",
+            "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p-00002.ts?mosaic-cors=cors-v1"
+          ],
+          "videos": [
+            {
+              "time": 1.024865,
+              "ready": 4,
+              "paused": false,
+              "levels": 4,
+              "error": null
+            }
+          ],
+          "overflow": false,
+          "startLevel": 0
+        }
+      ],
+      "coldControlsMs": 3146,
+      "coldClickToTime1Ms": 4085,
+      "preheated": [
+        {
+          "path": "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/master-240p-360p-480p-720p.m3u8",
+          "type": "opaque"
+        },
+        {
+          "path": "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p.m3u8",
+          "type": "opaque"
+        },
+        {
+          "path": "/processed/my-post/videos/da411723307b4df832000e83c46b972b5519092a7197e390a1ae63be4270387a/240p-00000.ts",
+          "type": "opaque"
+        }
+      ],
+      "errors": [],
+      "mediaFailures": []
+    }
+  },
+  "notes": [
+    "Timing values are individual network samples, not medians or guaranteed latency.",
+    "The retained browser kept old CSS and modules across deployment; the after sample is not a fully cold context.",
+    "Video samples use the same my-post content and manifest revision.",
+    "Windows WebKit real MP4 and mocked HLS controls were tested locally; physical Safari/iOS was not tested."
+  ]
+}

@@ -20,6 +20,8 @@ export default function renderDashboard(signal) {
     taxData: { categories: [], tags: [] },
     postList: [],
     bs: null,
+    settled: new Set(),
+    loaded: new Set(),
   };
   return {
     html: renderSnapshot(model, signal).html.replace(
@@ -27,21 +29,41 @@ export default function renderDashboard(signal) {
       '<div class="dash-load-errors" role="status"></div><div class="dash-health-bar"',
     ),
     onMount() {
+      let chartRevision = 0;
+      const sections = {
+        dashData: ['.dash-cards', '[data-dashboard-quickstart]'],
+        healthData: ['.dash-health-bar', '.page-subtitle'],
+        healthGithub: ['.dash-health-bar', '.page-subtitle'],
+        healthR2: ['.dash-health-bar', '.page-subtitle'],
+        trafficData: ['.dash-cards', '.dash-charts', '.dash-bottom'],
+        diskData: ['.dash-cards'],
+        cfg: ['[data-dashboard-site-link]'],
+        taxData: ['.dash-charts'],
+        postList: ['.dash-bottom', '[data-dashboard-quickstart]'],
+        bs: ['.dash-bottom'],
+      };
       const update = (key, value) => {
         if (signal.aborted) return;
         model[key] = value;
+        model.settled.add(key);
         const snapshot = renderSnapshot(model, signal),
           template = document.createElement('template');
         template.innerHTML = snapshot.html;
-        for (const selector of ['.dash-health-bar', '.dash-cards', '.dash-bottom']) {
+        const chartChanged = sections[key].includes('.dash-charts');
+        if (chartChanged) destroyCharts();
+        for (const selector of sections[key]) {
           const target = document.querySelector(selector),
             next = template.content.querySelector(selector);
           if (target && next) target.innerHTML = next.innerHTML;
         }
-        if (key === 'trafficData' || key === 'taxData') snapshot.onMount().catch(() => {});
+        if (chartChanged) {
+          const revision = ++chartRevision;
+          snapshot.onMount(() => revision === chartRevision).catch(() => {});
+        }
       };
       const failures = new Map();
       const showFailures = () => {
+        if (signal.aborted) return;
         const region = document.querySelector('.dash-load-errors');
         if (region)
           region.innerHTML = failures.size
@@ -51,7 +73,9 @@ export default function renderDashboard(signal) {
       const run = (key, request) =>
         request()
           .then((value) => {
+            if (signal.aborted) return;
             failures.delete(key);
+            model.loaded.add(key);
             showFailures();
             update(key, value);
           })
@@ -59,6 +83,7 @@ export default function renderDashboard(signal) {
             if (!signal.aborted) {
               failures.set(key, request);
               showFailures();
+              update(key, model[key]);
             }
           });
       for (const [key, request] of Object.entries({
@@ -82,21 +107,13 @@ export default function renderDashboard(signal) {
         },
         { signal },
       );
-      signal.addEventListener(
-        'abort',
-        () => {
-          document
-            .querySelectorAll('.dash-charts canvas')
-            .forEach((canvas) => window.Chart?.getChart(canvas)?.destroy());
-        },
-        { once: true },
-      );
+      signal.addEventListener('abort', destroyCharts, { once: true });
     },
   };
 }
 
 function renderSnapshot(
-  { dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg, taxData, postList, bs },
+  { dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg, taxData, postList, bs, settled, loaded },
   signal,
 ) {
   if (cfg.mediaBase) state.mediaBase = cfg.mediaBase;
@@ -126,29 +143,28 @@ function renderSnapshot(
   const healthItems = [
     {
       name: t('dashboard.healthWorker'),
-      status: healthData.status ? (healthData.status === 'ok' ? 'ok' : 'down') : 'pending',
+      status: healthStatus(healthData, settled.has('healthData')),
       latency: healthData.latency,
     },
     {
       name: t('dashboard.healthGithub'),
-      status: healthGithub.status ? (healthGithub.status === 'ok' ? 'ok' : 'down') : 'pending',
+      status: healthStatus(healthGithub, settled.has('healthGithub')),
       latency: healthGithub.latency,
     },
     {
       name: t('dashboard.healthR2'),
-      status: healthR2.status ? (healthR2.status === 'ok' ? 'ok' : 'down') : 'pending',
+      status: healthStatus(healthR2, settled.has('healthR2')),
       latency: healthR2.latency,
     },
     {
       name: t('dashboard.healthPages'),
-      status: healthData.status ? (healthData.status === 'ok' ? 'ok' : 'down') : 'pending',
+      status: healthStatus(healthData, settled.has('healthData')),
     },
   ];
   const allHealthy = healthItems.every((h) => h.status === 'ok');
 
-  const quickstart =
-    (!postList.length && dashData.posts !== '...') || dashData.posts === 0
-      ? `
+  const quickstart = (loaded.has('postList') ? !postList.length : loaded.has('dashData') && dashData.posts === 0)
+    ? `
       <div class="card card-pad mb-4">
         <h2 style="margin:0 0 12px"><i class="ri-rocket-line" style="color:var(--color-accent)"></i> ${t('dashboard.quickTitle')}</h2>
         <div class="quickstart-card">
@@ -167,7 +183,7 @@ function renderSnapshot(
         </div>
       </div>
     `
-      : '';
+    : '';
 
   return {
     html: `
@@ -181,7 +197,7 @@ function renderSnapshot(
             <button class="btn btn-secondary btn-sm" onclick="location.reload()"><i class="ri-refresh-line"></i> ${t('dashboard.refresh')}</button>
             <button class="btn btn-primary" onclick="location.hash='editor'"><i class="ri-add-line"></i> ${t('dashboard.newPost')}</button>
             <button class="btn btn-secondary" data-build-trigger onclick="window.doTriggerBuild()"><i class="ri-play-fill"></i> ${t('dashboard.buildDeploy')}</button>
-            ${state.siteUrl ? `<a href="${escHtml(state.siteUrl)}" target="_blank" rel="noopener" class="btn btn-secondary"><i class="ri-external-link-line"></i> ${t('dashboard.viewSite')}</a>` : ''}
+            <span data-dashboard-site-link>${state.siteUrl ? `<a href="${escHtml(state.siteUrl)}" target="_blank" rel="noopener" class="btn btn-secondary"><i class="ri-external-link-line"></i> ${t('dashboard.viewSite')}</a>` : ''}</span>
           </div>
         </div>
 
@@ -207,7 +223,7 @@ function renderSnapshot(
           <div class="dash-big-card"><span class="dash-big-num">${diskData.sizeMB ?? '...'} MB</span><span class="dash-big-label">${t('dashboard.r2Usage')} · ${t('dashboard.r2Meta', { objects: diskData.objects ?? '...', cost: diskData.cost ?? '...' })}</span></div>
         </div>
 
-        ${quickstart}
+        <div data-dashboard-quickstart>${quickstart}</div>
 
         <div class="dash-charts">
           <div class="dash-chart-card">
@@ -262,14 +278,14 @@ function renderSnapshot(
         </div>
       </div>
     `,
-    async onMount() {
+    async onMount(isCurrent) {
       // Lazy-load Chart.js only when the dashboard is actually shown
       try {
         await loadLib(CHART_URL);
       } catch {
         return;
       }
-      if (signal.aborted) return;
+      if (signal.aborted || !isCurrent()) return;
       const dayLabels = (trafficData.byDay || []).map((d) => d.date.slice(5));
       const dayData = (trafficData.byDay || []).map((d) => d.count);
       // "分类 & 标签" reflects the real site taxonomy (article counts),
@@ -298,22 +314,31 @@ function renderSnapshot(
         'var(--chart-9)',
         'var(--chart-10)',
       ];
-      const noData = (id) => {
+      const noData = (id, key) => {
         const el = document.getElementById(id);
         if (el && el.parentElement) {
-          el.parentElement.innerHTML = `<div style="text-align:center;padding:36px;color:var(--color-text-tertiary)"><i class="ri-bar-chart-line" style="font-size:30px"></i><p style="margin-top:8px;font-size:13px">${t('dashboard.noData')}</p></div>`;
+          el.parentElement.innerHTML = `<div style="text-align:center;padding:36px;color:var(--color-text-tertiary)"><i class="ri-bar-chart-line" style="font-size:30px"></i><p style="margin-top:8px;font-size:13px">${t(settled.has(key) ? 'dashboard.noData' : 'common.loading')}</p></div>`;
         }
       };
       const accent = getComputedStyle(document.documentElement).getPropertyValue('--chart-1').trim() || '#4361ee';
       if (dayData.some((v) => v > 0)) makeChart('chart-traffic', 'line', dayLabels, dayData, accent);
-      else noData('chart-traffic');
+      else noData('chart-traffic', 'trafficData');
       if (catData.some((v) => v > 0)) makeChart('chart-categories', 'doughnut', catLabels, catData, palette);
-      else noData('chart-categories');
+      else noData('chart-categories', 'taxData');
       if (tagLabels.length && tagData.some((v) => v > 0))
         makeChart('chart-tags', 'doughnut', tagLabels, tagData, palette);
-      else noData('chart-tags');
+      else noData('chart-tags', 'taxData');
     },
   };
+}
+
+function destroyCharts() {
+  document.querySelectorAll('.dash-charts canvas').forEach((canvas) => window.Chart?.getChart(canvas)?.destroy());
+}
+
+function healthStatus(data, settled) {
+  if (data.status) return data.status === 'ok' ? 'ok' : 'down';
+  return settled ? 'down' : 'pending';
 }
 
 function makeChart(id, type, labels, data, colors) {
