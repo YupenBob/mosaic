@@ -13,6 +13,7 @@ export function initLikes({ apiBase = '/api' } = {}) {
 
   const likedSet = loadLikedSet();
   let count = parseInt(btn.dataset.count) || 0;
+  let interacted = false;
   const liked = likedSet.has(slug);
 
   updateBtn(btn, count, liked);
@@ -21,6 +22,7 @@ export function initLikes({ apiBase = '/api' } = {}) {
   trackView(apiBase, slug);
 
   btn.addEventListener('click', async () => {
+    interacted = true;
     const set = loadLikedSet();
     const wasLiked = set.has(slug);
     const action = wasLiked ? 'unlike' : 'like';
@@ -52,6 +54,13 @@ export function initLikes({ apiBase = '/api' } = {}) {
       /* offline: localStorage is truth */
     }
   });
+  // A delayed statistics response must not overwrite a click already made on this page.
+  return (value) => {
+    if (!interacted && value != null) {
+      count = value;
+      updateBtn(btn, count, loadLikedSet().has(slug));
+    }
+  };
 }
 
 function trackView(apiBase, slug) {

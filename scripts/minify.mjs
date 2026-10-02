@@ -1,13 +1,14 @@
 /**
  * Minify the generated frontend assets (dist/assets) with esbuild.
- * Files keep their names and ESM imports (no bundling).
+ * Source modules stay separate; the published application has one dependency graph.
  *
  * Run: node scripts/minify.mjs   (called at the end of `npm run build`)
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadContext } from './lib/context.mjs';
-import { transform } from 'esbuild';
+import { transform, build } from 'esbuild';
+import { stampApp } from './lib/published-assets.mjs';
 
 const { root: ROOT, dist } = loadContext();
 const ASSETS = path.join(dist, 'assets');
@@ -33,4 +34,13 @@ async function walk(dir) {
 }
 
 await walk(ASSETS);
+await build({
+  entryPoints: [path.join(ROOT, 'src/assets/js/app.js')],
+  outfile: path.join(ASSETS, 'js/app.js'),
+  bundle: true,
+  format: 'esm',
+  minify: true,
+  target: 'es2020',
+});
 console.log('Minify complete');
+console.log('Published app:', stampApp(dist));

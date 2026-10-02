@@ -25,6 +25,8 @@ class VideoPlayer {
     this.container = container;
     this.video = container.querySelector('.video-element');
     if (!this.video) return;
+    this.positionKey =
+      'mosaic_video_pos_' + (this.video.dataset.mediaId || container.querySelector('source')?.src || this.video.src);
 
     this.index = index;
     this.total = total || parseInt(container.dataset.total) || 1;
@@ -73,8 +75,7 @@ class VideoPlayer {
     } catch {}
     // Restore playback position
     try {
-      const posKey = 'mosaic_video_pos_' + (this.video.src || container.querySelector('source')?.src || '').slice(-40);
-      const savedPos = parseFloat(localStorage.getItem(posKey));
+      const savedPos = parseFloat(localStorage.getItem(this.positionKey));
       if (savedPos > 1 && savedPos < (this.video.duration || Infinity)) {
         this.video.currentTime = savedPos;
       }
@@ -140,6 +141,12 @@ class VideoPlayer {
 
     // Show controls on load
     this.showControls();
+    container.dataset.playerReady = 'true';
+    container.removeAttribute('aria-busy');
+    if (container.dataset.pendingPlay === 'true') {
+      delete container.dataset.pendingPlay;
+      this.togglePlay();
+    }
   }
 
   /**
@@ -147,10 +154,13 @@ class VideoPlayer {
    * best MP4 tier rendered as a data-res fallback source.
    */
   destroyHls() {
+    const requestedPlayback = this._loadingStarted || !this.video.paused;
     try {
       if (this.hls) this.hls.destroy();
     } catch {}
     this.hls = null;
+    delete this.video._hls;
+    this.isHLS = false;
     const mp4s = this.container.querySelectorAll('source[data-res][src]');
     if (!mp4s.length) return;
     const rank = (res) => (res === '4K' ? 2160 : parseInt(res) || 0);
@@ -170,7 +180,7 @@ class VideoPlayer {
     });
     this.currentRes = best.dataset.res;
     this.video.src = best.src;
-    this.video.play().catch(() => {});
+    if (requestedPlayback) this.video.play().catch(() => {});
     if (this.qualityMenu) this.buildQualityMenu();
     this.updateQualityActive();
     vlog('warn', 'HLS unrecoverable — fell back to MP4 (' + best.dataset.res + ')');
@@ -180,17 +190,15 @@ class VideoPlayer {
     // Check stored preference first
     try {
       const stored = localStorage.getItem('mosaic_video_quality');
-      if (stored && ['360p', '480p', '720p', '1080p'].includes(stored)) return stored;
+      if (stored && this.sources[stored]) return stored;
     } catch {}
     const w = window.innerWidth;
     const dpr = window.devicePixelRatio || 1;
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const isSlow = conn && (conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g');
-    if (isSlow) return '360p';
-    if (w * dpr >= 1920) return '1080p';
-    if (w * dpr >= 1280) return '720p';
-    if (w * dpr >= 640) return '480p';
-    return '360p';
+    const target = isSlow ? 360 : w * dpr;
+    const available = Object.keys(this.sources).sort((a, b) => parseInt(a) - parseInt(b));
+    return available.find((res) => parseInt(res) >= target) || available.at(-1) || 'single';
   }
 
   buildSpeedMenu() {
@@ -363,6 +371,7 @@ class VideoPlayer {
     v.addEventListener(
       'play',
       () => {
+        this.startLoading();
         c.classList.add('playing');
         c.classList.remove('paused');
         if (this.playBtn) this.playBtn.innerHTML = '<i class="ri-pause-fill"></i>';
@@ -382,6 +391,10 @@ class VideoPlayer {
       'loadedmetadata',
       () => {
         if (this.timeDur) this.timeDur.textContent = this.fmt(v.duration);
+        try {
+          const saved = parseFloat(localStorage.getItem(this.positionKey));
+          if (saved > 1 && saved < v.duration && v.currentTime < 1) v.currentTime = saved;
+        } catch {}
       },
       { signal: lifecycle.signal },
     );
@@ -402,7 +415,7 @@ class VideoPlayer {
         }
         // Save position
         try {
-          if (v.currentTime > 1) localStorage.setItem('mosaic_video_pos_' + (v.src || '').slice(-40), v.currentTime);
+          if (v.currentTime > 1) localStorage.setItem(this.positionKey, v.currentTime);
         } catch {}
       },
       { signal: lifecycle.signal },
@@ -658,9 +671,17 @@ class VideoPlayer {
 
   togglePlay() {
     if (this.video.paused) {
+      this.startLoading();
       this.video.play()?.catch(() => {});
     } else {
       this.video.pause();
+    }
+  }
+
+  startLoading() {
+    if (!this._loadingStarted) {
+      this.hls?.startLoad();
+      this._loadingStarted = true;
     }
   }
 

@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { stageAdmin } from '../scripts/lib/published-assets.mjs';
 import { chromium } from 'playwright';
 import { ROOT } from '../scripts/lib/context.mjs';
 import { normalizeConfig } from '../shared/config.mjs';
 import { serveDirectory } from './helpers/static-server.mjs';
-const server = await serveDirectory(path.join(ROOT, 'cloud-admin'));
+const staged = fs.mkdtempSync(path.join(os.tmpdir(), 'mosaic-admin-'));
+stageAdmin(path.join(ROOT, 'cloud-admin'), path.join(staged, 'dist'), staged);
+const server = await serveDirectory(path.join(staged, 'dist'));
 const browser = await chromium.launch({ headless: true });
 const requests = [],
   errors = [];
@@ -108,6 +113,11 @@ try {
         location.hash = value;
       }, route);
       await page.waitForTimeout(350);
+      await page.locator('#main-content .page-anim').first().waitFor();
+      await page.evaluate(async () => {
+        const element = document.querySelector('#main-content .page-anim');
+        await Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => {})));
+      });
       await page.addScriptTag({ path: path.join(ROOT, 'node_modules/axe-core/axe.min.js') });
       const violations = await page.evaluate(async () =>
         (await window.axe.run(document)).violations.map((item) => ({
@@ -127,4 +137,5 @@ try {
 } finally {
   await browser.close();
   await server.close();
+  fs.rmSync(staged, { recursive: true, force: true });
 }

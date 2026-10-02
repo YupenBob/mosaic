@@ -24,7 +24,7 @@ import { markDirty } from './github.js';
 import { DEFAULTS } from '../../shared/config.mjs';
 import { getConfig } from './services/site-config.js';
 import { registerUpload, invalidateMedia, jobsRequest } from './services/jobs.js';
-import { folderFor, validSegment } from '../../shared/media-manifest.mjs';
+import { folderFor, validSegment, mediaUrl, compareMediaOrder } from '../../shared/media-manifest.mjs';
 import { protectedMediaKeys } from './services/media-references.js';
 
 // Workers platform request-body limit (~100MB). Larger files must use the
@@ -234,22 +234,38 @@ export async function listMedia(c, mediaBaseOverride) {
   const slug = c.req.param('slug');
   const r2Public = c.env.R2_PUBLIC_URL || mediaBaseOverride || '';
   const seen = new Set();
-  const result = { photos: [], videos: [], music: [] };
+  const result = { photos: [], videos: [], music: [], covers: [] };
   const tasks = c.env.JOBS ? await jobsRequest(c.env, 'media-list', { slug }) : [];
   const taskByFile = new Map(tasks.map((task) => [`${task.folder}/${task.filename}`, task]));
+  const taskByKey = new Map(tasks.filter((task) => task.sourceKey).map((task) => [task.sourceKey, task]));
 
-  const add = (name, size) => {
-    if (seen.has(name)) return;
-    seen.add(name);
+  const add = (name, size, key = '', manifestItem = null) => {
     const folder = folderForExt(name.split('.').pop()?.toLowerCase() || '');
-    const url = r2Public
-      ? `${r2Public}/originals/${encodeURIComponent(slug)}/${folder}/${encodeURIComponent(name)}`
-      : `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`;
+    const task =
+      manifestItem || taskByKey.get(key) || taskByFile.get(`${folder}/${name}`) || taskByFile.get(`covers/${name}`);
+    const identity = task?.id || `${folder}/${name}`;
+    if (seen.has(identity)) return;
+    seen.add(identity);
+    const sourceKey = task?.sourceKey || key;
+    const previewUrl = task?.previewKey ? mediaUrl(task.previewKey, r2Public) : '';
+    const url =
+      r2Public && sourceKey
+        ? mediaUrl(sourceKey, r2Public)
+        : `/api/media/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`;
     const ext = name.split('.').pop()?.toLowerCase();
-    const task = taskByFile.get(`${folder}/${name}`) || taskByFile.get(`covers/${name}`);
-    const item = { name, url, size, ...(task ? { status: task.status, taskId: task.taskId } : {}) };
-    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) result.photos.push(item);
-    else if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) result.videos.push(item);
+    const item = {
+      name,
+      url: task?.sourceAvailable === false ? previewUrl : url,
+      size,
+      previewUrl,
+      ...(task
+        ? { id: task.id, status: task.status, taskId: task.taskId, published: task.published, order: task.order }
+        : {}),
+    };
+    if (task?.folder === 'covers') result.covers.push(item);
+    else if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif', 'tiff', 'tif'].includes(ext))
+      result.photos.push(item);
+    else if (['mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v'].includes(ext)) result.videos.push(item);
     else if (['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) result.music.push(item);
   };
 
@@ -260,13 +276,15 @@ export async function listMedia(c, mediaBaseOverride) {
       for (const obj of list.objects || []) {
         const name = obj.key.split('/').pop();
         if (!name || name.startsWith('.')) continue;
-        add(name, obj.size);
+        add(name, obj.size, obj.key);
       }
       cursor = list.truncated ? list.cursor : null;
     } while (cursor);
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 502);
   }
+  for (const item of tasks) add(item.filename, 0, item.sourceKey, item);
+  for (const list of Object.values(result)) list.sort(compareMediaOrder);
   return c.json(result);
 }
 

@@ -10,14 +10,16 @@ export function register(component) {
 
 export async function loadComponents(config, pageType) {
   const components = _registry.filter((c) => c.enabled !== false);
-  for (const comp of components) {
-    if (comp.page !== pageType && comp.page !== 'all') continue;
-    const compConfig = (config && config[comp.name]) || {};
-    if (compConfig.enabled === false) continue;
-    try {
-      await comp.init(document.body, compConfig);
-    } catch (err) {
-      console.error('Component ' + comp.name + ' init failed:', err);
-    }
-  }
+  await Promise.all(
+    components.map(async (comp) => {
+      if (comp.page !== pageType && comp.page !== 'all') return;
+      const compConfig = (config && config[comp.name]) || {};
+      if (compConfig.enabled === false) return;
+      try {
+        await comp.init(document.body, compConfig);
+      } catch (err) {
+        console.error('Component ' + comp.name + ' init failed:', err);
+      }
+    }),
+  );
 }

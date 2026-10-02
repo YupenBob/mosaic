@@ -58,17 +58,29 @@ export const DEFAULTS = {
     maxFileBytes: 5368709120,
   },
   cache: { postsMs: 60000, configMs: 120000, diskMs: 300000, usageMaxAgeMs: 86400000 },
-  admin: { dirtyPollMs: 60000, jobPollMs: 5000 },
+  admin: {
+    dirtyPollMs: 60000,
+    jobPollMs: 5000,
+    idlePollMs: 30000,
+    hiddenPollMs: 60000,
+    requestTimeoutMs: 15000,
+    cacheMs: 15000,
+    buildCacheMs: 3000,
+  },
   player: {
+    defaultAspect: 16 / 9,
+    requestVersion: 'cors-v1',
     speeds: [0.5, 0.75, 1, 1.25, 1.5, 2],
     qualityOrder: ['4K', '1080p', '720p', '480p', '360p', '240p'],
     hls: {
+      autoStartLoad: false,
+      startFragPrefetch: false,
       maxBufferLength: 90,
       maxMaxBufferLength: 300,
       backBufferLength: 30,
       fragLoadingMaxRetry: 6,
       fragLoadingTimeOut: 60000,
-      manifestLoadingTimeOut: 60000,
+      manifestLoadingTimeOut: 10000,
       levelLoadingTimeOut: 60000,
     },
   },
@@ -103,6 +115,8 @@ export function normalizeConfig(raw = {}, env = {}) {
 
 export function validateConfig(config) {
   const errors = [];
+  if (!Number.isFinite(config.player?.defaultAspect) || config.player.defaultAspect <= 0)
+    errors.push('player.defaultAspect must be positive');
   for (const [name, value, min, max] of [
     ['pageSize', config.pageSize, 1, 10000],
     ['build.timeoutMinutes', config.build?.timeoutMinutes, 10, 360],
@@ -150,6 +164,10 @@ export function validateConfig(config) {
     errors.push('Invalid media.audio.bitrates');
   if (!/^\d+k$/.test(config.videoQuality?.audioBitrate)) errors.push('Invalid videoQuality.audioBitrate');
   for (const key of ['leaseMs', 'pollMs']) if (!(config.media?.[key] > 0)) errors.push(`media.${key} must be positive`);
+  for (const key of ['requestTimeoutMs', 'jobPollMs', 'dirtyPollMs', 'idlePollMs', 'hiddenPollMs'])
+    if (!(config.admin?.[key] > 0)) errors.push(`admin.${key} must be positive`);
+  for (const key of ['cacheMs', 'buildCacheMs'])
+    if (!(config.admin?.[key] >= 0)) errors.push(`admin.${key} must not be negative`);
   if (!config.deployment?.branch || !config.mediaSource?.bucket || !config.media?.manifestKey)
     errors.push('Deployment branch, bucket and manifest key are required');
   return errors;

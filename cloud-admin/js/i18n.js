@@ -6,6 +6,9 @@ export const I18N = {
     jobs: {
       title: '媒体处理',
       pending: '排队中',
+      processing: '高档处理中',
+      previous: '沿用可用产物',
+      uploaded: '已上传',
       running: '处理中',
       ready: '已就绪',
       failed: '处理失败',
@@ -48,6 +51,7 @@ export const I18N = {
     },
     common: {
       error: '错误',
+      partialError: '部分数据暂不可用，仍可继续操作',
       delete: '删除',
       cancel: '取消',
       confirm: '确认',
@@ -501,6 +505,9 @@ export const I18N = {
     jobs: {
       title: 'Media processing',
       pending: 'Queued',
+      processing: 'Higher tiers processing',
+      previous: 'Using published output',
+      uploaded: 'Uploaded',
       running: 'Processing',
       ready: 'Ready',
       failed: 'Failed',
@@ -543,6 +550,7 @@ export const I18N = {
     },
     common: {
       error: 'Error',
+      partialError: 'Some data is unavailable. You can continue working.',
       delete: 'Delete',
       cancel: 'Cancel',
       confirm: 'Confirm',

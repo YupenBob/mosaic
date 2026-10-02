@@ -270,14 +270,14 @@ function showQualityFlash(label) {
     el = document.createElement('div');
     el.id = 'gallery-quality-flash';
     el.style.cssText =
-      'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.75);color:#fff;padding:6px 16px;border-radius:20px;font-size:14px;pointer-events:none;opacity:0;transition:opacity 0.15s ease';
+      'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;background:#242424;color:#fff;padding:6px 16px;border-radius:20px;font-size:14px;pointer-events:none;visibility:hidden';
     document.body.appendChild(el);
   }
   el.textContent = label;
-  el.style.opacity = '1';
+  el.style.visibility = 'visible';
   clearTimeout(el._timer);
   el._timer = setTimeout(() => {
-    el.style.opacity = '0';
+    el.style.visibility = 'hidden';
   }, 800);
 }
 

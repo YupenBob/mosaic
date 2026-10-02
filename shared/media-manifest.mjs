@@ -79,6 +79,11 @@ export function mediaUrl(key, base = '') {
   if (!key) return '';
   return `${base.replace(/\/+$/, '')}/${key.split('/').map(encodeURIComponent).join('/')}`;
 }
+export function compareMediaOrder(a, b) {
+  return typeof a.order === 'number' && typeof b.order === 'number'
+    ? a.order - b.order
+    : String(a.order ?? a.filename ?? a.name).localeCompare(String(b.order ?? b.filename ?? b.name), 'en');
+}
 export function objectKeys(published) {
   const result = new Set();
   const walk = (value) => {
