@@ -21,7 +21,8 @@ const config = normalizeConfig({
 });
 let confirmations = 0,
   jobStatus = 'pending',
-  metricFailed = false;
+  metricFailed = false,
+  emptySite = false;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 try {
   const page = await browser.newPage();
@@ -41,25 +42,47 @@ try {
       body = config;
     } else if (name === '/dirty') body = { dirty: false };
     else if (name === '/build/status') body = { status: 'unknown' };
-    else if (name === '/stats') body = { posts: 3, categories: 2, tags: 1 };
+    else if (name === '/stats')
+      body = { posts: emptySite ? 0 : 3, categories: emptySite ? 0 : 2, tags: emptySite ? 0 : 1 };
     else if (name === '/stats/traffic') {
-      await wait(1200);
+      await wait(metricFailed ? 100 : 500);
       status = metricFailed ? 200 : 503;
       metricFailed = true;
-      body = status === 200 ? { total: 10, byDay: [], top5: [] } : { error: 'fixture slow service' };
+      body =
+        status === 200
+          ? {
+              total: emptySite ? 0 : 10,
+              byDay: emptySite ? [] : [{ date: '2026-10-03', count: 10 }],
+              top5: [],
+            }
+          : { error: 'fixture slow service' };
     } else if (name === '/stats/posts') {
       await wait(1200);
       body = { stats: {} };
+    } else if (name === '/health/github' && emptySite) {
+      status = 503;
+      body = { error: 'fixture health unavailable' };
     } else if (name.startsWith('/health')) body = { status: 'ok' };
     else if (name === '/disk') body = { sizeMB: 1, objects: 1, cost: 0 };
-    else if (name === '/taxonomy') body = { categories: [], tags: [] };
+    else if (name === '/taxonomy')
+      body = {
+        categories: emptySite
+          ? []
+          : [
+              { name: 'parent/child', count: 2 },
+              { name: 'other', count: 1 },
+            ],
+        tags: emptySite ? [] : [{ name: 'tag', count: 1 }],
+      };
     else if (name === '/posts')
       body = {
-        posts: [
-          { slug: 'fixture', title: 'Apple', category: 'parent/child', cover: server.url + '/actual-cover.webp' },
-          { slug: 'second', title: 'Apple elsewhere', category: 'other' },
-          { slug: 'third', title: 'Banana', category: 'parent/child' },
-        ],
+        posts: emptySite
+          ? []
+          : [
+              { slug: 'fixture', title: 'Apple', category: 'parent/child', cover: server.url + '/actual-cover.webp' },
+              { slug: 'second', title: 'Apple elsewhere', category: 'other' },
+              { slug: 'third', title: 'Banana', category: 'parent/child' },
+            ],
       };
     else if (name === '/posts/fixture')
       body = {
@@ -137,6 +160,9 @@ try {
   await page.locator('[onclick="location.hash=\'editor\'"]').first().waitFor();
   const shellMs = Date.now() - started;
   assert.ok(shellMs < 1200, 'dashboard actions render before slow statistics');
+  await page.evaluate(() => {
+    window.fixtureActionNode = document.querySelector('.page-header-actions .btn-primary');
+  });
   await page.locator('[data-metrics-retry]').waitFor();
   assert.equal(requests.filter((r) => r === '/config').length, 1, 'startup shares configuration request');
   assert.equal(
@@ -150,8 +176,34 @@ try {
     'published admin loads one application module',
   );
   console.log(`Admin slow service: actions available in ${shellMs}ms; failed metrics allow retry; one config request`);
+  await page.locator('[data-dashboard-site-link] a').waitFor();
+  assert.equal(await page.locator('[data-dashboard-site-link] a').getAttribute('href'), server.url);
+  assert.ok(!(await page.locator('.page-subtitle').innerText()).includes('加载'), 'settled health clears loading text');
+  await page.waitForFunction(() => !!window.Chart?.getChart(document.querySelector('#chart-categories')));
+  await page.evaluate(() => {
+    window.fixtureCategoryChart = window.Chart.getChart(document.querySelector('#chart-categories'));
+  });
+  await page.locator('[data-metrics-retry]').click();
+  await page.waitForFunction(
+    () => window.Chart?.getChart(document.querySelector('#chart-traffic'))?.data.datasets[0].data[0] === 10,
+  );
+  assert.equal(await page.evaluate(() => window.fixtureCategoryChart.ctx), null, 'superseded charts are destroyed');
+  assert.equal(await page.evaluate(() => Object.keys(window.Chart.instances).length), 3);
+  assert.equal(
+    await page.evaluate(() => window.fixtureActionNode === document.querySelector('.page-header-actions .btn-primary')),
+    true,
+    'metric refresh keeps action nodes',
+  );
+  console.log(
+    'Admin dashboard: late traffic restores charts, health settles, site link appears and chart instances stay bounded',
+  );
   await page.evaluate(() => (location.hash = 'posts'));
   await page.locator('#post-search').waitFor();
+  assert.equal(
+    await page.evaluate(() => Object.keys(window.Chart.instances).length),
+    0,
+    'leaving dashboard destroys charts',
+  );
   await page.locator('#post-search').fill('Apple');
   await page.locator('#post-cat-filter').selectOption('parent/child');
   await wait(250);
@@ -237,6 +289,16 @@ try {
     requests.filter((r) => r.endsWith('/cancel')).length,
     0,
     'leaving the editor does not cancel confirmed processing',
+  );
+  emptySite = true;
+  await page.goto(server.url, { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-dashboard-quickstart] .quickstart-card').waitFor();
+  assert.equal(await page.locator('.dash-cards .dash-big-num').first().innerText(), '0');
+  await page.waitForFunction(() => !document.querySelector('.page-subtitle').textContent.includes('加载'));
+  assert.equal(
+    await page.locator('.dash-health-dot.down').count(),
+    1,
+    'failed health settles instead of loading forever',
   );
   assert.deepEqual(errors, []);
   console.log(
