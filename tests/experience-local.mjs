@@ -250,10 +250,18 @@ try {
       await page.locator('.video-big-play').first().click();
       await page.waitForFunction(() => document.querySelector('video').currentTime > 0.3);
       assert.deepEqual(errors, [], 'playback has no JavaScript errors');
-      assert.ok(
-        requests.some((r) => r.url.includes('clip.mp4') && r.range),
-        'real range playback reaches the media service',
-      );
+      // Small MP4s may be fetched whole by WebKit; verify ranged CORS transport explicitly.
+      const range = await page.evaluate(async (url) => {
+        const response = await fetch(url, { headers: { Range: 'bytes=0-127' } });
+        return {
+          status: response.status,
+          range: response.headers.get('Content-Range'),
+          bytes: (await response.arrayBuffer()).byteLength,
+        };
+      }, `${mediaUrl}/fixture/native/clip.mp4?mosaic-cors=cors-v1&range-check=1`);
+      assert.equal(range.status, 206);
+      assert.ok(range.range.startsWith('bytes 0-127/'));
+      assert.equal(range.bytes, 128);
       console.log(
         `${engine.name()}: ${engine === chromium ? 'failed manifest recovers to MP4; ' : ''}low-tier native/range playback passed`,
       );
