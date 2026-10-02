@@ -24,7 +24,7 @@ Zero cost · Cloud management · Zero ops · Pure static · Ready out of the box
 
 Mosaic is a **media-first static site framework**: write like Hexo, but it is not a "blog that embeds MP4s". Photo galleries, multi-bitrate HLS video, and a music player are first-class citizens.
 
-It turns the whole chain — content authoring, media processing, static publishing, and analytics — into a reusable framework: content in Git, media in Cloudflare R2, compute in GitHub Actions, display on Cloudflare Pages, and management in a build-free cloud console. **Designed from day one for hundreds of users to use out of the box.**
+It turns the whole chain — content authoring, media processing, static publishing, and analytics — into a reusable framework: content in Git, media in Cloudflare R2, compute in GitHub Actions, display on Cloudflare Pages, and management in a native JS cloud console. **Designed from day one for hundreds of users to use out of the box.**
 
 ## Features
 
@@ -55,7 +55,7 @@ It turns the whole chain — content authoring, media processing, static publish
 
 | Capability | Description |
 | --- | --- |
-| Build-free SPA | Pure Vanilla JS, ES modules, no framework or build step |
+| Native JS SPA | Modular source, published as one content-versioned ESM entry |
 | Dashboard | Traffic chart, real taxonomy stats, leaderboard, storage, health |
 | Build center | Step-level progress + ETA, timing, failure highlight, GitHub links |
 | Editor | Live Markdown preview, autosave drafts, cover picker, drag-drop upload (concurrent + retry) |
@@ -159,7 +159,7 @@ Auth-grouped REST endpoints (see [handover.md](handover.md) and [docs/api.md](do
 │   └── data/                 #   i18n
 ├── worker/                   # Cloudflare Worker API (Hono + DO)
 │   └── scripts/              #   metadata migration / SDK video uploader
-├── cloud-admin/              # build-free Vanilla JS SPA admin
+├── cloud-admin/              # modular Vanilla JS SPA admin source
 ├── functions/                # frontend Pages Functions proxy
 ├── tests/                    # E2E / smoke tests (Playwright + Node)
 ├── docs/                     # architecture / config / media / music / testing / ops
@@ -171,7 +171,7 @@ Auth-grouped REST endpoints (see [handover.md](handover.md) and [docs/api.md](do
 
 1. Configure Cloudflare (R2 bucket + Pages projects + Worker)
 2. Deploy Worker: `cd worker && npx wrangler deploy`
-3. Deploy admin: `npx wrangler pages deploy cloud-admin --project-name mosaic-admin`
+3. Stage the admin with `node scripts/stage-admin.mjs`, then deploy with `npx wrangler pages deploy .mosaic/admin-dist --project-name mosaic-admin` (use your configured project name)
 4. Configure GitHub Actions secrets (R2 credentials, CF token, Worker secrets)
 5. Follow the [migration guide](docs/migration.md): deploy the coordinator, migrate manifests, then enable the separate workflows
 

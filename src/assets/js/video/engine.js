@@ -5,8 +5,6 @@ export function initHls(hlsSource, log) {
     // Pre-set sources so quality menu shows immediately
     // Sources come from the manifest-backed MP4 elements until HLS levels load.
     this.currentRes = 'auto'; // Default to ABR
-    // ABR start estimate: match the stored preference so playback starts at
-    // the right tier instead of ramping up from the lowest one.
     var storedPref = (function () {
       try {
         return localStorage.getItem('mosaic_video_quality');
@@ -14,26 +12,8 @@ export function initHls(hlsSource, log) {
         return null;
       }
     })();
-    var defaultEstimate = 2500000;
-    if (storedPref === '1080p') defaultEstimate = 6000000;
-    else if (storedPref === '720p') defaultEstimate = 3000000;
-    else if (storedPref === '480p') defaultEstimate = 1500000;
-    else if (storedPref === '360p') defaultEstimate = 800000;
     try {
       this.hls = new window.Hls({
-        maxBufferLength: 90,
-        maxMaxBufferLength: 300,
-        backBufferLength: 30,
-        startLevel: -1,
-        enableWorker: true,
-        autoStartLoad: false,
-        startFragPrefetch: false,
-        capLevelToPlayerSize: true,
-        abrEwmaDefaultEstimate: defaultEstimate,
-        fragLoadingMaxRetry: 6,
-        fragLoadingTimeOut: 60000,
-        manifestLoadingTimeOut: 10000,
-        levelLoadingTimeOut: 60000,
         ...window.__MOSAIC_CONFIG?.player?.hls,
         xhrSetup(xhr, url) {
           xhr.open('GET', playbackUrl(url), true);
@@ -75,7 +55,7 @@ export function initHls(hlsSource, log) {
           self.buildQualityMenu();
         }
         // Apply a stored manual preference so playback starts at that tier
-        if (storedPref && ['360p', '480p', '720p', '1080p', '4K'].indexOf(storedPref) >= 0) {
+        if (storedPref && storedPref !== 'auto') {
           var want = storedPref === '4K' ? 2160 : parseInt(storedPref) || 0;
           var sidx = (self.hls.levels || []).findIndex(function (l) {
             return l.height === want;
@@ -87,11 +67,6 @@ export function initHls(hlsSource, log) {
             log('info', 'Stored quality applied: ' + storedPref + ' (level ' + sidx + ')');
             self.updateQualityActive();
           }
-        } else {
-          // No stored preference: start at a mid tier so the first frames
-          // arrive quickly instead of probing up from the lowest level.
-          var mid = Math.min(2, (self.hls.levels || []).length - 1);
-          if (mid >= 0) self.hls.startLevel = mid;
         }
       });
       // Quality switch completion event

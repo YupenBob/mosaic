@@ -56,4 +56,4 @@ npm run test:admin:local
 
 见 [体验排查与验证](docs/experience-2026-10-02.md)。新增缓存开启的真实 HLS/MP4 测试，以及慢后台、上传确认失败、任务重试、封面和编辑光标用例；命令已并入现有 CI。媒体处理、清单和站点发布契约保持兼容，播放策略不进入媒体处理指纹。
 
-后台现在部署 .mosaic/admin-dist；先执行 node scripts/stage-admin.mjs。前台发布文件名包含内容哈希。不要绕过此步骤部署未版本化后台模块，否则会命中 4 小时旧缓存。
+后台现在部署 .mosaic/admin-dist；先执行 node scripts/stage-admin.mjs，生成单个后台 ESM 入口及内容版本。前台发布文件名包含内容哈希。不要绕过此步骤部署源码，否则会重新引入模块下载链和 4 小时旧缓存。HLS 默认从最低已发布档开始自动升档，player.hls.startLevel 可覆盖，手动清晰度优先；这些策略不使媒体重新编码。

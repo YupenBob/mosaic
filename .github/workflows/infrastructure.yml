@@ -1,7 +1,19 @@
 name: Mosaic Infrastructure
 on:
   push:
-    paths: ['worker/**', 'cloud-admin/**', 'shared/**', '.github/workflows/infrastructure.yml']
+    paths:
+      - 'worker/**'
+      - 'cloud-admin/**'
+      - 'shared/**'
+      - 'scripts/lib/published-assets.mjs'
+      - 'scripts/lib/context.mjs'
+      - 'scripts/stage-admin.mjs'
+      - 'scripts/deployment-env.mjs'
+      - 'scripts/configure-pages.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.nvmrc'
+      - '.github/workflows/infrastructure.yml'
   workflow_dispatch:
 concurrency:
   group: mosaic-infrastructure-${{ github.ref }}

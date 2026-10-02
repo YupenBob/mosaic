@@ -73,6 +73,10 @@ export const DEFAULTS = {
     speeds: [0.5, 0.75, 1, 1.25, 1.5, 2],
     qualityOrder: ['4K', '1080p', '720p', '480p', '360p', '240p'],
     hls: {
+      startLevel: 0,
+      enableWorker: true,
+      capLevelToPlayerSize: true,
+      abrEwmaDefaultEstimate: 2500000,
       autoStartLoad: false,
       startFragPrefetch: false,
       maxBufferLength: 90,
@@ -168,6 +172,8 @@ export function validateConfig(config) {
     if (!(config.admin?.[key] > 0)) errors.push(`admin.${key} must be positive`);
   for (const key of ['cacheMs', 'buildCacheMs'])
     if (!(config.admin?.[key] >= 0)) errors.push(`admin.${key} must not be negative`);
+  if (!Number.isInteger(config.player?.hls?.startLevel) || config.player.hls.startLevel < -1)
+    errors.push('player.hls.startLevel must be an integer of -1 or greater');
   if (!config.deployment?.branch || !config.mediaSource?.bucket || !config.media?.manifestKey)
     errors.push('Deployment branch, bucket and manifest key are required');
   return errors;
