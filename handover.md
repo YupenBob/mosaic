@@ -119,4 +119,22 @@ npm run test:admin:local
   独立 verifier 报告 `.mosaic/qa/verification-report-v2.1.md`。旧媒体没有预览字段时自动回退
   原图，重新处理即补齐；无需全量重转码。
 
+### 2026-10-25 合入 main 并上线（Experience v2 + v2.1）
+
+- 代码提交 `def2e52`（含 `f3aebb5` 主体、`c2f57ee` 视觉打磨、`def2e52` 瀑布流间距单位/
+  弹层圆角/WebKit e2e 稳定性修复），已推送 `main` 与 `feat/experience-v2`。
+- Actions：[Verify #40117300414](https://github.com/YupenBob/mosaic/actions/runs/40117300414)、
+  [Infrastructure #40117300474](https://github.com/YupenBob/mosaic/actions/runs/40117300474)、
+  [Site #40117300569](https://github.com/YupenBob/mosaic/actions/runs/40117300569)，均成功；
+  Worker、后台与站点均已发布。
+- 线上核验：`build-snapshot.json` 的 `gitSha=def2e52...`；首页 14 张卡片为 JS 瀑布流
+  （gap 32px、圆角 26px、Chromium squircle）、单应用包 `app.871dab9a3041ebb0.js`；
+  `/api/health` 正常，新 Worker 路由 `/api/media/interpolate` 返回 401（存在但需鉴权）；
+  后台 bundle 含 `cardLayout`/`media/interpolate`/`keepSourceFiles` 新能力；无 console 错误。
+- 说明：线上存量 14 篇中 8 篇卡片已有 LQIP（图片封面）；旧视频封面暂无 `posterPreview`，
+  自动回退高清海报，后续重新处理媒体即补齐预览。回退：上一成功部署为 `aad8bd4` 的站点/后台，
+  保留当前媒体清单与 Durable Object 命名空间，Worker 回退使用 Infrastructure 工作流对应
+  历史版本。
+
+
 
