@@ -184,53 +184,223 @@
   color: var(--color-accent-text);
 }
 
-/* Card Grid — masonry via CSS columns */
-.card-grid {
-  column-count: 1;
-  column-gap: var(--space-6);
-}
-
-.card-grid > * {
-  break-inside: avoid;
-  margin-bottom: var(--space-6);
-}
-
-@media (min-width: 640px) {
-  .card-grid {
-    column-count: 2;
-  }
-}
-
-@media (min-width: 1024px) {
-  .card-grid {
-    column-count: 3;
-  }
-}
-
-@media (min-width: 1440px) {
-  .container {
-    padding: 0 var(--space-8);
-  }
-  .card-grid {
-    column-count: 4;
-  }
-}
+/* Card grid lives in card.css (it owns the card layout). */
 
 /* Empty state */
 .empty-state {
   text-align: center;
   padding: var(--space-20) var(--space-4);
   color: var(--color-text-tertiary);
+  border-radius: var(--card-radius);
 }
 
-.empty-state i {
-  font-size: 3rem;
-  display: block;
+.empty-state-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
   margin-bottom: var(--space-4);
+  border-radius: 50%;
+  background: var(--color-tag-bg);
+  color: var(--color-accent-text);
+  font-size: 2rem;
 }
 
 .empty-state p {
   font-size: var(--font-size-lg);
+}
+
+/* Search dropdown layering (filter.css has the visuals) */
+.search-results-dropdown {
+  z-index: var(--z-dropdown);
+}
+
+/* === Focus visibility ===
+ * One consistent, high-contrast focus ring for keyboard users. Component
+ * styles only remove outlines when they replace them (`.theme-toggle` etc.). */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.header a:focus-visible,
+.header button:focus-visible {
+  outline-offset: 3px;
+}
+
+/* === Header theme menu === */
+.theme-menu-root {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 16px); /* clear the sticky header, aligned to the toggle */
+  right: 0;
+  z-index: var(--z-popover);
+  width: 246px;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  /* opacity/translate/scale are animated by the motion module (inline) */
+  transform-origin: top right;
+}
+
+.theme-menu[hidden] {
+  display: none;
+}
+
+.theme-menu-group + .theme-menu-group {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.theme-menu-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.theme-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.theme-mode {
+  position: relative;
+  cursor: pointer;
+}
+
+.theme-mode-input,
+.theme-swatch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-mode-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: var(--space-2) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--button-radius);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.theme-mode:hover .theme-mode-text {
+  background: var(--color-tag-bg);
+  color: var(--color-text-primary);
+}
+
+.theme-mode-input:checked + .theme-mode-text {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  color: var(--color-accent-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.theme-mode-input:focus-visible + .theme-mode-text {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.theme-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 2px 2px;
+}
+
+.theme-swatch {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.theme-swatch-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.theme-swatch:hover .theme-swatch-dot {
+  transform: scale(1.1);
+}
+
+.theme-swatch-input:checked + .theme-swatch-dot {
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-accent);
+}
+
+.theme-swatch-input:focus-visible + .theme-swatch-dot {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* Palette swatches reference the global palette tokens (tokens.css). */
+[data-accent-option='blue'] .theme-swatch-dot {
+  background: var(--palette-blue);
+}
+[data-accent-option='violet'] .theme-swatch-dot {
+  background: var(--palette-violet);
+}
+[data-accent-option='emerald'] .theme-swatch-dot {
+  background: var(--palette-emerald);
+}
+[data-accent-option='rose'] .theme-swatch-dot {
+  background: var(--palette-rose);
+}
+[data-accent-option='amber'] .theme-swatch-dot {
+  background: var(--palette-amber);
+}
+[data-accent-option='slate'] .theme-swatch-dot {
+  background: var(--palette-slate);
+}
+
+@media (max-width: 639px) {
+  .theme-menu {
+    width: min(268px, calc(100vw - 24px));
+    right: -4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-mode-text,
+  .theme-swatch-dot,
+  .theme-toggle .morph-icon {
+    transition: none;
+  }
+
+  .theme-swatch:hover .theme-swatch-dot {
+    transform: none;
+  }
 }
 
 /* Pagination */

@@ -1,7 +1,24 @@
 <%
-/* List page: shows card grid with filter bar */
+/* List page: shows card grid with filter bar.
+ * Cards are rendered by the single shared renderer
+ * (src/assets/js/cards/render.js) — provided to templates by
+ * scripts/site/render.mjs — so SSR and client re-renders share one markup. */
 const pageDataTitle = typeof pageTitle !== 'undefined' ? pageTitle : site.title;
 const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site.description;
+const themeCfg = site.themeMode || {};
+const experienceCfg = site.experience || {};
+const cardCfg = experienceCfg.card || {};
+const showThemeMenu = themeCfg.showMenu !== false;
+const allowVisitorToggle = themeCfg.allowVisitorToggle !== false;
+const themeMenuLabel = t('theme_menu');
+const accentOptions = [
+  ['blue', 'accent_blue'],
+  ['violet', 'accent_violet'],
+  ['emerald', 'accent_emerald'],
+  ['rose', 'accent_rose'],
+  ['amber', 'accent_amber'],
+  ['slate', 'accent_slate'],
+];
 %>
 <!DOCTYPE html>
 <html lang="<%= site.language || 'zh-CN' %>">
@@ -9,17 +26,26 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="<%= pageDesc %>" />
+  <meta name="theme-color" content="#f5f5f7" />
   <meta name="data-base" content="<%= rp %>data" />
   <title><%= pageDataTitle %></title>
   <script>
-    /* Apply the pinned theme before first paint (no flash of wrong theme) */
+    /* Apply the pinned theme + accent before first paint (no flash of wrong theme).
+     * data-theme = RESOLVED light|dark; data-theme-mode = visitor preference;
+     * data-accent = palette. Kept in sync with post.ejs / 404.ejs. */
     (function () {
       try {
-        var t = localStorage.getItem('mosaic_theme');
+        var root = document.documentElement;
+        var fallbackMode = '<%= (site.themeMode && site.themeMode.default) || site.theme || "auto" %>';
+        var fallbackAccent = '<%= (site.themeMode && site.themeMode.accent) || "blue" %>';
+        var mode = localStorage.getItem('mosaic_theme') || fallbackMode;
+        var accent = localStorage.getItem('mosaic_accent') || fallbackAccent;
         var dark =
-          t === 'dark' ||
-          (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+          mode === 'dark' ||
+          (mode !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        root.setAttribute('data-theme', dark ? 'dark' : 'light');
+        root.setAttribute('data-theme-mode', mode === 'light' || mode === 'dark' ? mode : 'auto');
+        root.setAttribute('data-accent', accent || 'blue');
       } catch (e) {}
     })();
   </script>
@@ -34,6 +60,10 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <link rel="stylesheet" href="<%= rp %>assets/css/gallery.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/video.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/filter.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/motion.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/icons.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/note.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/feed.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/responsive.css" />
   <meta property="og:title" content="<%= pageDataTitle %>" />
   <meta property="og:description" content="<%= pageDesc %>" />
@@ -46,9 +76,30 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"WebSite","name":"<%= site.title %>","description":"<%= site.description %>","url":"<%= site.url || '' %>"}
   </script>
-<script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality }).replace(/</g, '\\u003c') %>;</script>
+<script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality, themeMode: site.themeMode, experience: site.experience, apiBase: site.apiBase }).replace(/</g, '\\u003c') %>;</script>
+  <script>
+    /* Scroll-reveal gating: only hide reveal targets when motion is allowed.
+     * The timeout is a safety net — if the app bundle fails to boot, content
+     * is revealed instead of staying invisible. */
+    (function () {
+      try {
+        var exp = (window.__MOSAIC_CONFIG && window.__MOSAIC_CONFIG.experience) || {};
+        var motion = exp.motion || {};
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var on = motion.enabled !== false && motion.spring !== 'none' && !reduce;
+        document.documentElement.setAttribute('data-motion', on ? 'on' : 'off');
+        setTimeout(function () {
+          if (!document.documentElement.hasAttribute('data-motion-ready')) {
+            document.documentElement.setAttribute('data-motion', 'fallback');
+          }
+        }, 1600);
+      } catch (e) {
+        document.documentElement.setAttribute('data-motion', 'off');
+      }
+    })();
+  </script>
 </head>
-<body data-page="list" data-category="<%= activeCategory || '' %>" data-tag="<%= activeTag || '' %>">
+<body data-page="list" data-category="<%= activeCategory || '' %>" data-tag="<%= activeTag || '' %>" data-card-size="<%= cardCfg.size || 'large' %>" data-card-image="<%= cardCfg.image || 'full' %>" data-card-layout="<%= cardCfg.layout || 'masonry' %>">
 
 <header class="header">
   <div class="container">
@@ -61,7 +112,50 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
         <% }); %>
       <% } %>
     </nav>
-    <button type="button" class="theme-toggle" id="theme-toggle" aria-label="<%= t('theme_light') %>" title="<%= t('theme_light') %>"><i class="ri-sun-line"></i></button>
+    <% if (allowVisitorToggle) { %>
+    <div class="theme-menu-root">
+      <% if (showThemeMenu) { %>
+      <button type="button" class="theme-toggle" id="theme-menu-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="theme-menu" aria-label="<%= themeMenuLabel %>" title="<%= themeMenuLabel %>">
+        <span class="morph-icon-slot" data-morph-icon="theme" aria-hidden="true"><i class="ri-sun-line icon-fallback-sun"></i><i class="ri-moon-line icon-fallback-moon"></i></span>
+      </button>
+      <div class="theme-menu" id="theme-menu" hidden>
+        <div class="theme-menu-group">
+          <span class="theme-menu-label" id="theme-mode-label"><%= t('theme_mode') %></span>
+          <div class="theme-modes" role="radiogroup" aria-labelledby="theme-mode-label">
+            <label class="theme-mode">
+              <input type="radio" class="theme-mode-input" name="mosaic-theme-mode" value="auto" />
+              <span class="theme-mode-text"><i class="ri-contrast-2-line" aria-hidden="true"></i><%= t('theme_mode_auto') %></span>
+            </label>
+            <label class="theme-mode">
+              <input type="radio" class="theme-mode-input" name="mosaic-theme-mode" value="light" />
+              <span class="theme-mode-text"><i class="ri-sun-line" aria-hidden="true"></i><%= t('theme_mode_light') %></span>
+            </label>
+            <label class="theme-mode">
+              <input type="radio" class="theme-mode-input" name="mosaic-theme-mode" value="dark" />
+              <span class="theme-mode-text"><i class="ri-moon-line" aria-hidden="true"></i><%= t('theme_mode_dark') %></span>
+            </label>
+          </div>
+        </div>
+        <div class="theme-menu-group">
+          <span class="theme-menu-label" id="theme-accent-label"><%= t('theme_accent') %></span>
+          <div class="theme-swatches" role="radiogroup" aria-labelledby="theme-accent-label">
+            <% accentOptions.forEach(function(option) { const value = option[0]; const labelKey = option[1]; %>
+            <label class="theme-swatch" data-accent-option="<%= value %>">
+              <input type="radio" class="theme-swatch-input" name="mosaic-theme-accent" value="<%= value %>" />
+              <span class="theme-swatch-dot" aria-hidden="true"></span>
+              <span class="sr-only"><%= t(labelKey) %></span>
+            </label>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+      <% } else { %>
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="<%= t('theme_light') %>" title="<%= t('theme_light') %>">
+        <span class="morph-icon-slot" data-morph-icon="theme" aria-hidden="true"><i class="ri-sun-line icon-fallback-sun"></i><i class="ri-moon-line icon-fallback-moon"></i></span>
+      </button>
+      <% } %>
+    </div>
+    <% } %>
   </div>
 </header>
 
@@ -73,8 +167,8 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
       <!-- Search -->
       <div class="search-container">
         <div class="search-input-wrapper">
-          <i class="ri-search-line"></i>
-          <input type="text" class="search-input" placeholder="<%= t('search_placeholder') %>" autocomplete="off" />
+          <i class="ri-search-line" aria-hidden="true"></i>
+          <input type="text" class="search-input" placeholder="<%= t('search_placeholder') %>" autocomplete="off" aria-label="<%= t('search_placeholder') %>" />
         </div>
       </div>
 
@@ -105,41 +199,16 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
       <% } %>
     </div>
 
-    <!-- Card Grid -->
-    <div class="card-grid">
+    <!-- Card Grid — rendered by the shared cards/render.js module -->
+    <div class="card-grid" id="card-grid">
       <% if (posts && posts.length > 0) { %>
+        <% let priorityBudget = 2; %>
         <% posts.forEach(function(post) { %>
-        <a href="<%= rp %>posts/<%= post.slug %>/" class="post-card<% if (!post.cover) { %> post-card-text<% } %>">
-          <% if (post.cover) { %>
-          <div class="post-card-cover" style="padding-top:<%= (100 / (post.coverAspect || 1.778)).toFixed(2) %>%">
-            <img src="<% if (post.cover && (post.cover.startsWith('http') || post.cover.startsWith('/api/'))) { %><%= post.cover %><% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.cover %><% } %>"
-                 <% if (post.coverSrcset) { %>srcset="<% if (post.cover && (post.cover.startsWith('http') || post.cover.startsWith('/api/'))) { %><%= post.coverSrcset['480'] %> 480w, <%= post.coverSrcset['720'] %> 720w, <%= post.coverSrcset['1080'] %> 1080w<% } else { %><%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['480'] %> 480w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['720'] %> 720w, <%= rp %>posts/<%= post.slug %>/<%= post.coverSrcset['1080'] %> 1080w<% } %>"
-                 sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"<% } %>
-                 alt="<%= post.title %>" loading="lazy" onload="this.classList.add('loaded')" />
-          </div>
-          <% } %>
-          <div class="post-card-body">
-            <span class="post-card-category"><%= post.category %></span>
-      <h2 class="post-card-title"><%= post.title %></h2>
-            <p class="post-card-desc"><%= post.description %></p>
-            <div class="post-card-tags">
-              <% post.tags.forEach(function(t) { %>
-              <span class="post-card-tag"><%= t %></span>
-              <% }); %>
-            </div>
-          </div>
-          <div class="post-card-footer">
-            <span class="post-card-stat"><i class="ri-eye-line"></i><%= post.stats.views %></span>
-            <span class="post-card-stat"><i class="ri-time-line"></i><%= post.stats.dwell_time %>s</span>
-            <span class="post-card-stat"><i class="ri-heart-line"></i><%= post.stats.likes %></span>
-          </div>
-        </a>
+          <% const priority = Boolean(post.cover) && priorityBudget-- > 0; %>
+          <%- renderCard(post, { base: rp, priority: priority }) %>
         <% }); %>
       <% } else { %>
-        <div class="empty-state">
-          <i class="ri-inbox-line"></i>
-          <p><%= t('no_posts') %></p>
-        </div>
+        <%- renderEmptyState(t('no_posts')) %>
       <% } %>
     </div>
 
@@ -158,7 +227,7 @@ const pageDesc = typeof pageDescription !== 'undefined' ? pageDescription : site
   <div class="container">
     <p class="footer-tagline"><%= site.subtitle || '' %></p>
     <p>&copy; <%= new Date().getFullYear() %> <%= site.title %>. <%= t('built_with') %></p>
-    <p class="footer-feed"><a href="<%= rp %>feed.xml" title="RSS" aria-label="RSS"><i class="ri-rss-line"></i> RSS</a></p>
+    <p class="footer-feed"><a href="<%= rp %>feed.xml" title="RSS" aria-label="RSS"><i class="ri-rss-line" aria-hidden="true"></i> RSS</a></p>
   </div>
 </footer>
 

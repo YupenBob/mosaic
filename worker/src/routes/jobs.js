@@ -1,4 +1,5 @@
-import { jobsRequest, reconcileMedia } from '../services/jobs.js';
+import { jobsRequest, interpolateMedia, reconcileMedia } from '../services/jobs.js';
+import { getConfig } from '../services/site-config.js';
 import { GITHUB_API, headers } from '../services/github-client.js';
 
 async function pipelineAuth(c, next) {
@@ -87,6 +88,42 @@ export function registerMediaJobs(app) {
       return c.json({ ok: true, ...(await reconcileMedia(c)) });
     } catch (error) {
       return c.json({ error: error.message }, error.status || 502);
+    }
+  });
+
+  /**
+   * Post-hoc frame interpolation for already decoded videos.
+   * GET is a capability probe for the admin UI; POST enqueues processed-mode
+   * tasks (see docs/experience-v2-plan.md §4).
+   */
+  app.get('/api/media/interpolate', async (c) => {
+    try {
+      const config = await getConfig(c);
+      const interpolation = config.videoQuality?.interpolation || {};
+      return c.json({
+        ok: true,
+        supported: true,
+        defaults: {
+          fps: interpolation.fps,
+          mode: interpolation.mode,
+          mcMode: interpolation.mcMode,
+          meMode: interpolation.meMode,
+          vsbmc: interpolation.vsbmc,
+        },
+      });
+    } catch {
+      // The capability probe must not fail when the config repo is temporarily
+      // unreachable; the POST validates against the same contract anyway.
+      return c.json({ ok: true, supported: true, defaults: {} });
+    }
+  });
+  app.post('/api/media/interpolate', async (c) => {
+    try {
+      const body = await c.req.json().catch(() => ({}));
+      const result = await interpolateMedia(c, body);
+      return c.json({ ok: true, ...result });
+    } catch (error) {
+      return c.json({ error: error.message, code: error.code || 'INTERPOLATE_ERROR' }, error.status || 502);
     }
   });
 }

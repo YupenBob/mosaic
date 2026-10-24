@@ -33,6 +33,7 @@ try {
   add('videos', 'a.mp4');
   add('videos', 'b.mp4', {
     poster: 'processed/post/videos/v1/poster.jpg',
+    posterPreview: 'processed/post/videos/v1/poster-preview.webp',
     hls: 'processed/post/videos/v1/master.m3u8',
     sources: { '240p': 'processed/post/videos/v1/240p.mp4' },
   });
@@ -56,12 +57,24 @@ try {
   const listing = JSON.parse(fs.readFileSync(path.join(context.dist, 'data/posts-index.json')));
   assert.equal(listing.length, 1);
   assert.ok(!('bodyHTML' in listing[0]) && !('music' in listing[0]) && !('videos' in listing[0]));
+  assert.ok(
+    listing[0].coverLqip.startsWith('https://media.test/processed/post/videos/v1/poster-preview.webp'),
+    'listing exposes the few-KB cover LQIP',
+  );
   const posts = JSON.parse(fs.readFileSync(path.join(context.dist, 'data/posts.json')));
   assert.equal(posts[0].videos[0].pending, true, 'pending media preserve positional references');
   assert.ok(posts[0].videos[1].hls.startsWith('https://media.test/processed/'));
   const html = fs.readFileSync(path.join(context.dist, 'posts/post/index.html'), 'utf8');
   assert.match(html, /media-pending/);
   assert.ok(!html.includes('undefined'), 'no speculative media URLs');
+  const home = fs.readFileSync(path.join(context.dist, 'index.html'), 'utf8');
+  assert.match(home, /post-card-img is-lqip/, 'cards ship an LQIP first');
+  assert.match(
+    home,
+    /data-src="https:\/\/media.test\/processed\/post\/videos\/v1\/poster.jpg"/,
+    'HD URL waits in data-src',
+  );
+  assert.match(home, /--cover-aspect:/, 'per-card aspect reserves height for masonry');
   assert.ok(fs.existsSync(path.join(context.dist, 'categories/parent/child/grandchild/index.html')));
   fs.writeFileSync(path.join(context.dist, 'stale.html'), 'stale');
   generateSite(context);

@@ -1,0 +1,828 @@
+﻿/* === Note modal (Xiaohongshu-style, no page navigation) ==================== */
+/* Owned by overlay-feed. Uses only existing design tokens + new overlay vars. */
+
+html.overlay-scroll-locked {
+  overflow: hidden;
+}
+
+/* Native <dialog> = top layer, inert background, native Esc + focus restore.
+   We only skin the box; behaviour lives in src/assets/js/note/. */
+dialog.note-modal {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+dialog.note-modal:not([open]) {
+  display: none;
+}
+
+dialog.note-modal::backdrop {
+  background: rgba(12, 12, 16, 0.62);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.note-panel-host {
+  position: relative;
+  width: min(1080px, 92vw);
+  height: min(760px, 86vh);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+  will-change: opacity, scale, translate;
+}
+
+.note-panel-host.is-narrow {
+  width: min(760px, 92vw);
+  height: min(780px, 88vh);
+}
+
+.note-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+  height: 100%;
+  position: relative;
+}
+
+/* No photo / video / music-cover: single-column article layout (never an empty
+   black media pane). */
+.note-panel.no-media {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.note-panel.no-media .note-scroll {
+  padding: var(--space-8) var(--space-8) var(--space-6);
+}
+
+.note-panel.no-media .note-header {
+  padding-right: var(--space-8);
+}
+
+/* 鈹€鈹€ media carousel 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+.note-media-col {
+  min-width: 0;
+  min-height: 0;
+  background: #0b0b0e;
+}
+
+.note-media {
+  position: relative;
+  height: 100%;
+}
+
+.note-media-track {
+  display: flex;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.note-media-track::-webkit-scrollbar {
+  display: none;
+}
+
+.note-media-track:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.note-media-item {
+  flex: 0 0 100%;
+  height: 100%;
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.note-media-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: #121216;
+  background-size: cover;
+  background-position: center;
+}
+
+.note-media-lqip {
+  background-size: cover;
+  background-position: center;
+}
+
+/* Edge-to-edge (cover) instead of letterboxing: the Xiaohongshu look. */
+.note-media-img {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.note-media-item.is-video .note-media-img {
+  object-fit: cover;
+}
+
+.note-media-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.note-media-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 2.5rem;
+  background: transparent;
+  transition: background var(--transition-fast);
+}
+
+.note-media-play i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.note-media-play:hover i {
+  background: rgba(0, 0, 0, 0.66);
+}
+
+.note-media-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  transition: opacity var(--transition-fast);
+}
+
+.note-media-nav.prev {
+  left: 10px;
+}
+
+.note-media-nav.next {
+  right: 10px;
+}
+
+.note-media-nav:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.note-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.note-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+  transition:
+    width var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.note-dot.active {
+  width: 16px;
+  background: #fff;
+}
+
+/* 鈹€鈹€ content column 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+.note-body-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-surface);
+}
+
+.note-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-6) var(--space-6) var(--space-4);
+}
+
+.note-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  transition:
+    background var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.note-close:hover {
+  background: rgba(0, 0, 0, 0.66);
+}
+
+.note-header {
+  padding-right: var(--space-6);
+}
+
+.note-category {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-accent-text);
+}
+
+.note-title {
+  margin: var(--space-2) 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.note-desc {
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.note-tag {
+  font-size: var(--font-size-xs);
+  color: var(--color-accent-text);
+  background: var(--color-tag-bg);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.note-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.note-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 鈹€鈹€ replayed content blocks 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+.note-blocks {
+  margin-top: var(--space-4);
+}
+
+.note-rich {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.note-rich p,
+.note-rich ul,
+.note-rich ol,
+.note-rich blockquote,
+.note-rich pre {
+  margin-bottom: var(--space-3);
+}
+
+.note-rich h1,
+.note-rich h2,
+.note-rich h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-size-base);
+}
+
+.note-rich ul,
+.note-rich ol {
+  padding-left: var(--space-5);
+  list-style: disc;
+}
+
+.note-rich ol {
+  list-style: decimal;
+}
+
+.note-rich img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--card-radius-sm);
+  margin: var(--space-2) 0;
+}
+
+.note-rich blockquote {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.note-rich code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--color-tag-bg);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.note-rich pre {
+  overflow-x: auto;
+  padding: var(--space-3);
+  border-radius: var(--card-radius-sm);
+  background: var(--color-tag-bg);
+}
+
+.note-rich pre code {
+  background: none;
+  padding: 0;
+}
+
+.note-rich a {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.note-block-title {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* music */
+.note-music {
+  margin-top: var(--space-4);
+}
+
+.note-music-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.note-music-track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--card-radius-sm);
+}
+
+.note-music-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-tag-bg);
+  color: var(--color-text-primary);
+  flex: none;
+}
+
+.note-music-cover {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex: none;
+}
+
+.note-music-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-tag-bg);
+  color: var(--color-text-secondary);
+}
+
+.note-music-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.note-music-title {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-music-artist {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-music-duration {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  flex: none;
+}
+
+/* inline video card */
+.note-video-card {
+  margin-top: var(--space-3);
+  border-radius: var(--card-radius-sm);
+  overflow: hidden;
+  background: #000;
+}
+
+.note-video-poster {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  max-height: 52vh;
+}
+
+/* `hidden` must win over display:block (otherwise the poster stays visible and
+   stacks above the expanded video). */
+.note-video-poster[hidden],
+.note-video-el[hidden] {
+  display: none;
+}
+
+.note-video-poster img {
+  width: 100%;
+  height: auto;
+  max-height: 52vh;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.note-video-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 2rem;
+}
+
+.note-video-badge i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.note-video-el {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 56vh;
+  object-fit: contain;
+  background: #000;
+}
+
+/* 鈹€鈹€ footer / actions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+.note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--color-border-light);
+  background: var(--color-surface);
+}
+
+.note-stats {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.note-like-count-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.note-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.note-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.note-action:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+}
+
+.note-action.liked {
+  color: var(--note-like-text, #c0392b);
+  border-color: var(--note-like-text, #c0392b);
+}
+
+.note-action.liked i {
+  color: var(--note-like-text, #c0392b);
+}
+
+/* AA-safe like text in both themes (--color-like-active is used for the
+   decorative heart burst inside <canvas>-free particles only). */
+dialog.note-modal {
+  --note-like-text: #c0392b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) dialog.note-modal {
+    --note-like-text: #ff8080;
+  }
+}
+
+:root[data-theme='dark'] dialog.note-modal {
+  --note-like-text: #ff8080;
+}
+
+.note-action.pop {
+  transform: scale(1.12);
+}
+
+.note-open-post {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-border-light);
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-text);
+  background: var(--color-surface);
+}
+
+.note-open-post:hover {
+  background: var(--color-surface-hover);
+}
+
+/* 鈹€鈹€ skeleton / toast / hearts 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+.note-panel-skeleton {
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+}
+
+.note-skeleton-media {
+  background: linear-gradient(100deg, #1a1a1f 30%, #26262d 50%, #1a1a1f 70%);
+  background-size: 200% 100%;
+  animation: note-shimmer 1.4s ease-in-out infinite;
+}
+
+.note-skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  background: var(--color-surface);
+}
+
+.note-skeleton-line {
+  height: 14px;
+  border-radius: 7px;
+  background: var(--color-tag-bg);
+}
+
+.note-skeleton-line.w40 {
+  width: 40%;
+}
+
+.note-skeleton-line.w60 {
+  width: 60%;
+}
+
+.note-skeleton-line.w80 {
+  width: 80%;
+}
+
+.note-skeleton-status {
+  margin-top: var(--space-4);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+@keyframes note-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.note-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  font-size: var(--font-size-xs);
+  max-width: 80%;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.note-heart {
+  position: fixed;
+  z-index: 1200;
+  pointer-events: none;
+  color: var(--color-like-active);
+  font-size: 20px;
+  animation: note-heart-float 0.85s ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes note-heart-float {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 0px)), -170%) scale(1.5);
+  }
+}
+
+/* 鈹€鈹€ focus visibility 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+dialog.note-modal :focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 鈹€鈹€ mobile bottom sheet 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+@media (max-width: 768px) {
+  dialog.note-modal {
+    align-items: flex-end;
+  }
+
+  .note-panel-host {
+    width: 100%;
+    height: auto;
+    max-height: 90dvh;
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .note-panel,
+  .note-panel-skeleton {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: 90dvh;
+  }
+
+  .note-panel.no-media {
+    display: flex;
+    max-height: 90dvh;
+  }
+
+  .note-panel.no-media .note-body-col {
+    max-height: 90dvh;
+  }
+
+  .note-media-col {
+    flex: none;
+    height: 42dvh;
+    width: 100%;
+  }
+
+  .note-body-col {
+    flex: 1;
+    min-height: 0;
+    max-height: calc(90dvh - 42dvh);
+  }
+
+  .note-scroll {
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
+
+  .note-header {
+    padding-right: var(--space-8);
+  }
+
+  .note-title {
+    font-size: var(--font-size-lg);
+  }
+
+  .note-footer {
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .note-open-post {
+    padding: var(--space-2);
+  }
+
+  .note-close {
+    background: rgba(0, 0, 0, 0.55);
+  }
+
+  .note-skeleton-media {
+    flex: none;
+    height: 42dvh;
+  }
+}
+
+/* 鈹€鈹€ reduced motion 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+@media (prefers-reduced-motion: reduce) {
+  dialog.note-modal *,
+  dialog.note-modal *::before,
+  dialog.note-modal *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .note-heart {
+    display: none;
+  }
+}

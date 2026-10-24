@@ -1,0 +1,97 @@
+/* === Motion ===
+ *
+ * CSS half of the spring motion system. JS springs live in
+ * `assets/js/motion/`; this file owns the states that can be expressed in CSS:
+ * scroll reveal (gated on `html[data-motion="on"]` so content is never hidden
+ * without JS), reduced-motion fallbacks, and View Transitions styling.
+ *
+ * JS writes CSS individual properties (`translate`, `scale`, `opacity`,
+ * `filter`) instead of `transform`, so spring motion composes with the layout
+ * transforms declared elsewhere.
+ */
+
+:root {
+  --motion-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --motion-reveal-distance: 14px;
+}
+
+/* ---- Scroll reveal -------------------------------------------------------
+ * The inline head bootstrap sets data-motion="on" before first paint when
+ * animation is allowed, so cards below the fold never flash visible first.
+ * `data-motion="fallback"` (set by the bootstrap timeout) guarantees content
+ * stays visible even if the app bundle fails to boot. */
+[data-motion-reveal]:not(.is-revealed) {
+  opacity: 1;
+  translate: none;
+}
+
+html[data-motion='on'] [data-motion-reveal]:not(.is-revealed) {
+  opacity: 0;
+  translate: 0 var(--motion-reveal-distance);
+}
+
+html[data-motion='on'] [data-motion-reveal].is-revealed {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 480ms var(--motion-ease-out),
+    translate 620ms var(--motion-ease-spring);
+}
+
+html[data-motion='fallback'] [data-motion-reveal],
+html[data-motion='off'] [data-motion-reveal] {
+  opacity: 1 !important;
+  translate: none !important;
+  transition: none !important;
+}
+
+/* ---- View Transitions (progressive enhancement) ------------------------- */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: var(--motion-ease-out);
+}
+
+::view-transition-old(root) {
+  animation-name: mosaic-vt-out;
+}
+
+::view-transition-new(root) {
+  animation-name: mosaic-vt-in;
+}
+
+@keyframes mosaic-vt-out {
+  to {
+    opacity: 0;
+    scale: 0.995;
+  }
+}
+
+@keyframes mosaic-vt-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+/* ---- Reduced motion & disabled motion ------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  [data-motion-reveal] {
+    opacity: 1 !important;
+    translate: none !important;
+    transition: none !important;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+@media (scripting: none) {
+  [data-motion-reveal] {
+    opacity: 1 !important;
+    translate: none !important;
+  }
+}

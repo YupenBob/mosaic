@@ -169,6 +169,21 @@ try {
       await page.goto(`${server.url}/categories/parent/`, { waitUntil: 'domcontentloaded' });
       console.log(`  ${engine.name()}: checking categories`);
       assert.equal(await page.locator('.post-card').count(), 2);
+      // v2.1: aspect-ratio grid items could collapse to 0×0 in WebKit; the JS
+      // masonry packer plus layout rules must always give cards a real box.
+      const cardBox = await page
+        .locator('.post-card')
+        .first()
+        .evaluate((card) => {
+          const rect = card.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        });
+      assert.ok(cardBox.width > 100 && cardBox.height > 100, `${engine.name()}: cards keep a real size`);
+      assert.equal(
+        await page.evaluate(() => document.querySelector('.card-grid')?.classList.contains('is-masonry')),
+        true,
+        `${engine.name()}: masonry packing initialized`,
+      );
     } finally {
       await browser.close();
     }

@@ -38,7 +38,10 @@ try {
     requests.push(pathname);
     let body = { ok: true };
     if (pathname === '/auth/login') body = { token: 'fixture-token' };
-    else if (pathname === '/config') body = config;
+    else if (pathname === '/config' && route.request().method() === 'PUT') {
+      requests.push('/config:PUT');
+      body = { ok: true };
+    } else if (pathname === '/config') body = config;
     else if (pathname === '/dirty') body = { dirty: true, count: 2, last: new Date().toISOString() };
     else if (pathname === '/media-jobs') body = { jobs: [job] };
     else if (pathname.endsWith('/retry')) {
@@ -106,6 +109,17 @@ try {
     polls,
     'media polling stops when leaving the page',
   );
+  // Regression (v2.1): the documented default apiBase is a relative path
+  // ("/api"); a native <input type="url"> used to block every config save.
+  await page.evaluate(() => {
+    location.hash = 'config';
+  });
+  await page.locator('#main-content .page-anim').first().waitFor();
+  await page.locator('.page-header .btn-primary').click();
+  await page.waitForTimeout(400);
+  assert.ok(requests.includes('/config:PUT'), 'config saves with the default relative apiBase');
+  assert.equal(await page.locator('.config-field.has-error').count(), 0, 'no validation errors for /api');
+
   for (const theme of ['light', 'dark']) {
     await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
     for (const route of ['dashboard', 'posts', 'editor&slug=fixture', 'build', 'config', 'taxonomy', 'cleanup']) {

@@ -144,7 +144,8 @@ export function createRuntime() {
       },
       download: async (key, file, etag) => {
         const object = bucket.objects.get(key);
-        if (object?.etag !== etag) throw new Error('Source precondition failed');
+        if (etag && object?.etag !== etag) throw new Error('Source precondition failed');
+        if (!object) throw new Error('Missing object');
         fs.writeFileSync(file, object.body);
       },
       upload: async (key, file) => {

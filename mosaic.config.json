@@ -35,13 +35,43 @@
   },
 
   "theme": "auto",
+  "themeMode": {
+    "default": "auto",
+    "accent": "blue",
+    "allowVisitorToggle": true,
+    "showMenu": true
+  },
+  "experience": {
+    "card": { "size": "large", "image": "full", "layout": "masonry" },
+    "modal": { "enabled": true },
+    "verticalFeed": { "enabled": true },
+    "motion": { "enabled": true, "spring": "snappy" },
+    "morphIcons": { "enabled": true }
+  },
   "headerNav": [],
   "footerText": "",
 
   "searchMinChars": 2,
 
   "imageQuality": { "480p": 75, "720p": 80, "1080p": 85 },
-  "videoQuality": { "crf": 23, "preset": "veryfast", "maxHeight": 1080, "uploadAfterTiers": 1 },
+  "videoQuality": {
+    "crf": 23,
+    "preset": "veryfast",
+    "maxHeight": 1080,
+    "uploadAfterTiers": 1,
+    "interpolation": {
+      "enabled": false,
+      "fps": 60,
+      "mode": "mci",
+      "mcMode": "aobmc",
+      "meMode": "bidir",
+      "vsbmc": true
+    }
+  },
+
+  "media": {
+    "keepSourceFiles": true
+  },
 
   "cardShowTags": true,
   "cardShowStats": true,

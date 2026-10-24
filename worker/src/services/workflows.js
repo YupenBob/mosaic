@@ -37,6 +37,29 @@ export async function getWorkflowRun(c, id) {
   if (!response.ok) throw new Error(`GitHub run status: ${response.status}`);
   return response.json();
 }
+/** GitHub run states meaning the workflow is queued/running (one allowed at a time). */
+export const ACTIVE_RUN_STATUSES = ['queued', 'in_progress', 'waiting', 'pending', 'requested'];
+/**
+ * Find a queued/running run for a Mosaic workflow on the deployment branch.
+ * Used before dispatching a media run so the coordinator never duplicates (or
+ * cancels) a run that GitHub Actions already has in flight.
+ * @param {object} c - request/env context (`{ env }` also works)
+ * @param {'media'|'site'} kind
+ * @param {object} [config]
+ * @returns {Promise<object|null>} the active run or null
+ */
+export async function findActiveWorkflowRun(c, kind, config = null) {
+  config ||= await getConfig(c);
+  const workflow = kind === 'media' ? config.deployment.mediaWorkflow : config.deployment.siteWorkflow;
+  const url = new URL(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/actions/workflows/${workflow}/runs`);
+  url.searchParams.set('branch', config.deployment.branch);
+  url.searchParams.set('event', 'workflow_dispatch');
+  url.searchParams.set('per_page', '10');
+  const response = await fetch(url.href, { headers: headers(c) });
+  if (!response.ok) throw new Error(`GitHub ${kind} run lookup: ${response.status}`);
+  const data = await response.json();
+  return (data.workflow_runs || []).find((run) => ACTIVE_RUN_STATUSES.includes(run.status)) || null;
+}
 /**
  * Assemble the full build detail object (metadata + job step timeline) from a
  * GitHub workflow run. Shared by the latest-run status endpoint and the

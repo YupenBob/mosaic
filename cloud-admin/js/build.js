@@ -92,18 +92,26 @@ export default async function renderBuild(signal) {
         </div>
 
         <div class="build-note">
-          <i class="ri-information-line"></i>
+          <i class="ri-information-line" aria-hidden="true"></i>
           <span>${t('build.streamingNote')} ${t('build.timeoutNote')}</span>
         </div>
 
-        <section class="card media-jobs" aria-labelledby="media-jobs-title"><h2 id="media-jobs-title">${t('jobs.title')}</h2><div id="media-job-list" role="status">${t('common.loading')}</div></section>
+        <div id="build-status-card">${latest ? renderStatusCard(latest) : renderEmptyState()}</div>
+
+        <section class="card media-jobs" aria-labelledby="media-jobs-title">
+          <div class="section-head">
+            <h2 id="media-jobs-title"><i class="ri-hard-drive-3-line" aria-hidden="true"></i> ${t('jobs.title')}</h2>
+            <p class="section-hint">${t('jobs.sectionHint')}</p>
+          </div>
+          <div id="media-job-list" role="status" aria-live="polite">${t('common.loading')}</div>
+        </section>
+
         <div class="build-summary">
           <div class="dash-big-card build-summary-card"><span class="dash-big-num">${summary.successRate}</span><span class="dash-big-label">${t('build.successRate')}</span></div>
           <div class="dash-big-card build-summary-card"><span class="dash-big-num">${summary.avgDur}</span><span class="dash-big-label">${t('build.avgDuration')}</span></div>
           <div class="dash-big-card build-summary-card"><span class="dash-big-num mono" style="font-size:20px">${escHtml(summary.branch || '—')}</span><span class="dash-big-label">${t('build.currentBranch')}</span></div>
         </div>
 
-        <div id="build-status-card">${latest ? renderStatusCard(latest) : renderEmptyState()}</div>
         ${
           runs.length > 0
             ? `

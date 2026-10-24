@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runProcess } from './process.mjs';
 import { extractMusicMeta, extractMusicCover } from '../music-meta.mjs';
+import { writeWebpPreview } from './preview.mjs';
 export async function waveformFromFile(file, buckets) {
   const samples = Math.floor(fs.statSync(file).size / 2),
     per = Math.max(1, Math.ceil(samples / buckets));
@@ -45,9 +46,21 @@ export async function processAudio({ source, directory, job, store, prefix, publ
   const cover = (await extractMusicCover(source, coverFile))
     ? await store.upload(`${prefix}/cover.jpg`, coverFile)
     : '';
+  // Few-KB LQIP for card/hero previews (additive published field).
+  let coverPreview = '';
+  if (cover) {
+    const previewFile = path.join(directory, 'cover-preview.webp');
+    await writeWebpPreview({
+      input: coverFile,
+      output: previewFile,
+      width: job.config.media.image.placeholderWidth,
+      quality: job.config.media.image.placeholderQuality,
+    });
+    coverPreview = await store.upload(`${prefix}/cover-preview.webp`, previewFile);
+  }
   const waveformFile = path.join(directory, 'waveform.json');
   fs.writeFileSync(waveformFile, JSON.stringify(waveform));
   await store.upload(`${prefix}/waveform.json`, waveformFile);
-  await publish({ ...meta, cover, sources, waveform }, true);
+  await publish({ ...meta, cover, coverPreview, sources, waveform }, true);
   return true;
 }

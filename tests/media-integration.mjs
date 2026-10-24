@@ -79,6 +79,11 @@ try {
   assert.equal(Object.keys(video.published.sources).length, 3);
   assert.notEqual(video.published.hls, firstMaster, 'adding tiers creates a new immutable master');
   assert.ok(runtime.bucket.objects.has(firstMaster), 'old deployments retain their master');
+  const posterPreview = runtime.bucket.objects.get(video.published.posterPreview);
+  assert.ok(posterPreview, 'video publishes a few-KB card preview');
+  assert.ok(posterPreview.body.length < 20000, `poster preview stays tiny (${posterPreview.body.length} bytes)`);
+  const posterPreviewMeta = await sharp(posterPreview.body).metadata();
+  assert.ok(posterPreviewMeta.width <= 150, 'preview uses the configured placeholder width');
   const audio = path.join(root, 'fixture.flac');
   await runProcess('ffmpeg', [
     '-f',

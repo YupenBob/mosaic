@@ -20,8 +20,18 @@ export function readPosts(context, manifest) {
       if (!indexed && coverRef && !/^(https?:\/\/|\/)/.test(coverRef))
         selected = covers.find((c) => c.file === coverRef) || photos.find((c) => c.file === coverRef);
       if (!coverRef)
-        selected = videos.find((v) => v.poster) || photos.find((p) => !p.pending) || covers.find((c) => !c.pending);
-      const cover = /^(https?:\/\/|\/)/.test(coverRef) ? coverRef : selected?.poster || selected?.src480 || '';
+        selected =
+          videos.find((v) => v.poster) ||
+          photos.find((p) => !p.pending) ||
+          covers.find((c) => !c.pending) ||
+          music.find((m) => m.cover);
+      const cover = /^(https?:\/\/|\/)/.test(coverRef)
+        ? coverRef
+        : selected?.poster || selected?.src480 || selected?.cover || '';
+      // Few-KB preview for card LQIP blur-up (empty for externals/legacy assets).
+      const coverLqip = /^(https?:\/\/|\/)/.test(coverRef)
+        ? ''
+        : selected?.src10p || selected?.posterLqip || selected?.coverLqip || '';
       const coverSrcset = selected?.variants
         ? Object.fromEntries(
             Object.entries(selected.variants)
@@ -30,7 +40,10 @@ export function readPosts(context, manifest) {
           )
         : null;
       const coverAspect = Math.max(site.coverAspectMin, Math.min(site.coverAspectMax, selected?.aspect || 1.5));
-      for (const track of music) if (!track.cover && cover) track.cover = cover;
+      for (const track of music) {
+        if (!track.cover && cover) track.cover = cover;
+        if (!track.coverLqip && coverLqip) track.coverLqip = coverLqip;
+      }
       const videoMode = data.video_mode || 'stacked';
       const { blocks, bodyHTML } = buildBlocks({
         body: content,
@@ -55,6 +68,7 @@ export function readPosts(context, manifest) {
             .trim(),
         videoMode,
         cover,
+        coverLqip,
         coverAspect,
         coverSrcset,
         bodyHTML,

@@ -4,6 +4,8 @@ import app from '../worker/src/index.js';
 import { createRuntime } from './helpers/runtime.mjs';
 import { cleanupMedia } from '../scripts/media/cleanup.mjs';
 import { protectedMediaKeys } from '../worker/src/services/media-references.js';
+import { processingConfig } from '../shared/config.mjs';
+import { fingerprint } from '../shared/media-manifest.mjs';
 const runtime = createRuntime();
 const { call, bucket } = runtime;
 const queued = await runtime.enqueue('post', 'clip.mp4');
@@ -247,3 +249,102 @@ assert.ok(
   (await protectedMediaKeys(initial.env)).has(legacyKey),
   'migration protects the site already deployed before the coordinator existed',
 );
+// ── keepSource=false: originals are released only via a verified final publish ──
+const retention = createRuntime();
+await retention.enqueue('keep', 'clip.mp4', Buffer.from('keep-source'), { options: { keepSource: false } });
+const keepJob = (await retention.call('claim', { runId: 'keep' })).job;
+assert.equal(keepJob.options.keepSource, false);
+const keepTier = 'processed/keep/videos/gen/240p.mp4';
+await retention.bucket.put(keepTier, 'tier');
+const keepOriginal = 'originals/keep/videos/clip.mp4';
+const realDelete = retention.bucket.delete.bind(retention.bucket);
+retention.bucket.delete = async () => {
+  throw new Error('R2 delete unavailable');
+};
+const publishKeep = (complete = true) =>
+  retention.call('publish', {
+    id: keepJob.id,
+    token: keepJob.token,
+    runId: keepJob.runId,
+    published: { sources: { '240p': keepTier } },
+    complete,
+    sourceRetained: false,
+  });
+await publishKeep(false);
+assert.ok(retention.bucket.objects.has(keepOriginal), 'partial publish never deletes the source');
+await publishKeep(true);
+assert.ok(retention.bucket.objects.has(keepOriginal), 'a failed R2 delete keeps the original');
+let keptAsset = (await retention.call('state')).manifest.assets['keep/videos/clip.mp4'];
+assert.notEqual(keptAsset.source.available, false, 'failed deletion never marks the source unavailable');
+assert.match(retention.persistent.get('state').lastSourceDeleteError, /unavailable/);
+retention.bucket.delete = realDelete;
+await publishKeep(true);
+keptAsset = (await retention.call('state')).manifest.assets['keep/videos/clip.mp4'];
+assert.equal(retention.bucket.objects.has(keepOriginal), false, 'final publish released the original');
+assert.equal(keptAsset.source.available, false);
+assert.ok(keptAsset.sourceDeletedAt);
+assert.ok(keptAsset.published.sources['240p'], 'source retention never touches published outputs');
+await retention.call('complete', {
+  id: keepJob.id,
+  token: keepJob.token,
+  runId: keepJob.runId,
+  complete: true,
+});
+assert.equal(
+  (await retention.call('state')).jobs.find((job) => job.id === keepJob.id).status,
+  'ready',
+  'source retention failure/success never fails the task',
+);
+// ── processed-mode tasks claim/publish without originals (post-hoc interpolation) ──
+const processed = createRuntime();
+await processed.enqueue('proc', 'clip.mp4', Buffer.from('processed-source'));
+const seedJob = (await processed.call('claim', { runId: 'seed' })).job;
+const seedTier = 'processed/proc/videos/seed/240p.mp4';
+await processed.bucket.put(seedTier, 'tier');
+await processed.call('publish', {
+  id: seedJob.id,
+  token: seedJob.token,
+  runId: seedJob.runId,
+  published: { sources: { '240p': seedTier } },
+  complete: true,
+});
+await processed.call('complete', {
+  id: seedJob.id,
+  token: seedJob.token,
+  runId: seedJob.runId,
+  complete: true,
+});
+const baseConfig = processed.config;
+const interpolationConfig = structuredClone(baseConfig);
+interpolationConfig.videoQuality.interpolation = { ...baseConfig.videoQuality.interpolation, enabled: true, fps: 24 };
+const enqueuedInterpolation = await processed.call('interpolate', {
+  all: true,
+  slug: '',
+  filename: '',
+  config: interpolationConfig,
+  stateConfig: baseConfig,
+  configHash: await fingerprint(processingConfig(baseConfig, 'videos')),
+});
+assert.equal(enqueuedInterpolation.enqueued, 1);
+await processed.bucket.delete('originals/proc/videos/clip.mp4');
+const processedClaim = await processed.call('claim', { runId: 'processed' });
+assert.equal(processedClaim.job.options.sourceMode, 'processed');
+assert.equal(processedClaim.job.options.interpolation.fps, 24);
+assert.ok(processedClaim.published.sources['240p'], 'processed-mode claim transports published tiers');
+const newTier = 'processed/proc/videos/interp/240p.mp4';
+await processed.bucket.put(newTier, 'tier');
+await processed.call('publish', {
+  id: processedClaim.job.id,
+  token: processedClaim.job.token,
+  runId: processedClaim.job.runId,
+  published: { sources: { '240p': newTier } },
+  complete: true,
+});
+const processedAsset = (await processed.call('state')).manifest.assets['proc/videos/clip.mp4'];
+assert.equal(processedAsset.published.sources['240p'], newTier);
+assert.notEqual(processedAsset.generation, 'legacy', 'post-hoc interpolation uses a new generation');
+// Experience v2 contract coverage that must stay ffmpeg-free: interpolation
+// config/options, keepSource normalization, retention eligibility, pure ffmpeg
+// filter construction and the persisted media-dispatch state machine.
+await import('./media-options-smoke.mjs');
+await import('./media-dispatch-smoke.mjs');

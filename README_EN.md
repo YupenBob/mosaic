@@ -43,11 +43,17 @@ It turns the whole chain — content authoring, media processing, static publish
 
 | Capability | Description |
 | --- | --- |
+| Large full-bleed cards | Masonry columns with per-card heights, edge-to-edge covers, few-KB LQIP loaded first and swapped in place, Xiaomi-style superellipse corners, compact text-only cards, no layout shift |
+| Open theming | Auto / light / dark modes plus 6 accents, no first-paint flash, admin-set defaults and visitor toggle |
+| Note modal | Xiaohongshu-style in-place detail overlay (photos / video / music / body), shareable `?note=` deep links, Esc/back, focus trap |
+| Vertical feed | Douyin-style full-screen video feed: wheel/touch/keyboard, exactly one playing, ±1 preload, double-tap like, muted autoplay |
+| Spring motion | One rAF spring system (snappy/smooth/bouncy), reduced-motion aware |
+| Morphicons | State icons morph between sun/moon, play/pause, heart states, bundled (no CDN) |
 | Photo gallery | 4 quality tiers (480p/720p/1080p/original), LQIP progressive loading, wheel zoom, filmstrip, zoom kept across quality switches |
-| Video player | HLS adaptive bitrate (ABR), manual quality switch, speed, PiP, playlist, fatal-error auto recovery |
-| Smart ABR | Bandwidth-based start, player-size capping, seamless switching, clean Auto logic |
+| Video player | One intent-gated decode flow: zero media requests before click, first click never swallowed, HLS ABR, manual tiers, speed, PiP, playlist, fatal-error MP4 fallback |
+| Smooth playback | Lowest-tier start + fast upgrade, device/network adaptive buffers, stall downgrade, background pause, position resume |
 | Music player | Track list, 128k/320k streams, mini player, Media Session, background persistence |
-| Search & filter | Full-text search, category/tag masonry cards |
+| Search & filter | Full-text search, category/tag masonry-like cards |
 | Dark mode / i18n | System-following theme, Chinese & English |
 | RSS / Sitemap / Comments | Auto feeds, sitemap, Giscus comments |
 
@@ -59,8 +65,10 @@ It turns the whole chain — content authoring, media processing, static publish
 | Dashboard | Traffic chart, real taxonomy stats, leaderboard, storage, health |
 | Build center | Step-level progress + ETA, timing, failure highlight, GitHub links |
 | Editor | Live Markdown preview, autosave drafts, cover picker, drag-drop upload (concurrent + retry) |
-| Site config | All settings editable, including quality tiers and transcode params |
-| Productivity | Command palette (Ctrl/Cmd+K), shortcuts, 3-state theme, trash, confirmations |
+| Site config | Theme modes/accents, card layout (masonry/grid) & experience switches, frame-interpolation settings, source retention, quality/transcode/retention policies |
+| Post-hoc interpolation | One-click frame interpolation for already-decoded videos (ffmpeg optical flow), per item/post/all, with cost warnings, progress and retry |
+| Source management | Global/per-upload “keep originals after decode”; deleted sources are marked and can still be re-interpolated from published tiers |
+| Productivity | Command palette (Ctrl/Cmd+K), shortcuts, 3-state theme, trash, confirmations, skeletons and inline retries |
 
 ### Engineering & Ops
 
@@ -91,7 +99,11 @@ flowchart LR
 
 Uploads automatically register durable media jobs. The media workflow downloads only changed files and runs separate image, video and audio processors. The site workflow reads source code, Markdown, configuration and a published manifest snapshot; it never downloads originals, invokes FFmpeg or waits for higher video tiers.
 
+Optional **ffmpeg optical-flow frame interpolation** (`minterpolate`, off by default) produces higher-fps tiers in the same transcode pass; already-decoded videos can be re-interpolated from their published MP4 tiers without re-downloading originals. A persisted `mediaDispatch` state machine tracks GitHub Actions runs so workflows are not queued twice or missed after runner interruptions. Originals can optionally be deleted after decode (clearly marked as irreversible).
+
 First uploads show a processing placeholder. Replacements keep the previous published output. Verified low video tiers go live first, higher tiers resume automatically, and every expanded HLS master has a new object key. Leases, run IDs and generations reject stale callbacks. Only the signed pipeline can acknowledge the Git SHA and manifest revision deployed successfully.
+
+The frontend decode flow is intent-gated: an unplayed player requests no fragments or manifests, `pointerdown` may prewarm only the master playlist, and playback loads the manifest then starts fragments once after `MANIFEST_PARSED`. This removes the old "first click does nothing" race; the same controller serves the post player, playlists and the vertical feed.
 
 ## Quick Start
 
@@ -189,6 +201,8 @@ See **[docs/SETUP.md](docs/SETUP.md)** for details.
 - [Operations](docs/operations.md)
 - [Migration](docs/migration.md)
 - [Production rollout and acceptance, 2026-10-01](docs/rollout-2026-10-01.md)
+- [Interaction proposals](docs/interaction-proposals.md)
+- [Experience v2 collaboration contract](docs/experience-v2-plan.md)
 - [Handover](handover.md)
 
 The refactor was merged in [PR #3](https://github.com/YupenBob/mosaic/pull/3) and deployed in infrastructure → media migration → site order. Manifest revision 1 retains 14 verified assets without re-encoding existing videos. Real mobile Chromium HLS, WebKit MP4 fallback, authenticated admin checks and all 27 sitemap URLs passed. The production list index decreased from 30019 B to 7480 B (75.1%); the isolated generator benchmark is slower and is reported separately in [performance measurements](docs/performance.md).
@@ -202,6 +216,12 @@ The refactor was merged in [PR #3](https://github.com/YupenBob/mosaic/pull/3) an
 - [x] Admin build page merged into a single view (overview/status/history + live polling)
 - [ ] Further admin build-page polish (interaction details & accessibility)
 - [x] Concurrent/resumable uploads (>100MB multipart, 3-way concurrency, per-part retry, resume)
+- [x] Large full-bleed cards, open theme modes, spring motion and Morphicons icons
+- [x] Masonry cards with per-card heights, few-KB LQIP-first loading and superellipse corners
+- [x] Xiaohongshu-style note modal (no navigation, shareable deep links) and Douyin-style vertical feed
+- [x] Intent-gated decode flow fix (first click, zero requests before play) and playback smoothness
+- [x] ffmpeg optical-flow frame interpolation (transcode-time + post-hoc) and optional source retention
+- [x] Reliable media workflow triggering (persisted dispatch state machine, no duplicate queues, budget resume)
 
 ## License
 

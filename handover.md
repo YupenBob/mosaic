@@ -61,3 +61,60 @@ npm run test:admin:local
 2026-10-03 追加修复已通过 PR #5 上线，代码为 b565dd0、清单 revision 9。线上同浏览器跨部署缓存、暖重载和最低档首片均核验；main 的 Verify/Infrastructure/Site 全部成功。实际部署与回退 ID、网络样本及真机 Safari/iOS 的验证限制见体验记录和测量 JSON。
 
 同日 PR #6（d075f80）修复仪表盘接口乱序返回后的标题、图表、站点链接和入门提示；后台已部署并核验真实流量图与图表清理。前台沿用 b565dd0，媒体清单保持 revision 9。部署、验证运行与同浏览器更新记录见体验文档的仪表盘章节。
+
+## 2026-10 Experience v2（大卡片/主题/弹层/竖屏/补帧/解码 flow）
+
+分支 `feat/experience-v2`，16 项需求的实现与验证记录，协作契约见
+[docs/experience-v2-plan.md](docs/experience-v2-plan.md)，交互提议见
+[docs/interaction-proposals.md](docs/interaction-proposals.md)。
+
+- **前台**：卡片渲染统一到 `src/assets/js/cards/render.js`（SSG 与客户端同源），大卡
+  full-bleed 全图 + 紧凑文字卡；主题三态 auto/light/dark + 6 套 accent（后台默认值/访客切换
+  权限），首帧无闪烁；Spring 动效核心（无动画库）与 Morphicons 状态图标；类小红书详情弹层
+  （不跳转、`?note=` 深链、焦点陷阱/滚动锁、按需 `data/notes/{slug}.json`）与类抖音竖屏 feed
+  （按需 `data/feed.json`、一次只播一个、意图预载 ±1）。
+- **播放**：`src/assets/js/video/playback.js` 成为唯一解码 flow 控制器（intent-gated：
+  attach 零请求、pointerdown 只 prewarm master、play 后 MANIFEST_PARSED 才 startLoad；首点
+  意图重放；3 次致命错误降级 MP4；稳定位置键）。修掉“第一次点击无反应”的根因；播放器拆分为
+  player/events/progress/gestures/quality/feedback/keyboard 等模块。
+- **媒体**：`videoQuality.interpolation`（ffmpeg 光流 minterpolate，单遍/档位）与后台
+  “后补帧”接口 `GET/POST /api/media/interpolate`（从已发布 MP4 重编码，不依赖 originals）；
+  `media.keepSourceFiles` / 上传级 `keepSource`（DO 在完整发布后原子删除源并标记
+  `source.available=false`）；处理指纹在补帧关闭时与旧版逐字节一致，不触发全量重转码。
+- **媒体 flow 触发修复**：任务协调器持久化 `mediaDispatch` 状态机（idle/dispatching/active/
+  retry + runId/backoff），只在确有待办且无排队/运行中 run 时 dispatch；runner 中断可恢复；
+  站点构建 dispatch 与媒体 dispatch 解耦。根因与测试见 `worker/src/jobs/media-dispatch.mjs`、
+  `tests/media-dispatch-smoke.mjs`。
+- **后台**：配置页拆分模块并新增主题/体验/补帧/保留源文件分区；补帧操作入口（单条/整篇/全部，
+  能力探测 404 优雅降级）；上传保留源文件开关与处理计划；命令面板/轮询拆分、骨架屏与局部重试、
+  移动端抽屉、跳过链接与焦点管理。
+- **验证**：`npm run check`、`lint`、`format:check`、`build`、`test:e2e:local`（含真实 HLS /
+  动态 hls.js / 播放指标）、`test:admin:local`、`test:media`（含真实 ffmpeg 补帧）与独立
+  verifier 报告 `.mosaic/qa/verification-report.md`；发布前照旧运行 Verify 工作流。
+- **部署注意**：本次改了 Worker（任务 options/调度状态机/补帧接口）、后台与前台，需要按
+  Infrastructure → Site/Admin 顺序发布；静态站点与媒体清单契约保持兼容。补帧与源文件保留
+  属于可选能力，默认关闭/保留，不影响现有媒体。
+
+## 2026-10 Experience v2.1（瀑布流 / LQIP 预览图 / 超椭圆圆角）
+
+在 v2 基础上追加的三项体验升级，核心契约仍见
+[docs/experience-v2-plan.md](docs/experience-v2-plan.md)。
+
+- **瀑布流卡片**：默认 `experience.card.layout='masonry'`。每张卡片高度由封面比例决定
+  （显示比例夹取 0.62–1.5），列内首尾相接；CSS 多列为无 JS 回退，`cards/masonry.js` 水合后
+  按最短列绝对定位打包（规避 WebKit 对 aspect-ratio 卡片的分栏 0×0/跨列 bug）。
+  `layout='grid'` 可一键切回等高网格，后台“体验 → 列表布局”可切换。
+- **几 KB 预览图（LQIP）**：图片复用既有 `placeholder.webp`；视频新增 `poster-preview.webp`、
+  音乐新增 `cover-preview.webp`（均 150px / q30，约 1–6KB，**不新增处理参数，指纹不变**）。
+  SSG 输出 `coverLqip`；卡片先渲染预览（模糊），`cards/media.js` 在首屏优先/接近视口时
+  解码高清并原位替换，`saveData` 时停留预览；`<noscript>` 回退高清，升级前后无 CLS。
+- **超椭圆圆角**：设计令牌放大（卡片 20px、弹层 28px、按钮 12px）；Chromium 等支持
+  `corner-shape: squircle` 的浏览器呈现连续曲率，WebKit/Safari 回退同半径圆形圆角。
+  未采用固定像素 clip-path/mask（阴影裁剪、响应式重算等兼容问题）。
+- **验证**：新增 `tests/preview-smoke.mjs`（纯 Node）、`tests/cards-media.mjs`（Chromium +
+  WebKit 的 LQIP/瀑布流/卡片尺寸回归，并入 `test:e2e:local`）；`site-smoke`/
+  `media-integration`/`generate-data-smoke`/`config-smoke`/`admin-local` 增补断言；
+  独立 verifier 报告 `.mosaic/qa/verification-report-v2.1.md`。旧媒体没有预览字段时自动回退
+  原图，重新处理即补齐；无需全量重转码。
+
+

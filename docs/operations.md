@@ -15,6 +15,9 @@
 ## 排查
 
 - pending 长时间无 run：检查任务 outbox、GitHub Actions 权限、workflow 文件名及 ref、同分支并发。调度失败不丢任务，由 alarm 重试。
+- Experience v2 媒体调度状态：DO 持久化 `mediaDispatch`（`idle|dispatching|active|retry`，含 runId/attempt/nextAt/lastError），`/api/internal/.../state` 与后台任务列表可见。媒体流未触发时先确认状态与 GitHub 上是否已有排队/运行的 Media run；队列延迟期间不会重复 dispatch，runner 中断/预算退出后自动重派并指数退避。站点构建 dispatch 与媒体 dispatch 相互独立。
+- 补帧任务：与普通转码共用队列，`options.sourceMode=processed` 表示从已发布 MP4 后补帧（不读 originals），`options.interpolation` 为本次参数；CPU 很重，关注 Actions 预算与 `media.timeoutMinutes`。
+- 源文件已删除（`source.available=false`）：无法再从源重新转码，只能基于已发布产物后补帧或重新上传；后台上传/任务列表会显示该状态。
 - running 租约到期：中断 runner 会在 lease 到期后进入有限重试，已发布低档不丢失。检查运行日志、FFmpeg 退出状态与 R2 上传验证。
 - failed：后台显示原始错误，解决后重试；默认首次失败之后重试三次。
 - 回调 401：核对 Worker/Actions PIPELINE_SECRET、签名原始 body 与时间戳；不要复用管理员 JWT。

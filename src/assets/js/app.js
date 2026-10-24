@@ -1,14 +1,41 @@
 /**
- * Mosaic App — thin orchestrator, delegates to components.
+ * Mosaic App — thin orchestrator. Page chrome (theme, motion, icons) starts
+ * immediately; content components and experience layers initialize lazily so
+ * one failing enhancement can never take down the page.
+ *
+ * Experience layers are optional and self-disable from
+ * `window.__MOSAIC_CONFIG.experience.*` (absent key = enabled):
+ *  - note modal (list pages): click a card to read it without navigating
+ *  - vertical feed (list pages): Douyin-style full-screen video browsing
+ *  - motion / Morphicons / theme menu: page chrome
  */
 import { $ } from './utils.js';
 import { setPosts, initI18n } from './data.js';
 import { register, loadComponents } from './components.js';
-import { initTheme, cycleTheme } from './theme.js';
+import { initTheme, cycleTheme, initThemeMenu } from './theme.js';
+import { initMotion } from './motion/index.js';
+import { initCardMedia } from './cards/media.js';
+import { initMasonry } from './cards/masonry.js';
+import { initNoteModal } from './note/index.js';
+import { initVerticalFeed } from './feed/index.js';
 import { initFilter } from './filter.js';
 import { initSearch } from './search.js';
 
 const DATA_BASE = document.querySelector('meta[name="data-base"]')?.content || '/data';
+const PAGE_TYPE = document.body.dataset.page || 'list';
+const disposers = [];
+
+/** Run one enhancement; failures are logged, never fatal. */
+function safe(name, init) {
+  try {
+    const dispose = init();
+    if (typeof dispose === 'function') disposers.push(dispose);
+    return dispose;
+  } catch (error) {
+    console.error(`[app] ${name} init failed:`, error);
+    return null;
+  }
+}
 
 // Init i18n from injected globals
 if (window.__I18N && window.__LANG) initI18n(window.__I18N, window.__LANG);
@@ -123,23 +150,83 @@ register({
   },
 });
 
+/**
+ * List-page experience layers. Both modules are idempotent, feature-flag
+ * themselves and no-op outside list pages, so wiring them unconditionally is
+ * safe (and keeps this orchestrator tiny).
+ */
+function initListExperience() {
+  // Masonry packs cards into balanced columns (JS because Safari mis-sizes
+  // aspect-ratio cards inside CSS multi-column); LQIPs then upgrade to HD.
+  safe('masonry', () => initMasonry());
+  safe('card-media', () => initCardMedia());
+  safe('note-modal', () => {
+    const note = initNoteModal();
+    return () => note?.dispose?.();
+  });
+  safe('vertical-feed', () => {
+    const feed = initVerticalFeed();
+    return () => feed?.dispose?.();
+  });
+}
+
 function tFallback() {
   return window.__LANG === 'en' ? 'Search unavailable — reload to retry' : '搜索暂不可用，请刷新重试';
 }
 
+/**
+ * Morphicons is bundled by esbuild in production, but the icon module uses a
+ * bare package specifier, which only resolves through the bundle. Load it
+ * dynamically so the source-module page (and any bundle-less deployment) still
+ * initializes everything else; icons are a progressive enhancement.
+ */
+function initMorphIcons() {
+  import('./icons/index.js')
+    .then(({ initIcons }) => safe('icons', () => initIcons()))
+    .catch((error) => console.warn('[app] Morphicons unavailable:', error?.message || error));
+}
+
 async function init() {
-  const pageType = document.body.dataset.page || 'list';
-  initTheme();
-  const themeToggle = document.getElementById('theme-toggle');
-  if (themeToggle) themeToggle.addEventListener('click', cycleTheme);
+  // Page chrome first: pre-paint bootstrap already resolved theme/accent, these
+  // calls only attach behavior and state. Order matters: theme publishes the
+  // resolved state, icons hydrate against it, motion enables reveal states.
+  safe('theme', () => {
+    initTheme();
+    initMotion();
+    const themeMenuToggle = document.getElementById('theme-menu-toggle');
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeMenuToggle) return initThemeMenu();
+    if (themeToggle) {
+      themeToggle.addEventListener('click', cycleTheme);
+      return () => themeToggle.removeEventListener('click', cycleTheme);
+    }
+    return null;
+  });
+  initMorphIcons();
+
+  if (PAGE_TYPE === 'list') initListExperience();
+
   try {
-    await loadComponents(window.__MOSAIC_CONFIG?.components || {}, pageType);
+    await loadComponents(window.__MOSAIC_CONFIG?.components || {}, PAGE_TYPE);
   } catch (err) {
     console.error('App init failed:', err);
     const grid = $('.card-grid');
     if (grid) grid.innerHTML = '<div class="empty-state"><i class="ri-inbox-line"></i><p>Failed to load.</p></div>';
   }
 }
+
+/** Tear down page-scoped listeners before the document is discarded. */
+function disposeAll() {
+  while (disposers.length) {
+    const dispose = disposers.pop();
+    try {
+      dispose?.();
+    } catch {
+      /* noop */
+    }
+  }
+}
+window.addEventListener('pagehide', disposeAll, { once: true });
 
 // Start
 if (document.readyState === 'loading') {

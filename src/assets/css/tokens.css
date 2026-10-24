@@ -19,6 +19,20 @@
   --color-tag-text: #515154;
   --color-stat-icon: #86868b;
   --color-like-active: #e74c3c;
+  --color-accent-contrast: #ffffff; /* text/icon on a --color-accent fill (AA for all palettes) */
+
+  /* Accent palette source shades — also used by the header theme-menu swatches.
+     The active palette is selected with `data-accent` (see below); the default
+     blue values are identical to the pre-v2 tokens. */
+  --palette-blue: #4361ee;
+  --palette-violet: #7c3aed;
+  --palette-emerald: #047857;
+  --palette-rose: #e11d48;
+  --palette-amber: #b45309;
+  --palette-slate: #475569;
+
+  /* Let form controls / scrollbars follow the resolved theme. */
+  color-scheme: light;
 
   /* Typography */
   --font-sans:
@@ -58,9 +72,14 @@
   --max-width-content: 1200px;
   --max-width-post: 840px;
   --header-height: 56px;
-  --card-radius: 12px;
-  --card-radius-sm: 8px;
-  --button-radius: 8px;
+  /* Continuous-curvature-friendly radii: cards/panels are deliberately larger
+     (v2.1 aesthetic) and become true squircles in browsers with corner-shape. */
+  --card-radius: 20px;
+  --card-radius-lg: 26px;
+  --card-radius-sm: 12px;
+  --button-radius: 12px;
+  --radius-panel: 28px;
+  --radius-chip: 9px;
 
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -75,6 +94,8 @@
 
   /* Z-index */
   --z-header: 100;
+  --z-dropdown: 150; /* search results / inline popovers inside content */
+  --z-popover: 200; /* header theme menu */
   --z-overlay: 1000;
   --z-modal: 1100;
 
@@ -90,10 +111,51 @@
   padding: 0 1px;
 }
 
+/* === Accent palettes (light values) ===
+ * `data-accent` swaps only the accent slot variables — structural tokens stay
+ * untouched, so components/components CSS never need per-palette variants.
+ * Every palette keeps white text on an accent fill at >= 4.5:1 (WCAG AA).
+ * Blue is the default and intentionally has no override block. */
+:root[data-accent='violet'] {
+  --color-accent: var(--palette-violet);
+  --color-accent-hover: #6d28d9;
+  --color-accent-text: #6d28d9; /* 7.1:1 on #fff */
+  --color-accent-text-hover: #5b21b6;
+}
+
+:root[data-accent='emerald'] {
+  --color-accent: var(--palette-emerald);
+  --color-accent-hover: #065f46;
+  --color-accent-text: #065f46; /* 7.7:1 on #fff */
+  --color-accent-text-hover: #064e3b;
+}
+
+:root[data-accent='rose'] {
+  --color-accent: var(--palette-rose);
+  --color-accent-hover: #be123c;
+  --color-accent-text: #be123c; /* 6.3:1 on #fff */
+  --color-accent-text-hover: #9f1239;
+}
+
+:root[data-accent='amber'] {
+  --color-accent: var(--palette-amber);
+  --color-accent-hover: #92400e;
+  --color-accent-text: #92400e; /* 7.1:1 on #fff */
+  --color-accent-text-hover: #78350f;
+}
+
+:root[data-accent='slate'] {
+  --color-accent: var(--palette-slate);
+  --color-accent-hover: #334155;
+  --color-accent-text: #334155; /* 10.4:1 on #fff */
+  --color-accent-text-hover: #1e293b;
+}
+
 /* Dark mode — follows the system unless the visitor pinned a theme via the
    header toggle (data-theme="light"/"dark" set before first paint). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
+    color-scheme: dark;
     --color-search-highlight: #ffd43b;
     --color-search-highlight-text: #1d1d1f;
     --color-bg: #1c1c1e;
@@ -114,6 +176,7 @@
   }
 }
 :root[data-theme='dark'] {
+  color-scheme: dark;
   --color-search-highlight: #ffd43b;
   --color-search-highlight-text: #1d1d1f;
   --color-bg: #1c1c1e;
@@ -131,4 +194,104 @@
   --color-accent-text: #8fa3ff; /* >= 4.5:1 on dark surfaces (WCAG AA) */
   --color-accent-text-hover: #a8b8ff;
   --shadow-card: 0 2px 12px var(--color-card-shadow);
+}
+
+/* === Accent palettes (dark values) ===
+ * On dark surfaces accent *text* must be a light tint (AA >= 4.5:1), exactly
+ * like the default blue rule above. Higher specificity than the two dark
+ * blocks above, so the palette's light tint wins. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light'])[data-accent='violet'] {
+    --color-accent-text: #c4b5fd; /* 7.6:1 on #2c2c2e */
+    --color-accent-text-hover: #ddd6fe;
+  }
+  :root:not([data-theme='light'])[data-accent='emerald'] {
+    --color-accent-text: #6ee7b7; /* 9.1:1 on #2c2c2e */
+    --color-accent-text-hover: #a7f3d0;
+  }
+  :root:not([data-theme='light'])[data-accent='rose'] {
+    --color-accent-text: #fda4af; /* 7.4:1 on #2c2c2e */
+    --color-accent-text-hover: #fecdd3;
+  }
+  :root:not([data-theme='light'])[data-accent='amber'] {
+    --color-accent-text: #fcd34d; /* 9.7:1 on #2c2c2e */
+    --color-accent-text-hover: #fde68a;
+  }
+  :root:not([data-theme='light'])[data-accent='slate'] {
+    --color-accent-text: #cbd5e1; /* 9.4:1 on #2c2c2e */
+    --color-accent-text-hover: #e2e8f0;
+  }
+}
+
+:root[data-theme='dark'][data-accent='violet'] {
+  --color-accent-text: #c4b5fd;
+  --color-accent-text-hover: #ddd6fe;
+}
+
+:root[data-theme='dark'][data-accent='emerald'] {
+  --color-accent-text: #6ee7b7;
+  --color-accent-text-hover: #a7f3d0;
+}
+
+:root[data-theme='dark'][data-accent='rose'] {
+  --color-accent-text: #fda4af;
+  --color-accent-text-hover: #fecdd3;
+}
+
+:root[data-theme='dark'][data-accent='amber'] {
+  --color-accent-text: #fcd34d;
+  --color-accent-text-hover: #fde68a;
+}
+
+:root[data-theme='dark'][data-accent='slate'] {
+  --color-accent-text: #cbd5e1;
+  --color-accent-text-hover: #e2e8f0;
+}
+
+/* === Continuous-curvature corners (squircle) — progressive enhancement ===
+ * Xiaomi-style superellipse corners are a native CSS feature in Chromium
+ * (`corner-shape: squircle`). Supporting browsers render the larger radii
+ * above as smooth continuous curves; everyone else keeps the same radius as a
+ * plain circular corner, so nothing clips, shifts or loses its shadow.
+ *
+ * Deliberately NOT implemented with per-element `clip-path: path()` masks:
+ * fixed-pixel paths do not scale, clip shadows/borders and need JS re-measure
+ * on every masonry reflow — not worth it for dozens of cards.
+ * Pure circles/pills (badges, avatars, tag pills, icon buttons) are excluded.
+ */
+@supports (corner-shape: squircle) {
+  :where(
+    .post-card,
+    .note-panel,
+    .note-media,
+    .note-video-card,
+    .video-container,
+    .video-controls,
+    .theme-menu,
+    .search-input-wrapper,
+    .search-input,
+    .search-results,
+    .pagination button,
+    .pagination a,
+    .gallery-toolbar,
+    .music-player,
+    .empty-state,
+    .note-toast
+  ) {
+    corner-shape: squircle;
+  }
+
+  :where(
+    .btn,
+    button:not(.icon-btn):not(.theme-toggle),
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea
+  ) {
+    corner-shape: squircle;
+  }
+
+  :where(.post-card-category, .post-card-tag, .filter-pill) {
+    corner-shape: squircle;
+  }
 }

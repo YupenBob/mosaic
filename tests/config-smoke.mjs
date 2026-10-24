@@ -18,6 +18,21 @@ assert.equal(
   true,
 );
 assert.deepEqual(validateConfig(config), []);
+assert.equal(config.experience.card.layout, 'masonry', 'masonry is the default card layout');
+assert.equal(
+  normalizeConfig({ experience: { card: { layout: 'grid' } } }).experience.card.layout,
+  'grid',
+  'card layout override is preserved',
+);
+assert.ok(
+  validateConfig(normalizeConfig({ experience: { card: { layout: 'columns' } } })).length,
+  'unknown layout rejected',
+);
+assert.equal(
+  await fingerprint(processingConfig(normalizeConfig({ experience: { card: { layout: 'grid' } } }), 'videos')),
+  await fingerprint(processingConfig(normalizeConfig({}), 'videos')),
+  'card layout must not invalidate encoding',
+);
 assert.ok(validateConfig(normalizeConfig({ videoQuality: { crf: -1 } })).length);
 assert.equal(config.player.hls.startLevel, 0);
 assert.ok(validateConfig(normalizeConfig({ player: { hls: { startLevel: -2 } } })).length);

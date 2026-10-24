@@ -214,6 +214,8 @@ function renderSnapshot(
             .join('')}
         </div>
 
+        <div class="dash-section-head"><h2>${t('dashboard.overview')}</h2></div>
+
         <div class="dash-cards">
           <div class="dash-big-card"><span class="dash-big-num">${dashData.posts ?? '...'}</span><span class="dash-big-label">${t('dashboard.posts')}</span></div>
           <div class="dash-big-card"><span class="dash-big-num">${dashData.categories ?? '...'}</span><span class="dash-big-label">${t('dashboard.categories')}</span></div>
@@ -224,6 +226,8 @@ function renderSnapshot(
         </div>
 
         <div data-dashboard-quickstart>${quickstart}</div>
+
+        <div class="dash-section-head"><h2>${t('dashboard.trends')}</h2></div>
 
         <div class="dash-charts">
           <div class="dash-chart-card">
@@ -238,6 +242,8 @@ function renderSnapshot(
             </div>
           </div>
         </div>
+
+        <div class="dash-section-head"><h2>${t('dashboard.details')}</h2></div>
 
         <div class="dash-bottom">
           <div class="dash-chart-card">

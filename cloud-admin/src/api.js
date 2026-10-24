@@ -214,22 +214,29 @@ export const media = {
 };
 export const mediaJobs = {
   list: (options = {}) => apiFetch('/media-jobs', options),
-  get: (id) => apiFetch(`/media-jobs/${encodeURIComponent(id)}`),
+  get: (id, options = {}) => apiFetch(`/media-jobs/${encodeURIComponent(id)}`, options),
   retry: (id) => apiFetch(`/media-jobs/${encodeURIComponent(id)}/retry`, { method: 'POST' }),
   cancel: (id) => apiFetch(`/media-jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+
+  /** Capability probe for post-hoc interpolation (404/405 on older Workers). */
+  interpolateCapability: () => apiFetch('/media/interpolate', { signal: null }),
+
+  /** Enqueue post-hoc interpolation for one video / one post / all videos. */
+  interpolate: (body) => apiFetch('/media/interpolate', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 // ── Upload (direct to Worker → R2) ─
 export const upload = {
-  /** Direct upload via Worker (fallback, <=100MB) */
-  directUrl: (slug, filename) =>
-    `${API_BASE}/upload/direct/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`,
-
   /** Presigned direct-to-R2 URL (primary path — single hop, >100MB capable) */
-  presign: (slug, filename, contentType) =>
+  presign: (slug, filename, contentType, keepSource) =>
     apiFetch('/upload/presign', {
       method: 'POST',
-      body: JSON.stringify({ slug, filename, contentType: contentType || 'application/octet-stream' }),
+      body: JSON.stringify({
+        slug,
+        filename,
+        contentType: contentType || 'application/octet-stream',
+        ...(typeof keepSource === 'boolean' ? { keepSource } : {}),
+      }),
     }),
 
   /** Multipart (resumable) upload for large files */
@@ -249,11 +256,16 @@ export const upload = {
       method: 'POST',
       body: JSON.stringify({ slug, filename, uploadId }),
     }),
-  multipartComplete: (slug, filename, uploadId) =>
+  multipartComplete: (slug, filename, uploadId, keepSource) =>
     apiFetch('/upload/multipart/complete', {
       signal: null,
       method: 'POST',
-      body: JSON.stringify({ slug, filename, uploadId }),
+      body: JSON.stringify({
+        slug,
+        filename,
+        uploadId,
+        ...(typeof keepSource === 'boolean' ? { keepSource } : {}),
+      }),
     }),
   multipartAbort: (slug, filename, uploadId) =>
     apiFetch('/upload/multipart/abort', {
@@ -262,11 +274,22 @@ export const upload = {
     }),
 
   /** Confirm a presigned upload landed in R2 (marks the site dirty) */
-  complete: (slug, filename) =>
+  complete: (slug, filename, keepSource) =>
     apiFetch(`/upload/complete/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}`, {
       method: 'POST',
       signal: null,
+      body: JSON.stringify(typeof keepSource === 'boolean' ? { keepSource } : {}),
     }),
+
+  /**
+   * Raw-body direct upload URL. `keepSource` travels as a query parameter
+   * because the request body is the file itself; callers should also send the
+   * `X-Mosaic-Keep-Source` header (accepted as a fallback by the Worker).
+   */
+  directUrl: (slug, filename, keepSource) =>
+    `${API_BASE}/upload/direct/${encodeURIComponent(slug)}/${encodeURIComponent(filename)}${
+      typeof keepSource === 'boolean' ? `?keepSource=${keepSource ? 1 : 0}` : ''
+    }`,
 };
 
 // ── Build ──────────────────────────────────

@@ -3,6 +3,7 @@ import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { createPageScope } from './lifecycle.js';
 import { modalConfirm, escHtml } from './ui.js?v=1';
+import { isConfigDirty, clearConfigDirty } from './config/form.js?v=1';
 import renderDashboard, { dashboardSkeleton } from './dashboard.js?v=1';
 import renderPosts, { postsSkeleton } from './posts.js?v=1';
 import renderEditor, { editorSkeleton } from './editor.js?v=1';
@@ -68,6 +69,23 @@ export function onHashChange() {
       return;
     }
   }
+  // Unsaved config changes: same guard, so a stray click never drops edits.
+  if (!state.editorDirty && isConfigDirty() && state.page === 'config' && page !== 'config') {
+    const target = location.hash;
+    if (target !== _lastHash) {
+      history.replaceState(null, '', _lastHash || '#config');
+      modalConfirm(
+        t('config.discardTitle'),
+        t('config.discardMsg'),
+        () => {
+          clearConfigDirty();
+          location.hash = target;
+        },
+        { danger: false, okLabel: t('config.discard') },
+      );
+      return;
+    }
+  }
   navigateTo(page, parseHash().params);
 }
 
@@ -117,10 +135,26 @@ async function renderPage(page, signal) {
     m.innerHTML = typeof result === 'string' ? result : result.html;
     if (result?.onUnmount) state.pageScope.own(result.onUnmount);
     if (result?.onMount && !signal.aborted) await result.onMount();
+    focusMain(m);
   } catch (err) {
     if (signal.aborted) return;
-    m.innerHTML = `<div class="page-anim"><h1>${t('common.error')}</h1><p class="error">${escHtml(err.message)}</p></div>`;
+    m.innerHTML = `<div class="page-anim"><div class="page-load-error" role="alert">
+      <i class="ri-error-warning-line" aria-hidden="true"></i>
+      <h1>${t('common.error')}</h1>
+      <p class="error">${escHtml(err.message)}</p>
+      <button type="button" class="btn btn-secondary" onclick="window.mosaicRetryPage()"><i class="ri-refresh-line" aria-hidden="true"></i> ${t('common.retry')}</button>
+    </div></div>`;
   }
+}
+
+// Exposed for the inline retry action of the page-level error state.
+window.mosaicRetryPage = () => navigateTo(state.page, state.params);
+
+/** Move keyboard focus into the freshly rendered page (skip-link target). */
+function focusMain(main) {
+  if (document.querySelector('.modal-overlay, .cmd-overlay')) return;
+  if (main.contains(document.activeElement)) return;
+  main.focus({ preventScroll: true });
 }
 
 function emptyPage() {

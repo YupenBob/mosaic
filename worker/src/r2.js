@@ -24,6 +24,7 @@ import { markDirty } from './github.js';
 import { DEFAULTS } from '../../shared/config.mjs';
 import { getConfig } from './services/site-config.js';
 import { registerUpload, invalidateMedia, jobsRequest } from './services/jobs.js';
+import { parseKeepSource } from './jobs/media-options.mjs';
 import { folderFor, validSegment, mediaUrl, compareMediaOrder } from '../../shared/media-manifest.mjs';
 import { protectedMediaKeys } from './services/media-references.js';
 
@@ -131,6 +132,22 @@ function folderForExt(ext) {
   return folderFor(`file.${ext}`);
 }
 
+/**
+ * Resolve the optional `keepSource` upload option. JSON endpoints carry it in
+ * the body; the direct-upload path streams the file as the request body, so it
+ * is read from `?keepSource=` or `X-Mosaic-Keep-Source` instead.
+ * @param {object} c - Hono context
+ * @param {object} [body] - parsed JSON body when available
+ * @returns {boolean|undefined}
+ */
+function uploadKeepSource(c, body = {}) {
+  return (
+    parseKeepSource(body.keepSource) ??
+    parseKeepSource(typeof c.req.query === 'function' ? c.req.query('keepSource') : undefined) ??
+    parseKeepSource(c.req.header('X-Mosaic-Keep-Source'))
+  );
+}
+
 // site-data is a reserved namespace (favicon etc.): not a post slug, so it is
 // never picked up by the pipeline sync and never swept as an orphan.
 export function mediaKey(slug, filename) {
@@ -174,10 +191,18 @@ export async function uploadDirect(c) {
     return c.json({ error: 'Uploaded object could not be verified; retry confirmation', code: 'R2_ERROR' }, 503);
   if (obj.size > config.upload.maxFileBytes)
     return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
-  const task = await registerUpload(c, key, obj);
+  const keepSource = uploadKeepSource(c);
+  const task = await registerUpload(c, key, obj, keepSource === undefined ? {} : { keepSource });
   if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj?.size ?? length, task?.objectDelta ?? 1);
   if (!task) await markDirty(c.env);
-  return c.json({ ok: true, key, filename, folder: isSiteData ? 'site-data' : folder, ...(task || {}) });
+  return c.json({
+    ok: true,
+    key,
+    filename,
+    folder: isSiteData ? 'site-data' : folder,
+    ...(keepSource === undefined ? {} : { keepSource }),
+    ...(task || {}),
+  });
 }
 
 // Confirm a presigned direct upload landed in R2, then mark the site dirty.
@@ -187,14 +212,22 @@ export async function uploadComplete(c) {
   if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
   const key = mediaKey(slug, filename);
   try {
+    const body = await c.req.json().catch(() => ({}));
     const obj = await c.env.MEDIA.head(key);
     if (!obj) return c.json({ error: 'Object not found', code: 'NOT_FOUND' }, 404);
     if (obj.size > (await getConfig(c)).upload.maxFileBytes)
       return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
-    const task = await registerUpload(c, key, obj);
+    const keepSource = uploadKeepSource(c, body || {});
+    const task = await registerUpload(c, key, obj, keepSource === undefined ? {} : { keepSource });
     if (!task) await markDirty(c.env);
     if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj.size ?? 0, task?.objectDelta ?? 1);
-    return c.json({ ok: true, key, size: obj.size, ...(task || {}) });
+    return c.json({
+      ok: true,
+      key,
+      size: obj.size,
+      ...(keepSource === undefined ? {} : { keepSource }),
+      ...(task || {}),
+    });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
   }
@@ -340,8 +373,9 @@ export async function serveMediaFile(c) {
 
 // Presigned direct upload: browser → R2 S3 endpoint (single hop, >100MB capable)
 export async function generatePresignedUrl(c) {
-  const { slug, filename, contentType } = await c.req.json().catch(() => ({}));
+  const { slug, filename, contentType, keepSource: rawKeepSource } = await c.req.json().catch(() => ({}));
   if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
+  const keepSource = parseKeepSource(rawKeepSource);
 
   const client = s3Client(c);
   if (!client) {
@@ -364,6 +398,8 @@ export async function generatePresignedUrl(c) {
     folder,
     expires: config.upload.presignSeconds,
     contentType: contentType || EXT_CONTENT_TYPE[ext] || 'application/octet-stream',
+    // Registration happens at /upload/complete; echo the choice for the client.
+    ...(keepSource === undefined ? {} : { keepSource }),
   });
 }
 
@@ -373,10 +409,19 @@ export async function generatePresignedUrl(c) {
  * otherwise a new multipart upload is created.
  */
 export async function startMultipartUpload(c) {
-  const { slug, filename, contentType, size, partSize, uploadId } = await c.req.json().catch(() => ({}));
+  const {
+    slug,
+    filename,
+    contentType,
+    size,
+    partSize,
+    uploadId,
+    keepSource: rawKeepSource,
+  } = await c.req.json().catch(() => ({}));
   if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
+  const keepSource = parseKeepSource(rawKeepSource);
 
   const config = await getConfig(c);
   const bucket = config.mediaSource.bucket;
@@ -428,6 +473,7 @@ export async function startMultipartUpload(c) {
       partCount,
       parts,
       expires: config.upload.presignSeconds,
+      ...(keepSource === undefined ? {} : { keepSource }),
     });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
@@ -455,10 +501,11 @@ export async function listMultipartParts(c) {
 
 // Complete a multipart upload (server assembles parts from R2) and mark dirty.
 export async function completeMultipartUpload(c) {
-  const { slug, filename, uploadId } = await c.req.json().catch(() => ({}));
+  const { slug, filename, uploadId, keepSource: rawKeepSource } = await c.req.json().catch(() => ({}));
   if (!slug || !filename || !uploadId) {
     return c.json({ error: 'slug, filename and uploadId required', code: 'INVALID_PARAMS' }, 400);
   }
+  const keepSource = parseKeepSource(rawKeepSource);
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
   const config = await getConfig(c);
@@ -506,10 +553,19 @@ export async function completeMultipartUpload(c) {
     if (!obj) throw new Error('Completed multipart object is missing');
     if (obj.size > config.upload.maxFileBytes)
       return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
-    const task = await registerUpload(c, key, obj, { uploadId });
+    const task = await registerUpload(c, key, obj, {
+      uploadId,
+      ...(keepSource === undefined ? {} : { keepSource }),
+    });
     if (!task) await markDirty(c.env);
     if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj.size ?? 0, task?.objectDelta ?? 1);
-    return c.json({ ok: true, key, size: obj.size, ...(task || {}) });
+    return c.json({
+      ok: true,
+      key,
+      size: obj.size,
+      ...(keepSource === undefined ? {} : { keepSource }),
+      ...(task || {}),
+    });
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
   }

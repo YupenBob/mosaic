@@ -5,8 +5,8 @@
 | 层 | 命令 | 验证 |
 | --- | --- | --- |
 | 静态 | `npm run validate`、`npm run lint`、`npm run format:check` | 共用配置、ESLint、格式、代理同步和模块语法 |
-| 离线 | `npm run check` | 所有模块语法、13 组内容块、6 组上传逻辑、原 38 组 Worker、Jobs/上传/配置/站点契约 |
-| 媒体集成 | `npm run test:media` | 本地 FFmpeg + Sharp 合成文件、内存 R2、隐私与发布验证 |
+| 离线 | `npm run check` | 所有模块语法、13 组内容块、6 组上传逻辑、原 38 组 Worker、Jobs/上传/配置/站点契约；新增媒体选项、补帧纯逻辑、调度状态机与播放 flow 契约 |
+| 媒体集成 | `npm run test:media` | 本地 FFmpeg + Sharp 合成文件、内存 R2、隐私与发布验证；真实 ffmpeg 补帧（配置补帧/processed 后补帧/源删除/预算续跑） |
 | 浏览器 | `npm run build` 后 `npm run test:e2e:local` | 现有内容搜索和路径回归，以及合成清单的移动 Chromium/WebKit 媒体回归 |
 | 后台浏览器 | `npm run test:admin:local` | 本地文件服务、完全 Mock API、路由、编辑器、任务重试/取消/轮询清理、7 页面×2 主题 axe |
 | 显式线上 | `npm run test:online` | 原有线上探针与真实后台；仅按需运行，使用独立凭据 |
@@ -31,6 +31,16 @@
 
 CI `verify.yml` 执行四层离线验证且没有生产 Secrets。旧 browser spec 只在本地运行四项路径与搜索检查，并阻止外部请求；媒体用例由新合成清单覆盖。测量方法见 [performance.md](performance.md)。
 
-published-assets 验证内容哈希稳定性、后台打包无模块加载链、依赖变更使整图版本变化、Pages 代理不被重写和输出路径保护。后台浏览器用例运行实际部署暂存产物，并验证仅一个应用脚本请求；未保存保护通过真实取消/放弃操作验证。video-startup 覆盖默认低档、配置覆盖、自动升档未锁定、240p 手动偏好与不可用偏好回退。
+published-assets 验证内容哈希稳定性、后台打包无模块加载链、依赖变更使整图版本变化、Pages 代理不被重写和输出路径保护。后台浏览器用例运行实际部署暂存产物，并验证仅一个应用脚本请求；未保存保护通过真实取消/放弃操作验证。video-startup 覆盖默认低档、配置覆盖、自动升档未锁定、240p 手动偏好与不可用偏好回退；`playback-flow` 以纯 Node 契约覆盖点击意图、单一 startLoad、元数据后恢复位置、3 次致命错误回退 MP4、手动锁档/自动、pagehide 与幂等销毁。
+
+## Experience v2 追加验证
+
+- `tests/media-options-smoke.mjs`：补帧滤镜构造（scale→minterpolate 顺序、yuv420p、档位排序、不可变 master）、配置指纹在关闭补帧时逐字节不变、`keepSourceFiles` 不进入指纹。
+- `tests/media-dispatch-smoke.mjs`：媒体调度状态机的 13 组场景（单次派发、排队/运行中抑制、runner 死亡后重派、miss/失败指数退避、验证失败不重复、站点构建独立、重启持久化、旧 `mediaDispatchAt` 迁移）。
+- `tests/video-interpolation.mjs`（真实 ffmpeg，属 `npm run test:media`）：10fps 合成源→配置补帧输出、processed 后补帧在源已删除时可用、预算中断续跑完成全部档位、新 generation 与 HLS/HEAD 发布契约、keepSource 删除标记。
+- `tests/preview-smoke.mjs`：几 KB WebP 预览生成（宽度/体积上限）、`resolveMedia` 的 `posterLqip/coverLqip/src10p` 映射、listing `coverLqip`、卡片 LQIP-first 标记（`is-lqip`/`data-src`/`noscript`/`--cover-aspect`/优先加载）、极端封面比例夹取与旧媒体回退。
+- `tests/cards-media.mjs`（Playwright，加入 `test:e2e:local`）：SSR 先输出预览图、首屏优先升级、滚动后全部升级、升级后无布局跳动；瀑布流列宽/各卡独立高度/列数（1440=3、390=1）与无横向溢出；Chromium + WebKit 都验证卡片尺寸（防 WebKit aspect-ratio 分栏回归）。
+- 体验层浏览器验证由 verifier 在独立 dist 上执行：主题三态+色板、卡片全图/大卡/瀑布流、LQIP 网络顺序、Spring 动效与 reduced-motion、Morphicons、超椭圆圆角（支持/回退两态）、详情弹层（不跳转/深链/Esc/焦点/滚动锁）、竖屏 feed（单实例播放/静音自动播放/滑动切换）与 axe 双主题扫描；结果见 `.mosaic/qa/verification-report-v2.1.md`（本地工件，不入库）。
+
 
 仪表盘回归让分类先返回、流量先失败再重试，使用真实 Chart.js 验证流量恢复、旧图表销毁、实例数量有界与页面退出清理；同时检查健康标题结束加载、迟到配置补上站点链接、空站点入门提示和操作节点保留。后台图表不再以接口返回顺序决定是否显示。

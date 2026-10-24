@@ -35,7 +35,7 @@ export function buildIndexes(posts) {
   }
   const categories = [...nodes.values()].filter((n) => n.depth === 0);
   const listing = posts.map(
-    ({ slug, title, date, category, tags, description, cover, coverAspect, coverSrcset, type, stats }) => ({
+    ({ slug, title, date, category, tags, description, cover, coverLqip, coverAspect, coverSrcset, type, stats }) => ({
       slug,
       title,
       date,
@@ -43,6 +43,7 @@ export function buildIndexes(posts) {
       tags,
       description,
       cover,
+      coverLqip,
       coverAspect,
       coverSrcset,
       type,

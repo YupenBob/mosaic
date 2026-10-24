@@ -25,28 +25,34 @@
 
 | 方法 | 路径 | 输入 / 响应 |
 | --- | --- | --- |
-| POST | `/api/upload/direct/:slug/:filename` | 原始二进制 body；平台大小限制仍适用 |
-| POST | `/api/upload/presign` | `{slug,filename,contentType}` → 签名 PUT URL |
-| POST | `/api/upload/complete/:slug/:filename` | HEAD 验证上传，再登记任务 |
+| POST | `/api/upload/direct/:slug/:filename` | 原始二进制 body；`keepSource` 用 query `?keepSource=1|0` 或 `X-Mosaic-Keep-Source` header；平台大小限制仍适用 |
+| POST | `/api/upload/presign` | `{slug,filename,contentType,keepSource?}` → 签名 PUT URL |
+| POST | `/api/upload/complete/:slug/:filename` | HEAD 验证上传，再登记任务；body 可带 `{keepSource}` |
 | POST | `/api/upload/multipart/start` | `{slug,filename,size,contentType,uploadId?}` → 分片 URL，可恢复 |
 | POST | `/api/upload/multipart/parts` | `{slug,filename,uploadId}` → 已上传分片 |
-| POST | `/api/upload/multipart/complete` | 同上；服务端核验并组装分片，再登记任务 |
+| POST | `/api/upload/multipart/complete` | 同上；服务端核验并组装分片，再登记任务；body 可带 `{keepSource}` |
 | POST | `/api/upload/multipart/abort` | 同上，取消尚未完成的上传 |
-| GET / DELETE | `/api/media/:slug/list`、`/api/media/:slug/:file` | 后台媒体列表与删除 |
+| GET / DELETE | `/api/media/:slug/list`、`/api/media/:slug/:file` | 后台媒体列表与删除；条目含 `options`、`sourceAvailable`、`sourceDeletedAt` |
 
 三种上传完成响应兼容原字段并增加 `taskId`、`status`。重复确认同一源 ETag 和配置指纹返回同一 taskId 与 `duplicate:true`。分片任务保存 uploadId 作为完成收据，重复 complete 不会再次组装或登记。未完成上传不会发布清单引用。
+
+`keepSource` 决定解码成功后是否保留 `originals/`：缺省取 `config.media.keepSourceFiles`；任务登记时解析并以 `job.options.keepSource` 持久化。为 `false` 时，全部档位发布成功后由任务协调器原子删除源对象并标记 `source.available=false`/`sourceDeletedAt`（元数据变更不触发站点重建）；删除失败只记录，不影响已发布产物。
 
 ## 媒体任务
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/media-jobs` | 精简任务列表，无配置、租约、断点波形 |
+| GET | `/api/media-jobs` | 精简任务列表，无配置、租约、断点波形；含 `options/sourceAvailable/sourceDeletedAt/published/generation` |
 | GET | `/api/media-jobs/:id` | 详情、源身份、重试次数、已发布断点 |
 | POST | `/api/media-jobs/:id/retry` | 重置重试预算并重新排队 |
 | POST | `/api/media-jobs/:id/cancel` | 撤销单任务租约，不取消同批其它文件 |
 | POST | `/api/media-jobs/reconcile` | 按当前配置核验源版本，增量排队 |
+| GET | `/api/media/interpolate` | 能力探测：`{ok,supported,defaults}`；未部署时 404 |
+| POST | `/api/media/interpolate` | `{slug?,filename?,all?,fps?}` → `{ok,enqueued,tasks:[{id,assetId}],skipped:[{assetId,reason}]}` |
 
-旧任务被替换或删除后重试/回调返回 409，不会恢复被删除媒体。
+`POST /api/media/interpolate` 对**已完成解码**的视频登记 `sourceMode=processed` 的后补帧任务：从已发布的档位 MP4 重新编码（ffmpeg `minterpolate`）并分片到新 generation，不读取 `originals/`，因此源文件已删除也可用。`skipped.reason` 为 `not-a-video | not-decoded | already-queued`；`fps` 必须是 24–120 的整数。旧任务被替换或删除后重试/回调返回 409，不会恢复被删除媒体。
+
+任务协调器持久化 `mediaDispatch` 状态（`idle|dispatching|active|retry`，含 runId/attempt/nextAt/lastError）：只有存在到期 pending 任务、没有运行中租约且没有已验证的 active/queued 媒体 run 时才 dispatch，避免 GitHub Actions 队列延迟导致的重复排队；runner 中断后会重新派发并指数退避。`/api/internal/.../state` 与 `jobs-list` 暴露该状态用于排查“媒体流为什么不触发”。
 
 ## 站点部署
 

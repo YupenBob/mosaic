@@ -139,6 +139,7 @@ for (const p of posts) {
   }
 
   if (p.cover) check(`${tag} cover is URL`, isUrl(p.cover));
+  check(`${tag} coverLqip is empty-or-url`, p.coverLqip === undefined || p.coverLqip === '' || isUrl(p.coverLqip));
   if (p.coverSrcset) {
     check(
       `${tag} coverSrcset variants`,

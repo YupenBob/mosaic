@@ -1,5 +1,20 @@
 /* === Responsive Overrides === */
 
+/* Mobile: slightly tighter typography inside the large cards */
+@media (max-width: 639px) {
+  .post-card-title {
+    font-size: 1.25rem;
+  }
+
+  .post-card--text .post-card-title {
+    font-size: 1.375rem;
+  }
+
+  .post-card-body {
+    padding: var(--space-3);
+  }
+}
+
 /* Tablet */
 @media (min-width: 640px) {
   :root {
@@ -13,12 +28,31 @@
   .post-content {
     font-size: var(--font-size-lg);
   }
+
+  .post-card-title {
+    font-size: 1.3125rem;
+  }
 }
 
 /* Desktop */
 @media (min-width: 1024px) {
   .post-page {
     padding: var(--space-12) var(--space-4);
+  }
+
+  .post-card-title {
+    font-size: 1.4375rem;
+  }
+}
+
+/* Wide desktop: cards are bigger, type scales with them */
+@media (min-width: 1440px) {
+  .post-card-title {
+    font-size: 1.5rem;
+  }
+
+  .post-card-desc {
+    font-size: var(--font-size-base);
   }
 }
 

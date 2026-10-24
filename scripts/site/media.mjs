@@ -39,6 +39,7 @@ export function resolveMedia(manifest, slug, site) {
       result.videos.push({
         ...identity,
         poster: url(output.poster),
+        ...(output.posterPreview ? { posterLqip: url(output.posterPreview) } : {}),
         ...(output.hls ? { hls: url(output.hls) } : {}),
         ...(output.sources
           ? { sources: Object.fromEntries(Object.entries(output.sources).map(([tier, key]) => [tier, url(key)])) }
@@ -54,9 +55,13 @@ export function resolveMedia(manifest, slug, site) {
         artist: output.artist || site.author?.name || '',
         album: output.album || '',
         cover: url(output.cover),
+        ...(output.coverPreview ? { coverLqip: url(output.coverPreview) } : {}),
         sources: Object.fromEntries(Object.entries(output.sources || {}).map(([tier, key]) => [tier, url(key)])),
         duration: output.duration || 0,
         waveform: output.waveform || null,
+        // Album art is square; used as a last-resort post cover so music posts
+        // are not the only text-only cards in the masonry grid.
+        aspect: 1,
       });
     }
   }

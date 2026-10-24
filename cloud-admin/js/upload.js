@@ -1,11 +1,14 @@
 /**
  * Upload flow — concurrent (2 at a time) presigned uploads with per-file
  * retry/cancel, thumbnails and graceful handling when the post isn't saved.
+ * Video uploads can opt into keeping the decoded source file (`keepSource`),
+ * defaulting to `config.media.keepSourceFiles`, and show what processing the
+ * media task will run before/after the upload is confirmed.
  */
 import { upload, mediaJobs, getToken } from '../src/api.js';
 import { state } from './state.js?v=1';
 import { t } from './i18n.js?v=1';
-import { escHtml } from './ui.js?v=1';
+import { escHtml, modalConfirm } from './ui.js?v=1';
 
 const settings = () => state.config.upload || {};
 // Files above this size use resumable multipart uploads (R2 part uploads).
@@ -61,6 +64,32 @@ function fileSize(size) {
   return size > 1048576 ? (size / 1048576).toFixed(1) + ' MB' : (size / 1024).toFixed(0) + ' KB';
 }
 
+/**
+ * Read the per-upload "keep source" toggle. Only videos use it; photos/audio
+ * leave it undefined so the Worker falls back to the site default.
+ * @returns {boolean|undefined}
+ */
+function keepSourceToggleValue() {
+  const input = document.getElementById('upload-keep-source');
+  if (!input) return undefined;
+  return !!input.checked;
+}
+
+/** Human description of what the media task will do for this file. */
+function processingPlan(item, job = null) {
+  if (item.kind !== 'video') return '';
+  const quality = state.config.videoQuality || {};
+  const options = job?.options || {};
+  const interpolation = options.interpolation || quality.interpolation;
+  const tiers = { 2160: '4K', 1080: '1080p', 720: '720p', 480: '480p', 360: '360p', 240: '240p' };
+  const parts = [t('editor.uploadPlanTranscode', { tier: tiers[quality.maxHeight || 1080] || '1080p' })];
+  if (interpolation?.enabled) parts.push(t('editor.uploadPlanInterp', { fps: interpolation.fps || 60 }));
+  const keep = typeof options.keepSource === 'boolean' ? options.keepSource : item.keepSource;
+  if (keep === true) parts.push(t('editor.uploadPlanKeep'));
+  else if (keep === false) parts.push(t('editor.uploadPlanDelete'));
+  return `<i class="ri-information-line" aria-hidden="true"></i> ${escHtml(parts.join(' · '))}`;
+}
+
 export function handleUploadFiles(files) {
   const slug = currentSlug();
   const progressEl = document.getElementById('upload-progress');
@@ -78,12 +107,16 @@ export function handleUploadFiles(files) {
   }
 
   const token = getToken();
+  const keepSourceDefault = keepSourceToggleValue();
   const queue = [...files].map((file) => {
+    const kind = fileKind(file.name);
     const item = {
       file,
-      kind: fileKind(file.name),
+      kind,
       slug,
       token,
+      // Snapshot the toggle so changing it mid-batch cannot split a batch.
+      keepSource: kind === 'video' ? keepSourceDefault : undefined,
       status: 'pending', // pending | uploading | done | error | cancelled
       controller: null,
       el: null,
@@ -94,7 +127,7 @@ export function handleUploadFiles(files) {
       'abort',
       () => {
         clearTimeout(item.pollTimer);
-        if (['pending', 'uploading'].includes(item.status)) cancelItem(item);
+        if (['pending', 'uploading'].includes(item.status)) abortItem(item);
         if (item.thumbUrl) URL.revokeObjectURL(item.thumbUrl);
       },
       { once: true },
@@ -157,16 +190,17 @@ function renderItem(item) {
     <div class="upload-item-info">
       <div class="upload-item-name">${escHtml(item.file.name)}</div>
       <div class="upload-item-meta"><span>${fileSize(item.file.size)}</span></div>
+      ${processingPlan(item) ? `<div class="upload-item-plan">${processingPlan(item)}</div>` : ''}
       <div class="upload-item-bar"><div class="upload-item-fill" style="width:0%"></div></div>
     </div>
-    <div class="upload-item-status">0%</div>
+    <div class="upload-item-status" aria-live="polite">0%</div>
     <div class="upload-item-actions">
       <button class="icon-btn" title="${t('editor.retry')}" aria-label="${t('editor.retry')}" style="display:none"><i class="ri-refresh-line"></i></button>
       <button class="icon-btn" title="${t('editor.cancelUpload')}" aria-label="${t('editor.cancelUpload')}"><i class="ri-close-line"></i></button>
     </div>
   `;
   item.el = el;
-  el.querySelector('.upload-item-actions .icon-btn:last-child').onclick = () => cancelItem(item);
+  el.querySelector('.upload-item-actions .icon-btn:last-child').onclick = () => requestCancel(item);
   el.querySelector('.upload-item-actions .icon-btn:first-child').onclick = () => retryItem(item);
   return el;
 }
@@ -205,6 +239,17 @@ function finishUpload(item, receipt) {
   }
 }
 
+/** Refresh the "what will happen" line from the job's persisted options. */
+function updatePlan(item, job) {
+  const planEl = item.el?.querySelector('.upload-item-plan');
+  if (!planEl || item.kind !== 'video') return;
+  const text = processingPlan(item, job);
+  if (text) planEl.innerHTML = text;
+  if (job.sourceAvailable === false) {
+    planEl.innerHTML = `${text} · <span class="upload-plan-warn">${t('jobs.sourceDeleted')}</span>`;
+  }
+}
+
 async function watchTask(item) {
   if (!item.el.isConnected || item.status === 'cancelled') return;
   const signal = state.pageScope?.signal;
@@ -218,6 +263,7 @@ async function watchTask(item) {
       label +
       (job.current ? ' · ' + job.current : '') +
       (job.error ? ' · ' + job.error : '');
+    updatePlan(item, job);
     item.taskFailed = ['failed', 'cancelled'].includes(job.status);
     item.el.querySelector('.upload-item-actions .icon-btn:first-child').style.display = item.taskFailed ? '' : 'none';
     item.el.querySelector('.upload-item-actions .icon-btn:last-child').style.display = ['pending', 'running'].includes(
@@ -242,7 +288,19 @@ function progressUI(item, pct) {
   if (statusEl && item.status !== 'cancelled') statusEl.textContent = pct + '%';
 }
 
-function cancelItem(item) {
+/** Ask before throwing away an in-flight upload (but never on page unload). */
+function requestCancel(item) {
+  if (item.status === 'uploading' && (item.progress || 0) > 0) {
+    modalConfirm(t('editor.cancelUploadTitle'), t('editor.cancelUploadMsg', { name: item.file.name }), () =>
+      abortItem(item),
+    );
+    return;
+  }
+  abortItem(item);
+}
+
+/** Stop an upload immediately (user-confirmed cancel or page disposal). */
+function abortItem(item) {
   clearTimeout(item.pollTimer);
   if (item.taskId && item.status === 'done') mediaJobs.cancel(item.taskId).catch(() => {});
   item.status = 'cancelled';
@@ -303,7 +361,12 @@ async function uploadFilePresigned(item) {
 
   let presigned;
   try {
-    presigned = await upload.presign(item.slug, item.file.name, item.file.type || 'application/octet-stream');
+    presigned = await upload.presign(
+      item.slug,
+      item.file.name,
+      item.file.type || 'application/octet-stream',
+      item.keepSource,
+    );
   } catch {
     return false;
   }
@@ -324,7 +387,7 @@ async function uploadFilePresigned(item) {
       }
       if (xhr.status >= 200 && xhr.status < 300) {
         // A retry confirms the existing object; it must not upload the whole file again.
-        item.confirm = () => upload.complete(item.slug, item.file.name);
+        item.confirm = () => upload.complete(item.slug, item.file.name, item.keepSource);
         item.confirm().then(resolve, reject);
       } else {
         resolve(false); // fall back to direct
@@ -389,7 +452,7 @@ async function uploadFileMultipart(item) {
     throw err;
   }
   item.confirm = async () => {
-    const receipt = await upload.multipartComplete(slug, filename, uploadId);
+    const receipt = await upload.multipartComplete(slug, filename, uploadId, item.keepSource);
     mpClear(slug, filename);
     return receipt;
   };
@@ -480,12 +543,17 @@ function uploadPartXhr(item, part, partSize) {
 
 function uploadFileDirect(item) {
   return new Promise((resolve, reject) => {
-    const url = upload.directUrl(item.slug, item.file.name);
+    const url = upload.directUrl(item.slug, item.file.name, item.keepSource);
     const xhr = new XMLHttpRequest();
     item.controller = xhr;
     xhr.open('POST', url);
     xhr.setRequestHeader('Authorization', 'Bearer ' + item.token);
     xhr.setRequestHeader('Content-Type', item.file.type || 'application/octet-stream');
+    if (typeof item.keepSource === 'boolean') {
+      // Raw-body upload cannot carry JSON, so the Worker also accepts this
+      // header as a fallback to the `?keepSource=` query parameter.
+      xhr.setRequestHeader('X-Mosaic-Keep-Source', item.keepSource ? '1' : '0');
+    }
     xhr.timeout = 300000;
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable && item.status !== 'cancelled') progressUI(item, Math.round((e.loaded / e.total) * 100));

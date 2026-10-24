@@ -58,12 +58,22 @@ export function debounce(fn, ms) {
 }
 
 // ── Toast ────────────────────────────────────────────────────
-export function toast(msg, type = 'info', duration = 5000) {
+/**
+ * Show a transient notification.
+ * @param {string} msg Message (escaped).
+ * @param {'info'|'success'|'error'|'warning'} [type]
+ * @param {number} [duration] Auto-dismiss delay in ms (0 = sticky).
+ * @param {{label:string, onClick:Function}} [action] Optional inline action
+ *   (e.g. retry / view progress) — toasts never steal focus and never block
+ *   the page behind them.
+ */
+export function toast(msg, type = 'info', duration = 5000, action = null) {
   let container = document.querySelector('.toast-container');
   if (!container) {
     container = document.createElement('div');
     container.className = 'toast-container';
     container.setAttribute('aria-live', 'polite');
+    container.setAttribute('role', 'status');
     document.body.appendChild(container);
   }
   const icons = {
@@ -75,9 +85,10 @@ export function toast(msg, type = 'info', duration = 5000) {
   const el = document.createElement('div');
   el.className = 'toast toast-' + type;
   el.innerHTML = `
-    <span class="toast-icon"><i class="${icons[type] || icons.info}"></i></span>
+    <span class="toast-icon"><i class="${icons[type] || icons.info}" aria-hidden="true"></i></span>
     <span class="toast-msg">${escHtml(msg)}</span>
-    <button class="toast-close" aria-label="Close"><i class="ri-close-line"></i></button>
+    ${action ? `<button class="toast-action" type="button">${escHtml(action.label)}</button>` : ''}
+    <button class="toast-close" type="button" aria-label="${t('common.close')}"><i class="ri-close-line" aria-hidden="true"></i></button>
   `;
   let progressEl = null;
   if (duration > 0) {
@@ -90,7 +101,20 @@ export function toast(msg, type = 'info', duration = 5000) {
     setTimeout(() => el.remove(), 200);
   };
   el.querySelector('.toast-close').addEventListener('click', dismiss);
+  const actionBtn = el.querySelector('.toast-action');
+  if (actionBtn) {
+    actionBtn.addEventListener('click', async () => {
+      dismiss();
+      try {
+        await action.onClick();
+      } catch {
+        /* action failures surface through their own toasts */
+      }
+    });
+  }
   container.appendChild(el);
+  // Keep the stack short so notifications never bury the page content.
+  while (container.children.length > 4) container.firstElementChild.remove();
   if (duration > 0) {
     requestAnimationFrame(() => {
       if (progressEl) {
@@ -369,7 +393,6 @@ export function setBtnBusy(btn, busy, busyHtml) {
     btn.innerHTML = btn.dataset.restore || btn.innerHTML;
   }
 }
-
 export function quick(promiseFn, fallback, ms = 15000) {
   return Promise.race([
     Promise.resolve()

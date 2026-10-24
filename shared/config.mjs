@@ -1,6 +1,32 @@
 /** Runtime-neutral configuration shared by the generator and Worker. */
+export const THEME_MODES = ['auto', 'light', 'dark'];
+export const THEME_ACCENTS = ['blue', 'violet', 'emerald', 'rose', 'amber', 'slate'];
+export const CARD_SIZES = ['large', 'compact'];
+export const CARD_IMAGES = ['full', 'cover'];
+export const CARD_LAYOUTS = ['masonry', 'grid'];
+export const MOTION_SPRINGS = ['none', 'snappy', 'smooth', 'bouncy'];
+/** ffmpeg `minterpolate` mi_mode enum. */
+export const INTERPOLATION_MODES = ['mci', 'blend', 'dup'];
+/** ffmpeg `minterpolate` mc_mode enum. */
+export const INTERPOLATION_MC_MODES = ['aobmc', 'vmm', 'obmc'];
+/** ffmpeg `minterpolate` me_mode enum. */
+export const INTERPOLATION_ME_MODES = ['bidir', 'epzs', 'esa'];
 export const DEFAULTS = {
   language: 'zh-CN',
+  theme: 'auto',
+  themeMode: {
+    default: 'auto',
+    accent: 'blue',
+    allowVisitorToggle: true,
+    showMenu: true,
+  },
+  experience: {
+    card: { size: 'large', image: 'full', layout: 'masonry' },
+    modal: { enabled: true },
+    verticalFeed: { enabled: true },
+    motion: { enabled: true, spring: 'snappy' },
+    morphIcons: { enabled: true },
+  },
   pageSize: 50,
   gallerySingleThreshold: 5,
   apiBase: '/api',
@@ -19,6 +45,19 @@ export const DEFAULTS = {
     audioBitrate: '128k',
     segmentSeconds: 6,
     posterSeconds: 1,
+    /**
+     * Optical-flow frame interpolation (ffmpeg `minterpolate`). Disabled by
+     * default; only an enabled config participates in the processing
+     * fingerprint, so enabling it never reschedules assets implicitly.
+     */
+    interpolation: {
+      enabled: false,
+      fps: 60,
+      mode: 'mci',
+      mcMode: 'aobmc',
+      meMode: 'bidir',
+      vsbmc: true,
+    },
   },
   build: { timeoutMinutes: 90 },
   deployment: {
@@ -45,6 +84,8 @@ export const DEFAULTS = {
     reconcileBatchSize: 25,
     cacheControl: 'public, max-age=86400',
     manifestKey: 'site-data/media-manifest.json',
+    /** Keep originals/ after decoding. Never part of the processing fingerprint. */
+    keepSourceFiles: true,
     image: { placeholderWidth: 150, placeholderQuality: 30 },
     audio: { bitrates: ['128k', '320k'], waveformBuckets: 400, sampleRate: 8000 },
   },
@@ -103,6 +144,10 @@ export function deepMerge(base, patch) {
 
 export function normalizeConfig(raw = {}, env = {}) {
   const config = deepMerge(structuredClone(DEFAULTS), raw);
+  // Legacy `theme` string maps onto themeMode.default unless the new key says otherwise.
+  if (raw.themeMode?.default === undefined && THEME_MODES.includes(raw.theme)) config.themeMode.default = raw.theme;
+  // Keep emitting the legacy scalar for older templates/consumers.
+  config.theme = config.themeMode.default;
   config.plugins = deepMerge(
     { 'compress-images': { enabled: true }, 'compress-videos': { enabled: raw.enableVideoCompression !== false } },
     raw.plugins || {},
@@ -117,8 +162,79 @@ export function normalizeConfig(raw = {}, env = {}) {
   return config;
 }
 
+/**
+ * Append an enum validation error when `value` is not one of `allowed`.
+ * @param {string[]} errors
+ * @param {string} name
+ * @param {unknown} value
+ * @param {readonly string[]} allowed
+ */
+function checkEnum(errors, name, value, allowed) {
+  if (!allowed.includes(value)) errors.push(`${name} must be one of ${allowed.join(', ')}`);
+}
+
+/**
+ * Append a boolean validation error when `value` is not a boolean.
+ * @param {string[]} errors
+ * @param {string} name
+ * @param {unknown} value
+ */
+function checkBoolean(errors, name, value) {
+  if (typeof value !== 'boolean') errors.push(`${name} must be a boolean`);
+}
+
+/**
+ * Validate optical-flow interpolation settings. Shared by full config
+ * validation and the Worker's `POST /api/media/interpolate` fps override.
+ * @param {unknown} value
+ * @param {string} [prefix]
+ * @returns {string[]} human-readable errors (empty when valid)
+ */
+export function validateInterpolation(value, prefix = 'videoQuality.interpolation') {
+  const errors = [];
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [`${prefix} must be an object`];
+  checkBoolean(errors, `${prefix}.enabled`, value.enabled);
+  if (!Number.isInteger(value.fps) || value.fps < 24 || value.fps > 120)
+    errors.push(`${prefix}.fps must be an integer in 24..120`);
+  checkEnum(errors, `${prefix}.mode`, value.mode, INTERPOLATION_MODES);
+  checkEnum(errors, `${prefix}.mcMode`, value.mcMode, INTERPOLATION_MC_MODES);
+  checkEnum(errors, `${prefix}.meMode`, value.meMode, INTERPOLATION_ME_MODES);
+  checkBoolean(errors, `${prefix}.vsbmc`, value.vsbmc);
+  return errors;
+}
+
+/**
+ * Merge a partial interpolation override over a base (typically the configured
+ * defaults). Unknown keys are ignored; `enabled` defaults to `true` when an
+ * override is supplied, because requesting interpolation means enabling it.
+ * @param {object} base
+ * @param {object} [override]
+ * @returns {{enabled:boolean, fps:number, mode:string, mcMode:string, meMode:string, vsbmc:boolean}}
+ */
+export function mergeInterpolation(base = {}, override) {
+  const merged = { ...DEFAULTS.videoQuality.interpolation, ...base };
+  if (override && typeof override === 'object')
+    for (const key of Object.keys(DEFAULTS.videoQuality.interpolation))
+      if (override[key] !== undefined) merged[key] = override[key];
+  if (override && merged.enabled !== true && override.enabled === undefined) merged.enabled = true;
+  return merged;
+}
+
 export function validateConfig(config) {
   const errors = [];
+  checkEnum(errors, 'themeMode.default', config.themeMode?.default, THEME_MODES);
+  checkEnum(errors, 'themeMode.accent', config.themeMode?.accent, THEME_ACCENTS);
+  checkBoolean(errors, 'themeMode.allowVisitorToggle', config.themeMode?.allowVisitorToggle);
+  checkBoolean(errors, 'themeMode.showMenu', config.themeMode?.showMenu);
+  checkEnum(errors, 'experience.card.size', config.experience?.card?.size, CARD_SIZES);
+  checkEnum(errors, 'experience.card.image', config.experience?.card?.image, CARD_IMAGES);
+  checkEnum(errors, 'experience.card.layout', config.experience?.card?.layout, CARD_LAYOUTS);
+  for (const name of ['modal', 'verticalFeed', 'motion', 'morphIcons'])
+    checkBoolean(errors, `experience.${name}.enabled`, config.experience?.[name]?.enabled);
+  checkEnum(errors, 'experience.motion.spring', config.experience?.motion?.spring, MOTION_SPRINGS);
+  checkBoolean(errors, 'media.keepSourceFiles', config.media?.keepSourceFiles);
+  if (config.videoQuality?.interpolation !== undefined)
+    errors.push(...validateInterpolation(config.videoQuality.interpolation));
   if (!Number.isFinite(config.player?.defaultAspect) || config.player.defaultAspect <= 0)
     errors.push('player.defaultAspect must be positive');
   for (const [name, value, min, max] of [
@@ -180,12 +296,17 @@ export function validateConfig(config) {
 }
 
 export function processingConfig(config, folder) {
-  if (folder === 'videos')
+  if (folder === 'videos') {
+    const video = { ...config.videoQuality };
+    // Fingerprint compatibility: disabled interpolation must not invalidate the
+    // fingerprint of every existing asset (which would retranscode the library).
+    if (video.interpolation?.enabled !== true) delete video.interpolation;
     return {
-      video: config.videoQuality,
+      video,
       enabled: config.plugins['compress-videos']?.enabled,
       image: config.media.image,
     };
+  }
   if (folder === 'music') return { audio: config.media.audio };
   return {
     image: config.imageQuality,

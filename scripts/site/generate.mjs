@@ -5,6 +5,7 @@ import { loadManifest } from './media.mjs';
 import { readPosts } from './posts.mjs';
 import { buildIndexes } from './indexes.mjs';
 import { renderSite } from './render.mjs';
+import { writeExperienceData } from './experience-data.mjs';
 export function generateSite(context) {
   const manifest = loadManifest(context.manifestPath);
   const posts = readPosts(context, manifest);
@@ -40,6 +41,8 @@ export function generateSite(context) {
     })),
   }))
     fs.writeFileSync(path.join(dataDir, name), JSON.stringify(value));
+  // Experience v2 artifacts (feed + lazy note details); additive only.
+  const experience = writeExperienceData({ dist, config: context.config, posts });
   renderSite(context, posts, indexes);
   const leaseFile = path.join(root, '.mosaic/build-lease.json');
   const lease = fs.existsSync(leaseFile) ? JSON.parse(fs.readFileSync(leaseFile, 'utf8')) : {};
@@ -66,5 +69,6 @@ export function generateSite(context) {
     posts: posts.length,
     mediaRevision: manifest.revision,
     listingBytes: fs.statSync(path.join(dataDir, 'posts-index.json')).size,
+    experience,
   };
 }

@@ -3,6 +3,7 @@
  * macOS-style toolbar at top, thumbnail strip at bottom.
  */
 import { $, $$ } from './utils.js';
+import { decodeThenSwap } from './utils/images.js';
 import { t } from './data.js';
 
 const RESOLUTIONS = ['480p', '720p', '1080p', 'orig'];
@@ -100,20 +101,6 @@ function pickRes(img) {
 
 function tierSrc(img, res) {
   return img.dataset['src' + res.replace('p', '')] || img.dataset.src480;
-}
-
-function decodeThenSwap(img, src) {
-  return new Promise((resolve) => {
-    const probe = new Image();
-    const done = (ok) => {
-      if (ok) img.src = src;
-      resolve(ok);
-    };
-    probe.onload = () => done(true);
-    probe.onerror = () => done(false);
-    probe.src = src;
-    if (probe.complete && probe.naturalWidth > 0) done(true);
-  });
 }
 
 // Gradient blur-up: LQIP (already the src) -> 480p -> target tier. Each tier

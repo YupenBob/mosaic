@@ -9,8 +9,12 @@ import { processImage } from './images.mjs';
 import { processVideo } from './videos.mjs';
 import { processAudio } from './audio.mjs';
 import { hashFile } from './process.mjs';
-export async function processTask(job, { request, store, workRoot, now = Date.now, deadline = Infinity }) {
+export async function processTask(
+  job,
+  { request, store, workRoot, now = Date.now, deadline = Infinity, published = null },
+) {
   const directory = fs.mkdtempSync(path.join(workRoot, 'task-'));
+  const processedMode = job.options?.sourceMode === 'processed';
   const source = path.join(directory, `source.${job.filename.split('.').pop()}`);
   const identity = { id: job.id, token: job.token, runId: job.runId };
   const started = now();
@@ -30,17 +34,24 @@ export async function processTask(job, { request, store, workRoot, now = Date.no
   );
   try {
     controller.signal.throwIfAborted();
-    await store.download(job.source.key, source, job.source.etag, { signal: controller.signal });
-    const hash = await hashFile(source, { signal: controller.signal });
+    // Processed-mode jobs re-encode already published tiers; originals may be gone.
+    let hash = job.source?.etag || '';
+    if (!processedMode) {
+      await store.download(job.source.key, source, job.source.etag, { signal: controller.signal });
+      hash = await hashFile(source, { signal: controller.signal });
+    } else if (!published?.sources || !Object.keys(published.sources).length) {
+      throw new Error('Processed source has no published tiers to re-encode');
+    }
     const prefix = `processed/${job.slug}/${job.folder}/${job.generation}`;
-    const publish = async (published, complete, sanitized = false) => {
+    const publish = async (payload, complete, sanitized = false, extra = {}) => {
       if (heartbeatError) throw heartbeatError;
       controller.signal.throwIfAborted();
       await request('media/publish', {
         ...identity,
-        published: { ...published, sourceHash: hash },
+        published: { ...payload, sourceHash: hash },
         complete,
         sanitized,
+        ...extra,
       });
     };
     const budgetExceeded = () =>
@@ -55,6 +66,7 @@ export async function processTask(job, { request, store, workRoot, now = Date.no
       publish,
       budgetExceeded,
       signal: controller.signal,
+      published,
     });
     await request('media/complete', { ...identity, complete });
     return complete;
@@ -83,13 +95,13 @@ export async function runMedia() {
   const deadline = Date.now() + context.config.media.timeoutMinutes * 60000 * context.config.media.budgetRatio;
   let failures = 0;
   while (Date.now() < deadline) {
-    const { job, more } = await request('media/claim', { runId });
+    const { job, published, more } = await request('media/claim', { runId });
     if (!job) {
       if (more) continue;
       break;
     }
     try {
-      const complete = await processTask(job, { request, store, workRoot, deadline });
+      const complete = await processTask(job, { request, store, workRoot, deadline, published });
       if (!complete) break;
     } catch (error) {
       console.error(`${job.filename}: ${error.message}`);

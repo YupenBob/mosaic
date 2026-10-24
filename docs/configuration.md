@@ -28,6 +28,14 @@
 | `videoQuality.crf` / `preset` / `maxHeight` | 23 / veryfast / 1080 | 实际 FFmpeg 编码参数 |
 | `videoQuality.uploadAfterTiers` | 1 | 验证后分批发布视频档位 |
 | `videoQuality.fps` / `segmentSeconds` / `audioBitrate` | 30 / 6 / 128k | 视频帧率、HLS 分片、AAC 码率 |
+| `videoQuality.interpolation` | enabled:false, fps:60, mode:mci, mcMode:aobmc, meMode:bidir, vsbmc:true | ffmpeg 光流补帧（minterpolate）；仅 enabled 时进入处理指纹 |
+| `media.keepSourceFiles` | true | 解码成功并全部档位发布后是否保留 `originals/` 源文件；不进入处理指纹 |
+| `theme` / `themeMode.default` | auto / auto | 主题模式：auto / light / dark（`themeMode` 优先，旧 `theme` 自动映射） |
+| `themeMode.accent` / `allowVisitorToggle` / `showMenu` | blue / true / true | 主题色板与访客切换入口 |
+| `experience.card` | size:large, image:full, layout:masonry | 列表卡片尺寸、封面展示方式与布局（`masonry` 瀑布流 / `grid` 等高网格） |
+| `experience.modal` / `verticalFeed` | enabled:true / enabled:true | 小红书式详情弹层、抖音式竖屏模式开关 |
+| `experience.motion` | enabled:true, spring:snappy | Spring 动效开关与预设（none / snappy / smooth / bouncy） |
+| `experience.morphIcons` | enabled:true | Morphicons 形变图标开关 |
 | `upload.concurrency` / `partConcurrency` / `partRetries` | 3 / 3 / 3 | 浏览器上传调度 |
 | `upload.multipartThreshold` / `partSize` | 100 MiB / 100 MiB | 分片阈值与片大小 |
 | `upload.presignSeconds` / `maxFileBytes` | 3600 / 5 GiB | 签名时效与文件上限 |
@@ -46,7 +54,29 @@
 
 没有显式 `media.timeoutMinutes` 时沿用旧 `build.timeoutMinutes`。处理指纹只包含对应处理器参数；改标题、缓存或部署域名不会使所有文件重新转码。
 
+## 补帧与源文件保留（Experience v2）
+
+**光流补帧**：`videoQuality.interpolation.enabled=true` 时，每个视频档位在转码阶段追加
+`minterpolate`（`fps` / `mode` / `mcMode` / `meMode` / `vsbmc`）单遍生成，输出 yuv420p、
+偶数宽高，音频与 HLS 发布契约不变。默认关闭；**关闭时该字段从处理指纹中移除**，因此升级代码
+本身不会让已有媒体重新转码。开启/修改补帧参数会改变处理指纹，现有视频会被登记补处理（即全局
+“后补帧”），请评估 Actions 时间与费用。帧率上限 120，建议源帧率的整数倍（如 30→60）。
+
+**后补帧（已完成解码的视频）**：后台可对单条视频、单篇文章或全部视频触发
+`POST /api/media/interpolate`，任务以 `options.sourceMode='processed'` 从**已发布的档位 MP4**
+重新补帧并分片，不重新下载源文件；即使 `originals/` 已删除也可用。新产物使用新 generation，
+旧部署地址保持有效，全部文件 HEAD 验证后才切换主清单。
+
+**保留源文件**：`media.keepSourceFiles` 为全局默认值，上传时可按视频覆盖
+（`keepSource`）。为 `false` 时，任务全部档位发布成功后由任务协调器原子删除
+`originals/...` 并标记 `source.available=false`/`sourceDeletedAt`；删除失败只记录日志，不回滚
+已发布产物。删除后无法再从源重新转码，但仍可基于已发布产物后补帧；后台会显示该状态。
+
 HLS 默认 `autoStartLoad:false`、`startFragPrefetch:false`，点击播放才开始分片下载；`manifestLoadingTimeOut` 默认 10000ms。`player.hls.startLevel` 默认 0，从最低已发布档开始后自动升档；可设为其他非负档位索引或 -1（由 HLS 自动估算）。用户手动选择且仍可用的清晰度优先。引擎直接读取统一 HLS 配置，不再覆盖启动档位。播放请求命名空间不是随机时间戳，同一版本仍可缓存。变更这些播放或后台策略不会触发转码。
+
+体验相关开关（`themeMode`、`experience.*`、`media.keepSourceFiles`）不影响媒体处理指纹；
+`videoQuality.interpolation` 仅在其启用时参与指纹。`experience.*.enabled=false` 时前台不注入
+对应入口，行为与旧版一致。
 
 ## 环境与 Secrets
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ejs from 'ejs';
+import { renderCard, renderCards, renderEmptyState } from '../../src/assets/js/cards/render.js';
 export function renderSite(context, posts, indexes) {
   ejs.clearCache();
   const { config: SITE, src: SRC, dist: DIST } = context;
@@ -123,6 +124,9 @@ export function renderSite(context, posts, indexes) {
       i18n,
       categories,
       tags,
+      renderCard,
+      renderCards,
+      renderEmptyState,
       lang: SITE.language || 'zh-CN',
       activeCategory: data.activeCategory || '',
       activeTag: data.activeTag || '',

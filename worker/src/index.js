@@ -33,7 +33,7 @@ app.use(
         .filter(Boolean);
       return origin && allowed.includes(origin) ? origin : null;
     },
-    allowHeaders: ['Authorization', 'Content-Type'],
+    allowHeaders: ['Authorization', 'Content-Type', 'X-Mosaic-Keep-Source'],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   }),
 );

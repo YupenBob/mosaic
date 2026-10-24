@@ -1,121 +1,103 @@
-/** HLS setup, adaptive levels and recovery. */
+/**
+ * hls.js adapter: one place that constructs the engine and normalizes its
+ * events/levels for the decode controller.
+ *
+ * Intent-gated by design: constructing the engine only wires events and
+ * attaches the media element. `loadSource()` is called by the controller on an
+ * explicit play intent, so an unplayed player performs zero HLS requests.
+ *
+ * Only the documented hls.js surface is used (`on`, `loadSource`, `attachMedia`,
+ * `startLoad`, `stopLoad`, `recoverMediaError`, `destroy`, `levels`,
+ * `loadLevel`/`nextLevel`/`autoLevelCapping`). Test doubles that stub
+ * `window.Hls` therefore stay compatible.
+ */
+import { guessHeight, formatBitrate, tierLabel } from './tune.js';
 import { playbackUrl } from './request.js';
-export function initHls(hlsSource, log) {
-  if (this.isHLS && hlsSource && typeof window.Hls !== 'undefined' && window.Hls.isSupported?.() !== false) {
-    // Pre-set sources so quality menu shows immediately
-    // Sources come from the manifest-backed MP4 elements until HLS levels load.
-    this.currentRes = 'auto'; // Default to ABR
-    var storedPref = (function () {
-      try {
-        return localStorage.getItem('mosaic_video_quality');
-      } catch {
-        return null;
-      }
-    })();
+
+/** Normalize `hls.levels` into the controller/quality-menu shape. */
+export function readLevels(levels) {
+  return (Array.isArray(levels) ? levels : []).map((level, index) => {
+    const height = Number(level?.height) > 0 ? Number(level.height) : guessHeight(level?.bitrate);
+    return {
+      index,
+      height,
+      width: Number(level?.width) || 0,
+      bitrate: Number(level?.bitrate) || 0,
+      label: tierLabel(height),
+      detail: formatBitrate(level?.bitrate),
+    };
+  });
+}
+
+/**
+ * Construct and wire the hls.js engine (no network request yet).
+ * @param {{
+ *   video: HTMLVideoElement,
+ *   options?: object,
+ *   callbacks?: {
+ *     onManifest?: (levels: object[]) => void,
+ *     onLevelSwitched?: (data: object) => void,
+ *     onMediaAttached?: () => void,
+ *     onFragLoaded?: () => void,
+ *     onError?: (data: object) => void,
+ *   },
+ * }} config
+ * @returns {{hls: object, levels: () => object[], loadSource: (url: string) => void}}
+ */
+export function createHlsEngine({ video, options = {}, callbacks = {} }) {
+  const Hls = typeof window !== 'undefined' ? window.Hls : undefined;
+  if (!Hls) throw new Error('hls.js is not available');
+  const report = (name, payload) => {
     try {
-      this.hls = new window.Hls({
-        ...window.__MOSAIC_CONFIG?.player?.hls,
-        xhrSetup(xhr, url) {
-          xhr.open('GET', playbackUrl(url), true);
-        },
-      });
-      log('info', 'HLS init: loading ' + hlsSource.src);
-      this.hls.loadSource(hlsSource.src);
-      this.hls.attachMedia(this.video);
-      // Expose the Hls instance on the element (debugging/tests)
-      this.video._hls = this.hls;
-      var self = this;
-      this.hls.on('hlsManifestParsed', function () {
-        if (!self.hls || self.lifecycle?.signal.aborted) return;
-        log(
-          'info',
-          'HLS manifest loaded: ' +
-            (self.hls.levels || []).length +
-            ' levels, ' +
-            (self.hls.levels || [])
-              .map(function (l) {
-                return l.height + 'p';
-              })
-              .join(', '),
-        );
-        self.sources = {};
-        var levels = self.hls.levels || [];
-        levels.forEach(function (level) {
-          var h = level.height || 0;
-          if (h === 0)
-            h = level.bitrate > 12000000 ? 2160 : level.bitrate > 3000000 ? 1080 : level.bitrate > 1500000 ? 720 : 480;
-          var label = h >= 2160 ? '4K' : h + 'p';
-          self.sources[label] = hlsSource.src;
-        });
-        if (Object.keys(self.sources).length === 0) {
-          self.sources = {};
-        }
-        if (self.qualityMenu) {
-          self.qualityMenu.innerHTML = '';
-          self.buildQualityMenu();
-        }
-        // Apply a stored manual preference so playback starts at that tier
-        if (storedPref && storedPref !== 'auto') {
-          var want = storedPref === '4K' ? 2160 : parseInt(storedPref) || 0;
-          var sidx = (self.hls.levels || []).findIndex(function (l) {
-            return l.height === want;
-          });
-          if (sidx >= 0) {
-            self.currentRes = storedPref;
-            self.hls.loadLevel = sidx;
-            self.hls.nextLevel = sidx;
-            log('info', 'Stored quality applied: ' + storedPref + ' (level ' + sidx + ')');
-            self.updateQualityActive();
-          }
-        }
-      });
-      // Quality switch completion event
-      this.hls.on('hlsLevelSwitched', function (event, data) {
-        if (!self.hls || self.lifecycle?.signal.aborted) return;
-        clearTimeout(self._switchFailTimer);
-        self._switching = false;
-        var level = self.hls.levels[data.level];
-        if (level) {
-          var h = level.height || 0;
-          var label = h >= 2160 ? '4K' : h + 'p';
-          log('info', 'Level switched to ' + label + ' (h=' + h + ')');
-          if (!self.isAuto()) {
-            self.currentRes = label;
-          }
-          self.updateQualityActive();
-          // Only toast on manual switches; automatic ABR changes stay quiet
-          if (!self.isAuto()) self.showSwitchToast('Switched to ' + label);
-        }
-      });
-      this.hls.on('hlsError', function (event, data) {
-        if (!self.hls || self.lifecycle?.signal.aborted) return;
-        log('error', 'HLS error: ' + data.type + ' - ' + (data.details || ''));
-        if (data.fatal) {
-          if (/manifestLoad|manifestParsing/.test(data.details || '')) {
-            self.destroyHls();
-            return;
-          }
-          self._fatalCount = (self._fatalCount || 0) + 1;
-          log('error', 'HLS FATAL ' + data.type + ' (attempt ' + self._fatalCount + ')');
-          try {
-            if (self._fatalCount <= 2) {
-              if (data.type === 'networkError') self.hls.startLoad();
-              else if (data.type === 'mediaError') self.hls.recoverMediaError();
-              else self.destroyHls();
-            } else {
-              // Two recovery attempts failed — degrade to MP4 instead of a
-              // dead player.
-              self.destroyHls();
-            }
-          } catch (e) {
-            log('error', 'HLS recovery failed: ' + e.message);
-            self.destroyHls();
-          }
-        }
-      });
-    } catch (e) {
-      console.error('HLS init failed:', e);
-      this.isHLS = false;
+      callbacks[name]?.(payload);
+    } catch (error) {
+      console.error('[Video] hls callback failed:', error);
     }
+  };
+  const hls = new Hls({
+    ...options,
+    xhrSetup(xhr, requestUrl) {
+      xhr.open('GET', playbackUrl(requestUrl), true);
+    },
+  });
+  if (video) video._hls = hls;
+  const listen = (event, handler) => {
+    try {
+      if (typeof hls.on === 'function') hls.on(event, handler);
+    } catch {
+      /* a partial test double may not support every event */
+    }
+  };
+  listen('hlsManifestParsed', () => report('onManifest', readLevels(hls.levels)));
+  listen('hlsLevelSwitched', (_event, data) => report('onLevelSwitched', data || {}));
+  listen('hlsMediaAttached', () => report('onMediaAttached'));
+  listen('hlsFragLoaded', () => report('onFragLoaded'));
+  listen('hlsError', (_event, data) => report('onError', data || {}));
+  try {
+    if (typeof hls.attachMedia === 'function') hls.attachMedia(video);
+  } catch (error) {
+    report('onError', { fatal: true, type: 'mediaError', details: 'attachMedia', error });
+  }
+  return {
+    hls,
+    levels: () => readLevels(hls.levels),
+    loadSource(url) {
+      if (!url) return;
+      try {
+        hls.loadSource(playbackUrl(url));
+      } catch (error) {
+        report('onError', { fatal: true, type: 'otherError', details: 'loadSource', error });
+      }
+    },
+  };
+}
+
+/** Tear an hls.js instance down without throwing into player flows. */
+export function destroyHlsEngine(hls) {
+  if (!hls) return;
+  try {
+    if (typeof hls.destroy === 'function') hls.destroy();
+  } catch {
+    /* already destroyed */
   }
 }

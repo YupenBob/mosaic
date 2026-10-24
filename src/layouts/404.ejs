@@ -6,14 +6,21 @@
   <meta name="data-base" content="<%= rp %>data" />
   <title>404 - <%= site.title %></title>
   <script>
-    /* Apply the pinned theme before first paint (no flash of wrong theme) */
+    /* Apply the pinned theme + accent before first paint (no flash of wrong theme).
+       data-theme is resolved (light|dark); data-theme-mode keeps the preference. */
     (function () {
       try {
-        var t = localStorage.getItem('mosaic_theme');
+        var root = document.documentElement;
+        var fallbackMode = '<%= (site.themeMode && site.themeMode.default) || site.theme || "auto" %>';
+        var fallbackAccent = '<%= (site.themeMode && site.themeMode.accent) || "blue" %>';
+        var mode = localStorage.getItem('mosaic_theme') || fallbackMode;
+        var accent = localStorage.getItem('mosaic_accent') || fallbackAccent;
         var dark =
-          t === 'dark' ||
-          (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+          mode === 'dark' ||
+          (mode !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        root.setAttribute('data-theme', dark ? 'dark' : 'light');
+        root.setAttribute('data-theme-mode', mode === 'light' || mode === 'dark' ? mode : 'auto');
+        root.setAttribute('data-accent', accent || 'blue');
       } catch (e) {}
     })();
   </script>
@@ -23,13 +30,17 @@
   <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
   <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
-<script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality }).replace(/</g, '\\u003c') %>;</script>
+  <link rel="stylesheet" href="<%= rp %>assets/css/motion.css" />
+  <link rel="stylesheet" href="<%= rp %>assets/css/icons.css" />
+<script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality, themeMode: site.themeMode, experience: site.experience }).replace(/</g, '\\u003c') %>;</script>
 </head>
 <body data-page="404">
   <header class="header">
     <div class="container">
       <a href="<%= rp %>index.html" class="header-logo"><img src="<%= rp %>assets/logo.svg" alt="" class="header-logo-icon" width="28" height="28" /><%= site.title %></a>
-      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="<%= t('theme_light') %>" title="<%= t('theme_light') %>"><i class="ri-sun-line"></i></button>
+      <button type="button" class="theme-toggle" id="theme-toggle" aria-label="<%= t('theme_light') %>" title="<%= t('theme_light') %>">
+        <span class="morph-icon-slot" data-morph-icon="theme" aria-hidden="true"><i class="ri-sun-line icon-fallback-sun"></i><i class="ri-moon-line icon-fallback-moon"></i></span>
+      </button>
     </div>
   </header>
   <main class="main">

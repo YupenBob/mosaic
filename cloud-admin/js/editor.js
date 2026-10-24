@@ -2,10 +2,11 @@
  * Editor page — three-pane post editor with Markdown preview, autosave
  * drafts, cover picker, stats section and the media panel.
  */
-import { posts as postsApi, media as mediaApi, mediaJobs } from '../src/api.js';
+import { posts as postsApi, media as mediaApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
-import { escHtml, toast, modalConfirm, loadLib, openModal, closeModal } from './ui.js?v=1';
+import { escHtml, toast, loadLib, openModal, closeModal } from './ui.js?v=1';
+import { loadExistingMedia, setMediaPanelHooks } from './media-panel.js?v=1';
 
 const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';
@@ -495,6 +496,13 @@ export default async function renderEditor(signal) {
           <div class="editor-media-panel">
             <h2 class="media-panel-collapse" onclick="toggleMediaPanel()"><i class="ri-upload-cloud-2-line"></i> ${t('editor.mediaPanel')} <i class="ri-arrow-down-s-line" id="media-panel-caret" style="margin-left:auto"></i></h2>
             <div id="media-panel-body" class="media-panel-body">
+              <label class="upload-keep-source" for="upload-keep-source">
+                <input type="checkbox" id="upload-keep-source" ${state.config.media?.keepSourceFiles !== false ? 'checked' : ''} />
+                <span class="upload-keep-copy">
+                  <span class="upload-keep-title">${t('editor.keepSourceUpload')}</span>
+                  <small>${t('editor.keepSourceUploadHint')}</small>
+                </span>
+              </label>
               <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="${t('editor.upload')}">
                 <i class="ri-upload-cloud-2-line"></i>
                 <p>${t('editor.uploadHint')}</p>
@@ -514,7 +522,6 @@ export default async function renderEditor(signal) {
         () => {
           clearTimeout(previewTimer);
           clearTimeout(draftTimer);
-          clearTimeout(mediaRefreshTimer);
           state.editor.draftSnapshot = null;
         },
         { once: true },
@@ -522,6 +529,12 @@ export default async function renderEditor(signal) {
       state.editorDirty = false;
       state.editor.media = { photos: [], videos: [], music: [] };
       state.editorDraftKey = slug || null;
+      setMediaPanelHooks({
+        onMediaUpdated: (firstRender) => {
+          if (firstRender) renderBlocksFromBody();
+          else refreshBlockMedia();
+        },
+      });
       wireEditorInputs();
       wireBodyDnD();
       renderBlocksFromBody();
@@ -620,12 +633,31 @@ window.restoreDraft = () => {
 };
 
 window.discardDraft = () => {
+  const key = draftKey(state.params.slug || '__new');
+  let backup = null;
   try {
-    localStorage.removeItem(draftKey(state.params.slug || '__new'));
+    backup = localStorage.getItem(key);
+    localStorage.removeItem(key);
   } catch {}
   document.getElementById('draft-banner')?.remove();
   state.editor.draftSnapshot = null;
-  toast(t('editor.draftDiscarded'), 'info', 2500);
+  toast(
+    t('editor.draftDiscarded'),
+    'info',
+    6000,
+    backup
+      ? {
+          // Cheap, lossless undo: the draft snapshot is still in memory.
+          label: t('common.undo'),
+          onClick: () => {
+            try {
+              localStorage.setItem(key, backup);
+            } catch {}
+            toast(t('editor.draftUndone'), 'success', 3000);
+          },
+        }
+      : undefined,
+  );
 };
 
 // ── Save ───────────────────────────────────
@@ -925,125 +957,4 @@ window.toggleMediaPanel = () => {
   const hidden = body.style.display === 'none';
   body.style.display = hidden ? '' : 'none';
   if (caret) caret.className = hidden ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line';
-};
-
-// ── Media list ─────────────────────────────
-function mediaCell(type, f, i, slug) {
-  const ph = type === 'photo' ? `{{photo:${i}}}` : type === 'video' ? `{{video:${i}}}` : '{{music}}';
-  const inner =
-    type === 'photo'
-      ? `<img src="${escHtml(f.previewUrl || f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />`
-      : `<div class="media-cell-icon"><i class="ri-${type === 'video' ? 'video' : 'music'}-line"></i></div>`;
-  const click =
-    type === 'photo'
-      ? `onclick="window.pickCover('${escHtml(f.name)}')"`
-      : `onclick="window.insertPlaceholder('${escHtml(ph)}')"`;
-  return `
-    <div class="media-cell" ${click} draggable="true" data-ph="${escHtml(ph)}" title="${escHtml(f.name)} — ${t('editor.dragInsertHint')}">
-      ${inner}
-      <div class="media-cell-name">${escHtml(f.name)}</div>
-      ${f.status ? `<span class="media-cell-status">${escHtml(t('jobs.' + f.status))}${f.published && f.status !== 'ready' ? ' · ' + t('jobs.previous') : ''}</span>` : ''}
-      ${f.taskId && ['failed', 'cancelled'].includes(f.status) ? `<button type="button" class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.retryEditorMedia('${escHtml(f.taskId)}')">${t('jobs.retry')}</button>` : ''}
-      <button type="button" class="media-cell-insert" onclick="event.stopPropagation();window.insertPlaceholder('${escHtml(ph)}')" title="${t('editor.insert')}" aria-label="${t('editor.insert')} ${escHtml(f.name)}"><i class="ri-corner-down-left-line"></i></button>
-      <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(f.name)}','${type}s')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line"></i></button>
-    </div>`;
-}
-
-function mediaGroup(title, count, insertPh, cellsHtml) {
-  return `
-    <div class="media-group-head">
-      <span class="editor-section-title" style="margin:0">${title} (${count})</span>
-      <button type="button" class="btn btn-ghost btn-sm" onclick="window.insertPlaceholder('${escHtml(insertPh)}')">${t('editor.insertAll')}</button>
-    </div>
-    ${cellsHtml}`;
-}
-
-export async function loadExistingMedia(slug) {
-  clearTimeout(mediaRefreshTimer);
-  const el = document.getElementById('existing-media');
-  if (!el) return;
-  if (!el.querySelector('.media-grid')) el.innerHTML = `<p class="media-empty">${t('editor.loadMedia')}</p>`;
-  const signal = state.pageScope?.signal;
-  try {
-    const data = await mediaApi.list(slug);
-    if (signal?.aborted || !el.isConnected || slug !== getCurrentSlug()) return;
-    const photos = data.photos || [];
-    const videos = data.videos || [];
-    const music = data.music || [];
-    const covers = data.covers || [];
-    state.editor.media = { photos, videos, music, covers };
-    let html = `<div class="editor-section-title">${t('editor.existingMedia')}</div>`;
-    if (!photos.length && !videos.length && !music.length && !covers.length) {
-      html += `<p class="media-empty">${t('editor.noMedia')}</p>`;
-    } else {
-      if (photos.length) {
-        html += mediaGroup(
-          t('editor.photos'),
-          photos.length,
-          '{{gallery}}',
-          `<div class="media-grid">${photos.map((f, i) => mediaCell('photo', f, i, slug)).join('')}</div>`,
-        );
-      }
-      if (videos.length) {
-        html += mediaGroup(
-          t('editor.placeholderVideos'),
-          videos.length,
-          '{{videos}}',
-          `<div class="media-grid" style="margin-top:8px">${videos.map((f, i) => mediaCell('video', f, i, slug)).join('')}</div>`,
-        );
-      }
-      if (music.length) {
-        html += mediaGroup(
-          t('editor.music'),
-          music.length,
-          '{{music}}',
-          `<div class="media-grid" style="margin-top:8px">${music.map((f, i) => mediaCell('music', f, i, slug)).join('')}</div>`,
-        );
-      }
-      if (covers.length)
-        html += `<div class="editor-section-title">${t('editor.cover')}</div><div class="media-grid">${covers.map((f) => `<button type="button" class="media-cell" onclick="window.pickCover('${escHtml(f.name)}')"><img src="${escHtml(f.previewUrl || f.url)}" alt="${escHtml(f.name)}" loading="lazy" /><span class="media-cell-name">${escHtml(f.name)}</span></button>`).join('')}</div>`;
-    }
-    el.innerHTML = html;
-    updateCoverPreview();
-    if (el.dataset.loaded) refreshBlockMedia();
-    else renderBlocksFromBody();
-    el.dataset.loaded = 'true';
-    if (
-      [...photos, ...videos, ...music, ...covers].some((item) =>
-        ['pending', 'running', 'processing'].includes(item.status),
-      )
-    ) {
-      clearTimeout(mediaRefreshTimer);
-      mediaRefreshTimer = setTimeout(() => {
-        if (!signal?.aborted) loadExistingMedia(slug);
-      }, state.config.admin?.jobPollMs || 5000);
-    }
-  } catch {
-    if (signal?.aborted || !el.isConnected) return;
-    el.innerHTML = `<p class="media-empty">${t('editor.loadError')}</p>`;
-  }
-}
-
-window.loadExistingMedia = loadExistingMedia;
-let mediaRefreshTimer;
-window.retryEditorMedia = async (id) => {
-  try {
-    await mediaJobs.retry(id);
-    await loadExistingMedia(getCurrentSlug());
-  } catch (error) {
-    toast(error.message, 'error');
-  }
-};
-
-window.doDeleteMedia = (slug, file, type) => {
-  modalConfirm(t('editor.mediaDeleteConfirm', { file }), '', async () => {
-    try {
-      await mediaApi.delete(slug, file, type);
-      window.checkDirty && window.checkDirty();
-      await loadExistingMedia(slug);
-      toast(t('common.copied'), 'success');
-    } catch (err) {
-      toast(t('common.deleteFailed') + ': ' + err.message, 'error');
-    }
-  });
 };

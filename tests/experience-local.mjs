@@ -238,9 +238,11 @@ try {
       assert.deepEqual(modules, ['/assets/js/' + publishedApp], 'published app has one versioned module request');
       console.log(`${engine.name()}: click before delayed scripts is replayed; one app request`);
       if (engine === chromium) {
+        // Intent-gated decode: nothing is requested until a play intent, then a
+        // broken manifest must degrade to the published MP4 fallback and play.
         await page.goto(`${siteUrl}/posts/fallback/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction(() => document.querySelector('video').src.includes('clip.mp4'));
         await page.locator('.video-big-play').first().click();
+        await page.waitForFunction(() => new URL(document.querySelector('video').src).pathname.endsWith('clip.mp4'));
         await page.waitForFunction(() => document.querySelector('video').currentTime > 0.3);
       }
       await page.goto(`${siteUrl}/posts/native/`, { waitUntil: 'domcontentloaded' });

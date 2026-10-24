@@ -1,173 +1,102 @@
 /**
- * Category and tag filtering for list pages
+ * Category / tag filtering for list pages.
+ *
+ * Thin UI wiring only: filter rules live in `cards/state.js`, DOM rendering in
+ * `cards/grid.js`, and card markup in `cards/render.js` (shared with SSR).
+ *
+ * @module filter
  */
-import { $, $$, formatNumber, escapeHTML, resolveMediaUrl } from './utils.js';
+import { $, $$ } from './utils.js';
 import { getPosts } from './data.js';
+import {
+  filterPosts,
+  getFilterState,
+  initialStateFrom,
+  toggleCategory,
+  toggleTag,
+  updateFilterState as setFilterState,
+} from './cards/state.js';
+import { renderGrid } from './cards/grid.js';
 
-let filterState = {
-  activeCategory: '',
-  activeTags: new Set(),
-  searchQuery: '',
-};
+let wired = false;
 
+/** Sync the pill UI (active class + aria-pressed) with the filter state. */
+function updateFilterUI() {
+  const state = getFilterState();
+  $$('.filter-pill[data-category]').forEach((pill) => {
+    const active = pill.dataset.category === state.activeCategory;
+    pill.classList.toggle('active', active);
+    pill.setAttribute('aria-pressed', String(active));
+  });
+  $$('.filter-pill[data-tag]').forEach((pill) => {
+    const active = state.activeTags.has(pill.dataset.tag);
+    pill.classList.toggle('active', active);
+    pill.setAttribute('aria-pressed', String(active));
+  });
+}
+
+/**
+ * Initialize filtering on a list page. Idempotent: event listeners are wired
+ * once, later calls only refresh state/UI.
+ *
+ * @param {Array<Record<string, unknown>>} posts lite listing posts
+ */
 export function initFilter(posts) {
-  const urlParams = new URLSearchParams(window.location.search);
-  const categoryFromURL = urlParams.get('category');
-  const tagFromURL = urlParams.get('tag');
+  const state = initialStateFrom({
+    search: window.location.search,
+    category: document.body.dataset.category,
+    tag: document.body.dataset.tag,
+  });
+  setFilterState(state);
 
-  if (categoryFromURL) filterState.activeCategory = categoryFromURL;
-  if (tagFromURL) filterState.activeTags.add(tagFromURL);
-
-  const pageCategory = document.body.dataset.category;
-  const pageTag = document.body.dataset.tag;
-  if (pageCategory) filterState.activeCategory = pageCategory;
-  if (pageTag) filterState.activeTags.add(pageTag);
-
-  const categoryContainer = $('.filter-categories');
-  const tagContainer = $('.filter-tags');
-
-  if (categoryContainer) {
-    categoryContainer.addEventListener('click', (e) => {
-      const pill = e.target.closest('.filter-pill');
-      if (!pill) return;
-      const cat = pill.dataset.category;
-      filterState.activeCategory = filterState.activeCategory === cat ? '' : cat;
-      updateFilterUI();
-      renderCards(getPosts() || posts);
-    });
+  if (!wired) {
+    wired = true;
+    const categoryContainer = $('.filter-categories');
+    const tagContainer = $('.filter-tags');
+    if (categoryContainer) {
+      categoryContainer.addEventListener('click', (event) => {
+        const pill = event.target.closest('.filter-pill[data-category]');
+        if (!pill) return;
+        toggleCategory(pill.dataset.category);
+        updateFilterUI();
+        renderCards(getPosts() || posts);
+      });
+    }
+    if (tagContainer) {
+      tagContainer.addEventListener('click', (event) => {
+        const pill = event.target.closest('.filter-pill[data-tag]');
+        if (!pill) return;
+        toggleTag(pill.dataset.tag);
+        updateFilterUI();
+        renderCards(getPosts() || posts);
+      });
+    }
   }
-
-  if (tagContainer) {
-    tagContainer.addEventListener('click', (e) => {
-      const pill = e.target.closest('.filter-pill');
-      if (!pill) return;
-      const tag = pill.dataset.tag;
-      filterState.activeTags.has(tag) ? filterState.activeTags.delete(tag) : filterState.activeTags.add(tag);
-      updateFilterUI();
-      renderCards(getPosts() || posts);
-    });
-  }
-
   updateFilterUI();
 }
 
+/**
+ * Back-compat export used by `search.js`: merge a partial filter state.
+ * @param {Parameters<typeof setFilterState>[0]} newState
+ */
 export function updateFilterState(newState) {
-  Object.assign(filterState, newState);
+  setFilterState(newState);
 }
 
+/**
+ * Posts matching the current category/tag/search state.
+ * @param {Array<Record<string, unknown>>} posts
+ * @returns {Array<Record<string, unknown>>}
+ */
 export function getFilteredPosts(posts) {
-  let filtered = [...posts];
-  if (filterState.activeCategory) {
-    filtered = filtered.filter(
-      (p) => p.category === filterState.activeCategory || p.category?.startsWith(filterState.activeCategory + '/'),
-    );
-  }
-  if (filterState.activeTags.size > 0) {
-    filtered = filtered.filter((p) => p.tags.some((t) => filterState.activeTags.has(t)));
-  }
-  if (filterState.searchQuery) {
-    const q = filterState.searchQuery.toLowerCase();
-    filtered = filtered.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q)),
-    );
-  }
-  return filtered;
+  return filterPosts(posts || getPosts());
 }
 
+/**
+ * Re-render the card grid for a post list (shared markup + motion + a11y
+ * result announcement).
+ * @param {Array<Record<string, unknown>>} posts
+ */
 export function renderCards(posts) {
-  const filtered = getFilteredPosts(posts);
-  const grid = $('.card-grid');
-  if (!grid) return;
-
-  // Compute base path for links (same as EJS relativePath)
-  const dataBase = document.querySelector('meta[name="data-base"]')?.content || 'data';
-  const base = dataBase === 'data' ? '' : dataBase.replace(/\/?data$/, '');
-
-  if (filtered.length === 0) {
-    grid.innerHTML =
-      '<div class="empty-state"><i class="ri-inbox-line"></i><p>' +
-      (getPosts().length ? 'No results' : 'No posts') +
-      '</p></div>';
-    return;
-  }
-
-  grid.innerHTML = filtered
-    .map((post) => {
-      if (!post) return '';
-      const tags = post.tags || [];
-      const stats = post.stats || {};
-      const hasCover = !!post.cover;
-      const aspect = post.coverAspect || 1.778;
-      const pt = (100 / aspect).toFixed(2);
-      let coverHTML = '';
-      if (hasCover) {
-        const src = resolveMediaUrl(post.cover, base, post.slug);
-        const srcset = post.coverSrcset
-          ? ' srcset="' +
-            resolveMediaUrl(post.coverSrcset['480'], base, post.slug) +
-            ' 480w, ' +
-            resolveMediaUrl(post.coverSrcset['720'], base, post.slug) +
-            ' 720w, ' +
-            resolveMediaUrl(post.coverSrcset['1080'], base, post.slug) +
-            ' 1080w" sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"'
-          : '';
-        coverHTML =
-          '<div class="post-card-cover" style="padding-top:' +
-          pt +
-          '%"><img src="' +
-          src +
-          '"' +
-          srcset +
-          ' alt="' +
-          escapeHTML(post.title) +
-          '" loading="lazy" /></div>';
-      }
-      return (
-        '<a href="' +
-        base +
-        'posts/' +
-        post.slug +
-        '/" class="post-card' +
-        (hasCover ? '' : ' post-card-text') +
-        '">' +
-        coverHTML +
-        '<div class="post-card-body">' +
-        '<span class="post-card-category">' +
-        escapeHTML(post.category || '') +
-        '</span>' +
-        '<h2 class="post-card-title">' +
-        escapeHTML(post.title || '') +
-        '</h2>' +
-        '<p class="post-card-desc">' +
-        escapeHTML(post.description || '') +
-        '</p>' +
-        '<div class="post-card-tags">' +
-        tags.map((t) => '<span class="post-card-tag">' + escapeHTML(t) + '</span>').join('') +
-        '</div></div>' +
-        '<div class="post-card-footer">' +
-        '<span class="post-card-stat"><i class="ri-eye-line"></i>' +
-        formatNumber(stats.views) +
-        '</span>' +
-        '<span class="post-card-stat"><i class="ri-time-line"></i>' +
-        (stats.dwell_time || 0) +
-        's</span>' +
-        '<span class="post-card-stat"><i class="ri-heart-line"></i>' +
-        formatNumber(stats.likes) +
-        '</span>' +
-        '</div></a>'
-      );
-    })
-    .join('');
-}
-
-function updateFilterUI() {
-  $$('.filter-pill[data-category]').forEach((pill) => {
-    pill.classList.toggle('active', pill.dataset.category === filterState.activeCategory);
-  });
-  $$('.filter-pill[data-tag]').forEach((pill) => {
-    pill.classList.toggle('active', filterState.activeTags.has(pill.dataset.tag));
-  });
+  renderGrid(filterPosts(posts || getPosts()));
 }
