@@ -71,6 +71,10 @@ try {
     const browser = await engine.launch({ headless: true });
     try {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
+      // CI / Windows WebKit can stall on navigation and module boot when several
+      // browser suites run back-to-back; give it headroom instead of flaking.
+      page.setDefaultTimeout(30000);
+      page.setDefaultNavigationTimeout(60000);
       page.on('pageerror', (error) => errors.push(error.message));
       await page.route('**/*', (route) => {
         const url = new URL(route.request().url());
@@ -104,9 +108,11 @@ try {
           recoverMediaError() {}
         };
       });
-      const indexResponse = page.waitForResponse((response) => response.url().endsWith('/data/posts-index.json'));
       await page.goto(server.url, { waitUntil: 'domcontentloaded' });
-      await indexResponse;
+      // Wait for the app to finish booting instead of racing a response event:
+      // some Playwright WebKit runs miss waitForResponse even though the request
+      // happened (the request array below still proves the thin-index contract).
+      await page.waitForFunction(() => document.documentElement.dataset.interactive === 'ready');
       assert.ok(requests.includes('/data/posts-index.json'));
       assert.ok(!requests.includes('/data/posts.json'), 'list pages must not fetch full articles');
       await page.goto(`${server.url}/posts/blocks/`, { waitUntil: 'domcontentloaded' });

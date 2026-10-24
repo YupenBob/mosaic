@@ -61,11 +61,11 @@
   }
 }
 
-/* JS-packed masonry (applied by cards/masonry.js after hydration). */
+/* JS-packed masonry (applied by cards/masonry.js after hydration). The resolved
+ * column-gap is left intact so masonry.js can read real pixels (rem → px). */
 .card-grid.is-masonry {
   display: block;
   columns: auto;
-  column-gap: 0;
   position: relative;
 }
 

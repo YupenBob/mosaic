@@ -41,13 +41,27 @@ function columnCount(grid) {
 }
 
 /**
- * Gap between cards (horizontal and vertical) in px.
+ * Gap between cards (horizontal and vertical) in pixels.
+ *
+ * The CSS custom property is authored in `rem`/`px`, so it must be resolved to
+ * pixels (parseFloat("2rem") is just 2). The resolved `column-gap` is preferred
+ * because the browser has already converted the unit; the custom property is a
+ * fallback for engines that report `normal`.
  * @param {HTMLElement} grid
  * @returns {number}
  */
 function gapSize(grid) {
-  const raw = parseFloat(styleOf(grid).getPropertyValue('--masonry-gap'));
-  return Number.isFinite(raw) && raw >= 0 ? raw : 24;
+  const style = styleOf(grid);
+  const computed = parseFloat(style.columnGap);
+  if (Number.isFinite(computed) && computed >= 0) return computed;
+  const raw = style.getPropertyValue('--masonry-gap').trim();
+  const value = parseFloat(raw);
+  if (!Number.isFinite(value) || value < 0) return 24;
+  const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  if (/rem$/i.test(raw)) return value * rootFont;
+  if (/em$/i.test(raw)) return value * (parseFloat(style.fontSize) || rootFont);
+  if (/vw$/i.test(raw)) return (value * window.innerWidth) / 100;
+  return value;
 }
 
 /** Reset inline geometry written by a previous layout pass. */
@@ -97,12 +111,14 @@ export function layoutMasonry(grid = document.querySelector('.card-grid')) {
     card.style.removeProperty('top');
   }
 
-  // 2) measure heights at that width
+  // 2) measure heights at that width. Use the fractional border-box height:
+  //    offsetHeight rounds up, which would add a visible extra pixel to every
+  //    gutter.
   const heights = new Array(columns).fill(0);
   /** @type {Array<{card: HTMLElement, column: number, top: number}>} */
   const placements = [];
   for (const card of cards) {
-    const height = card.offsetHeight;
+    const height = card.getBoundingClientRect().height;
     let column = 0;
     for (let i = 1; i < columns; i += 1) if (heights[i] < heights[column] - 0.5) column = i;
     const top = heights[column];

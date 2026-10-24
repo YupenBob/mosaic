@@ -149,8 +149,9 @@ try {
     const browser = await engine.launch({ headless: true });
     try {
       const page = await browser.newPage();
-      page.setDefaultTimeout(10000);
-      page.setDefaultNavigationTimeout(30000);
+      // CI WebKit can need far longer than desktop Chromium to warm up.
+      page.setDefaultTimeout(15000);
+      page.setDefaultNavigationTimeout(60000);
       console.log(`Cache-enabled playback regression: ${engine.name()}`);
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));

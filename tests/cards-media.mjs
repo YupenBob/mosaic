@@ -108,18 +108,20 @@ try {
               const rect = card.getBoundingClientRect();
               const img = card.querySelector('.post-card-img');
               return {
-                width: Math.round(rect.width),
-                height: Math.round(rect.height),
+                width: rect.width,
+                height: rect.height,
                 src: img?.getAttribute('src') || '',
                 lqip: img?.classList.contains('is-lqip'),
-                top: Math.round(rect.top),
-                left: Math.round(rect.left),
+                top: rect.top,
+                left: rect.left,
               };
             });
             const gridRect = grid.getBoundingClientRect();
             return {
               isMasonry: grid.classList.contains('is-masonry'),
               display: getComputedStyle(grid).display,
+              // Resolved CSS gap in px (rem must be converted, not parsed as 2).
+              gap: parseFloat(getComputedStyle(grid).columnGap),
               gridHeight: Math.round(gridRect.height),
               gridWidth: Math.round(gridRect.width),
               overflow: document.documentElement.scrollWidth - window.innerWidth,
@@ -137,10 +139,32 @@ try {
             `${engine.name()} ${viewport.width}: equal column widths`,
           );
           assert.deepEqual(
-            [...new Set(result.cards.map((card) => card.height))].length > 1,
+            [...new Set(result.cards.map((card) => Math.round(card.height)))].length > 1,
             true,
             `${engine.name()} ${viewport.width}: cards keep their own heights`,
           );
+          assert.ok(result.gap >= 20, `${engine.name()} ${viewport.width}: real CSS gap (${result.gap}px, not 2)`);
+          // Horizontal neighbours are exactly one column-width + gap apart.
+          const firstRow = result.cards
+            .filter((card) => Math.abs(card.top - result.cards[0].top) < 1)
+            .sort((a, b) => a.left - b.left);
+          for (let i = 1; i < firstRow.length; i += 1) {
+            assert.ok(
+              Math.abs(firstRow[i].left - firstRow[i - 1].left - width - result.gap) <= 1.5,
+              `${engine.name()} ${viewport.width}: horizontal gutter uses the resolved gap (${firstRow[i].left - firstRow[i - 1].left} vs ${width}+${result.gap})`,
+            );
+          }
+          // The wrapped card sits one gap below the bottom of the card above it.
+          const firstColumn = result.cards
+            .filter((card) => Math.abs(card.left - result.cards[0].left) < 1)
+            .sort((a, b) => a.top - b.top);
+          if (firstColumn.length > 1) {
+            const [a, b] = firstColumn;
+            assert.ok(
+              Math.abs(b.top - (a.top + a.height) - result.gap) <= 2,
+              `${engine.name()} ${viewport.width}: vertical gutter uses the resolved gap (${(b.top - (a.top + a.height)).toFixed(2)} vs ${result.gap})`,
+            );
+          }
           assert.ok(result.gridHeight > Math.max(...result.cards.map((card) => card.height)));
           assert.ok(
             result.cards.every((card) => !card.lqip && /cover\.jpg/.test(card.src)),
