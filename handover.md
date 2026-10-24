@@ -108,9 +108,11 @@ npm run test:admin:local
   音乐新增 `cover-preview.webp`（均 150px / q30，约 1–6KB，**不新增处理参数，指纹不变**）。
   SSG 输出 `coverLqip`；卡片先渲染预览（模糊），`cards/media.js` 在首屏优先/接近视口时
   解码高清并原位替换，`saveData` 时停留预览；`<noscript>` 回退高清，升级前后无 CLS。
-- **超椭圆圆角**：设计令牌放大（卡片 20px、弹层 28px、按钮 12px）；Chromium 等支持
+- **超椭圆圆角与悬浮**：设计令牌放大（卡片 26px、弹层 34px、按钮 14px）；Chromium 等支持
   `corner-shape: squircle` 的浏览器呈现连续曲率，WebKit/Safari 回退同半径圆形圆角。
-  未采用固定像素 clip-path/mask（阴影裁剪、响应式重算等兼容问题）。
+  卡片悬浮使用采样后的欠阻尼 spring（上浮 7px + 轻微放大，带回弹收敛），列间距加大到
+  32px（桌面）/ 24px（平板），视觉更松弛。未采用固定像素 clip-path/mask（阴影裁剪、
+  响应式重算等兼容问题）。
 - **验证**：新增 `tests/preview-smoke.mjs`（纯 Node）、`tests/cards-media.mjs`（Chromium +
   WebKit 的 LQIP/瀑布流/卡片尺寸回归，并入 `test:e2e:local`）；`site-smoke`/
   `media-integration`/`generate-data-smoke`/`config-smoke`/`admin-local` 增补断言；

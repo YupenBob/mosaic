@@ -34,9 +34,14 @@ html[data-motion='on'] [data-motion-reveal]:not(.is-revealed) {
 html[data-motion='on'] [data-motion-reveal].is-revealed {
   opacity: 1;
   translate: 0 0;
+  /* Reveal transition also carries the card hover spring: this selector has a
+     higher specificity than `.post-card`, so omitting transform here would make
+     the hover lift snap instantly (no spring). */
   transition:
     opacity 480ms var(--motion-ease-out),
-    translate 620ms var(--motion-ease-spring);
+    translate 620ms var(--motion-ease-spring),
+    transform 700ms var(--spring-card, var(--motion-ease-spring)),
+    box-shadow 460ms ease;
 }
 
 html[data-motion='fallback'] [data-motion-reveal],
