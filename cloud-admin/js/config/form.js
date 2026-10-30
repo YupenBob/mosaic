@@ -31,6 +31,7 @@ function updateDirtyUi() {
   const discard = document.getElementById('config-discard-btn');
   if (hint) hint.style.display = configDirty ? 'block' : 'none';
   if (discard) discard.style.display = configDirty ? '' : 'none';
+  document.querySelector('.config-page-header')?.classList.toggle('is-dirty', configDirty);
 }
 
 /** Attach dirty tracking to every config control. */

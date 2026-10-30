@@ -30,6 +30,7 @@ import {
   registerAsset,
   removeAssets,
   restoreAssets,
+  rollbackAsset,
   settleTask,
 } from './jobs/media-task-ops.mjs';
 import { reconcileBatch } from './jobs/reconcile.mjs';
@@ -321,6 +322,7 @@ export class JobsDurableObject {
     if (operation === 'delete') return removeAssets(this.context(state, data));
     if (operation === 'delete-assets') return removeAssets(this.context(state, { ...data, assetIds: data.ids }));
     if (operation === 'restore-assets') return restoreAssets(this.context(state, { ...data, assetIds: data.ids }));
+    if (operation === 'rollback-asset') return rollbackAsset(this.context(state, data));
     if (operation === 'purge-assets') {
       const now = Date.now();
       const ids = [];

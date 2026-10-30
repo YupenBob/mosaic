@@ -49,7 +49,13 @@ media:
 
 - `degraded`：仍可用，但源文件已删或最新任务失败。
 - `DELETE /api/assets/:id` 默认软删除 7 天，`POST /api/assets/:id/restore` 恢复。
-- 实际对象清理由后续 cleanup 任务按 `purgeAfter` 执行。
+- 实际对象清理由 cleanup 按 `purgeAfter` 执行。
+
+## 代际回滚
+
+- 每次完整发布保留上一代 `previousPublished`；只保留当前 + 上一代。
+- `POST /api/assets/:id/rollback` 交换两代引用，旧对象仍在 R2；可再次回滚。
+- 素材详情里的「回滚上一代」只在 `canRollback` 为 true 时显示。
 
 ## 迁移
 

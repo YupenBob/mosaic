@@ -28,14 +28,14 @@ function statusBadge(asset) {
 function assetCard(asset) {
   const icon =
     asset.folder === 'videos' ? 'ri-video-line' : asset.folder === 'music' ? 'ri-music-line' : 'ri-image-line';
-  return `<article class="asset-card" data-asset-id="${escHtml(asset.id)}" tabindex="0" role="button">
+  return `<div class="asset-card" data-asset-id="${escHtml(asset.id)}" tabindex="0" role="button">
     <div class="asset-thumb">${asset.published ? `<img src="/api/assets/${encodeURIComponent(asset.id)}/preview" alt="" loading="lazy" onerror="this.style.display='none'" />` : `<i class="${icon}" aria-hidden="true"></i>`}</div>
     <div class="asset-body">
       <strong class="asset-name" title="${escHtml(asset.filename)}">${escHtml(asset.filename)}</strong>
       <span class="asset-meta">${escHtml(asset.folder)} · ${asset.createdAt ? escHtml(formatTime(asset.createdAt)) : ''}</span>
     </div>
     <div class="asset-status">${statusBadge(asset)}</div>
-  </article>`;
+  </div>`;
 }
 
 function lifecycleText(asset) {
@@ -69,6 +69,23 @@ function openAssetDetail(asset, onChanged) {
       onClick: () => copyText(asset.id),
     },
   ];
+  if (asset.canRollback && !deleting) {
+    actions.push({
+      label: t('library.rollback'),
+      className: 'btn-secondary',
+      closeOnClick: false,
+      onClick: async () => {
+        try {
+          await assets.rollback(asset.id);
+          toast(t('library.rolledBack'), 'success');
+          closeModal();
+          onChanged();
+        } catch (error) {
+          toast(t('library.rollbackFailed') + ': ' + (error.message || ''), 'error');
+        }
+      },
+    });
+  }
   if (deleting) {
     actions.push({
       label: t('library.restore'),

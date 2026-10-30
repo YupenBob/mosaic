@@ -5375,3 +5375,24 @@ body.sidebar-collapsed .nav-badge {
   font-size: 11px;
   line-height: 1.6;
 }
+
+/* Settings: keep save/discard reachable while scrolling. */
+.config-page-header {
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 6;
+  padding: 12px 0;
+  margin-top: -12px;
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid transparent;
+}
+.config-page-header.is-dirty {
+  border-bottom-color: var(--color-border-light);
+}
+@media (max-width: 720px) {
+  .config-page-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

@@ -9,8 +9,8 @@
 | P0 安全热修 | 完成 | `validSegment`、`jsStr`、`baseSha`、XSS 回归 |
 | P1 框架/视觉/动效/预览图 | 进行中 | 壳层、状态胶囊、账户菜单、动效、概览、文章筛选、编辑器两栏、预览图 |
 | P2 Media v2 | 进行中 | 资产身份/manifest v2、上传 API、Jobs 双读、v2 构建解析、素材库、生命周期、迁移 CLI、编辑器素材选择器已落地；待真实迁移执行 |
-| P3 任务中心/生命周期 | 进行中 | 任务中心页已落地；v2 资产生命周期（processing/ready/degraded/failed/deleting）、软删除/恢复、健康原因已落地 |
-| P4 草稿/预览 | 进行中 | R2 草稿、草稿模式/发布、草稿列表、私密预览 token/R2/预览 workflow 已落地；需真实 Actions 联调 |
+| P3 任务中心/生命周期 | 完成 | 任务中心（素材/媒体、操作、来源）、生命周期、软删除/恢复、到期清理、两代回滚已完成 |
+| P4 草稿/预览 | 完成（待真实 Actions 联调） | R2 草稿、草稿模式/发布、草稿列表、私密预览 token/R2/workflow、预览清理已完成 |
 | P5 视频增强 | 进行中 | 独立页面、补帧/重编码/两者、processed/original 来源、任务选项与测试已落地；真实 FFmpeg 长任务待联调 |
 | P6 主题系统 | 进行中 | 主题包契约、构建时布局/资源解析、default 微调项、starter 示例、后台主题页/API 已落地；主题上传/市场与更多主题待做 |
 | P7 版本历史 | 进行中 | Git 提交列表/详情/diff/按文件或整次恢复、后台页面已落地；真实 GitHub 联调待做 |
@@ -152,3 +152,10 @@ npx prettier --check <changed files>   # passed
 - 后台 `#history`：提交列表、文件 patch、恢复整次/单文件。
 - 测试：`tests/history-api.mjs`；admin-local 历史页 axe。
 - 文档：`docs/history.md`。
+
+## P8 收口进度
+
+- P3：任务中心显示 `kind/operation/sourceMode`；清理页可清理到期素材和过期预览；资产生命周期支持当前 + 上一代回滚。
+- P1：设置页保存头吸顶；上线页移除媒体任务面板，任务统一到任务中心。
+- P4：预览过期清理；`previews/` 不再无限增长。
+- 真实迁移/预览 Actions 仍需凭据联调；未在本地执行 R2 迁移。

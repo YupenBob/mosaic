@@ -91,6 +91,9 @@ export function publicJobView(job, asset) {
   const { config: _config, lease: _lease, processedSources: _processedSources, ...view } = job;
   return {
     ...view,
+    kind: job.kind || (job.v2 === true ? 'asset' : 'media'),
+    operation: job.options?.operation || (job.folder === 'videos' ? 'transcode' : 'process'),
+    sourceMode: job.options?.sourceMode || 'original',
     options: job.options || {},
     published: !!asset?.published,
     sourceAvailable: asset?.source?.available !== false,
@@ -115,6 +118,7 @@ export function publicAssetView(asset, job) {
     sourceDeletedAt: asset.sourceDeletedAt || asset.source?.deletedAt || null,
     published: !!asset.published,
     publishedGeneration: asset.published?.generation || null,
+    canRollback: !!asset.previousPublished,
     options: job?.options || {},
     v2: asset.v2 === true,
     createdAt: asset.createdAt || null,

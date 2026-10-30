@@ -43,7 +43,7 @@ function jobRow(job) {
         ${statusBadge(job.status)}
       </div>
       ${progress}${error}
-      <p class="media-job-meta">${job.createdAt ? escHtml(formatTime(job.createdAt)) : ''}${job.attempts ? ` · ${t('tasks.attempts', { n: job.attempts })}` : ''}</p>
+      <p class="media-job-meta">${escHtml(t('tasks.kind.' + (job.kind || 'media')))} · ${escHtml(t('tasks.operation.' + (job.operation || 'process')))}${job.sourceMode ? ` · ${escHtml(t('tasks.source.' + job.sourceMode))}` : ''}${job.createdAt ? ` · ${escHtml(formatTime(job.createdAt))}` : ''}${job.attempts ? ` · ${t('tasks.attempts', { n: job.attempts })}` : ''}</p>
     </div>
     <div class="media-job-actions">
       ${canRetry ? `<button type="button" class="btn btn-secondary btn-sm" data-job-action="retry" data-job-id="${escHtml(job.id)}"><i class="ri-refresh-line" aria-hidden="true"></i> ${t('jobs.retry')}</button>` : ''}

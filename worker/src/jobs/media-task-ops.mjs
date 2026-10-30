@@ -141,6 +141,20 @@ export async function removeAssets({ state, data, saveManifest }) {
   return { ok: true, soft: data.soft !== false };
 }
 
+/** Swap the current and previous published generations (two-generation retention). */
+export async function rollbackAsset({ state, data, saveManifest }) {
+  const asset = state.manifest.assets[data.id];
+  if (!asset?.v2) throw Object.assign(new Error('Asset not found'), { status: 404 });
+  if (!asset.previousPublished) throw Object.assign(new Error('No previous generation'), { status: 409 });
+  const current = asset.published;
+  asset.published = asset.previousPublished;
+  asset.previousPublished = current;
+  asset.status = 'ready';
+  if (asset.lifecycle) asset.lifecycle.state = 'ready';
+  await saveManifest(state);
+  return { ok: true, assetId: asset.id, generation: asset.published?.generation || null };
+}
+
 /** Restore a soft-deleted v2 asset before its purge date. */
 export async function restoreAssets({ state, data, saveManifest }) {
   const ids = new Set(Array.isArray(data.assetIds) ? data.assetIds : []);
@@ -394,6 +408,7 @@ export async function recordProgress({ state, data, env, operation, saveManifest
     }
     job.checkpoint = data.published;
     const same = JSON.stringify(asset.published) === JSON.stringify(data.published);
+    if (!same && asset.published && data.complete) asset.previousPublished = asset.published;
     asset.published = data.published;
     asset.status = data.complete ? 'ready' : 'processing';
     if (asset.v2) asset.lifecycle = markPublished(asset.lifecycle, { complete: data.complete === true });

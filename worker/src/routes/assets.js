@@ -152,6 +152,16 @@ export function registerAssets(app) {
     }
   });
 
+  app.post('/api/assets/:id/rollback', async (c) => {
+    const id = assetIdParam(c);
+    if (!id) return c.json({ error: 'Invalid asset id', code: 'INVALID_PARAMS' }, 400);
+    try {
+      return c.json(await jobsRequest(c.env, 'rollback-asset', { id }));
+    } catch (error) {
+      return c.json({ error: error.message, code: 'JOBS_ERROR' }, error.status || 503);
+    }
+  });
+
   app.post('/api/assets/:id/restore', async (c) => {
     const id = assetIdParam(c);
     if (!id) return c.json({ error: 'Invalid asset id', code: 'INVALID_PARAMS' }, 400);

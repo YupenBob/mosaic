@@ -49,7 +49,7 @@ export default async function renderConfig(signal) {
   return {
     html: `
       <div class="page-anim">
-        <div class="page-header">
+        <div class="page-header config-page-header">
           <div>
             <h1>${t('config.title')}</h1>
             <p class="page-subtitle" id="config-dirty-hint" style="display:none;color:var(--color-warning)"><i class="ri-circle-fill" style="font-size:8px"></i> ${t('config.unsaved')}</p>

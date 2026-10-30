@@ -54,6 +54,19 @@ const publishedState = await runtime.call('state');
 assert.ok(publishedState.manifest.assets[id].published.variants['480p']);
 assert.equal(publishedState.manifest.assets[id].status, 'processing');
 assert.equal(publishedState.manifest.assets[id].lifecycle.lastPublishedAt !== null, true);
+await runtime.bucket.put(`processed/assets/${id}/${claimed.job.generation}/720p.mp4`, 'encoded-two');
+await runtime.call('publish', {
+  id: claimed.job.id,
+  token: claimed.job.token,
+  runId: 'run-asset',
+  published: { variants: { '720p': `processed/assets/${id}/${claimed.job.generation}/720p.mp4` } },
+  complete: true,
+});
+const rolled = await runtime.call('rollback-asset', { id });
+assert.equal(rolled.ok, true);
+const rolledState = await runtime.call('state');
+assert.ok(rolledState.manifest.assets[id].published.variants['480p'], 'rollback restores the previous generation');
+assert.ok(rolledState.manifest.assets[id].previousPublished.variants['720p'], 'current generation is kept as previous');
 await runtime.call('failed', {
   id: claimed.job.id,
   token: claimed.job.token,

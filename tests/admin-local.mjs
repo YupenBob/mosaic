@@ -299,7 +299,7 @@ try {
   );
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.evaluate(() => {
-    location.hash = 'build';
+    location.hash = 'tasks';
   });
   await page.locator('[data-job-action="retry"]').waitFor();
   await page.locator('[data-job-action="retry"]').click();
@@ -334,7 +334,12 @@ try {
     for (const route of [
       'dashboard',
       'posts',
+      'drafts',
       'editor&slug=fixture',
+      'library',
+      'enhance',
+      'themes',
+      'history',
       'build',
       'tasks',
       'config',
