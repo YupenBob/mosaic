@@ -85,3 +85,9 @@ npx prettier --check <changed files>   # passed
 - `DELETE /api/assets/:id` 改为软删除（默认 7 天），默认列表隐藏，`POST /api/assets/:id/restore` 可恢复。
 - `assets-list` 暴露 `lifecycle`；`asset-preview` 公共缩略图。
 - 测试覆盖：v2 发布、失败降级、软删除/恢复、硬删除、重启恢复。
+
+## P2 迁移计划器
+
+- 新增 `scripts/media/plan-v2.mjs`：纯函数，把 v1 资产映射为确定性的 v2 资产 ID、R2 复制对、文章 `media` 引用（含 `photo:N` / `video:N` / 文件名封面）。
+- `tests/migrate-v2-plan.mjs`：确定性 ID、复制对、文章引用、已迁移文章跳过。
+- 尚未执行实际 R2 复制与文章提交；`migrate-v2.mjs` CLI/apply 是下一轮。
