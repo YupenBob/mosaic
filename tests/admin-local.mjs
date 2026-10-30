@@ -121,6 +121,15 @@ try {
       };
     else if (pathname.endsWith('/publish') && route.request().method() === 'POST')
       body = { ok: true, slug: 'fixture-draft', sha: 'published-sha' };
+    else if (pathname === '/previews' && route.request().method() === 'POST')
+      body = {
+        previewId: 'prv_0123456789abcdefghjkmnpq',
+        token: 'preview-token',
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        status: 'queued',
+      };
+    else if (pathname === '/previews/prv_0123456789abcdefghjkmnpq')
+      body = { id: 'prv_0123456789abcdefghjkmnpq', status: 'ready' };
     else if (pathname.startsWith('/drafts/drf_') && route.request().method() === 'PUT') {
       const input = JSON.parse(route.request().postData() || '{}');
       body = {
@@ -196,6 +205,10 @@ try {
   assert.equal(await page.locator('#fm-title').inputValue(), 'Fixture cloud draft');
   await page.evaluate(() => window.saveDraftNow());
   await page.waitForTimeout(300);
+  await page.evaluate(() => window.openPreview());
+  await page.waitForTimeout(500);
+  assert.ok(requests.includes('/previews'), 'preview create request is sent');
+  assert.ok(requests.includes('/previews/prv_0123456789abcdefghjkmnpq'), 'preview status is polled');
   await page.evaluate(() => window.publishDraft());
   await page.waitForTimeout(500);
   assert.ok(

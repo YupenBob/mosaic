@@ -10,7 +10,7 @@
 | P1 框架/视觉/动效/预览图 | 进行中 | 壳层、状态胶囊、账户菜单、动效、概览、文章筛选、编辑器两栏、预览图 |
 | P2 Media v2 | 进行中 | 资产身份/manifest v2、上传 API、Jobs 双读、v2 构建解析、素材库、生命周期、迁移 CLI、编辑器素材选择器已落地；待真实迁移执行 |
 | P3 任务中心/生命周期 | 进行中 | 任务中心页已落地；v2 资产生命周期（processing/ready/degraded/failed/deleting）、软删除/恢复、健康原因已落地 |
-| P4 草稿/预览 | 进行中 | R2 草稿 API、云端自动保存、草稿模式/发布、草稿列表已落地；真实预览构建待做 |
+| P4 草稿/预览 | 进行中 | R2 草稿、草稿模式/发布、草稿列表、私密预览 token/R2/预览 workflow 已落地；需真实 Actions 联调 |
 | P5 视频增强 | 未开始 | |
 | P6 主题系统 | 未开始 | |
 | P7 版本历史 | 未开始 | |
@@ -117,3 +117,12 @@ npx prettier --check <changed files>   # passed
   - 云端草稿加载/恢复/丢弃横幅。
 - 新增 `#drafts` 草稿列表：继续写、删除、新建。
 - 测试：`tests/drafts-api.mjs`（创建/保存/冲突/列表/删除/发布）；admin-local 覆盖草稿模式保存与发布。
+
+## P4 第二批（私密预览）
+
+- `POST /api/previews` 创建 `prv_`，派发 `preview.yml`；`GET /api/previews/:id` 轮询状态。
+- 预览访问：`/api/preview/<token>/`，HMAC 24h，R2 `previews/<id>/`，`noindex`/`no-store`。
+- 预览构建：Actions 用一次性 build token 读草稿 → 写内容 → `npm run build` → 上传 R2 → 回调状态。
+- 编辑器草稿模式新增「预览文章」，轮询完成后 toast 打开。
+- 新增 `scripts/preview/{write-draft,upload}.mjs`、`.github/workflows/preview.yml`、`docs/preview.md`、`tests/preview-api.mjs`。
+- 未真实触发 Actions；需要 R2/Worker 凭据与 `PREVIEW_SECRET`。

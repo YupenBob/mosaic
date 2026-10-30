@@ -60,10 +60,12 @@ export const DEFAULTS = {
     },
   },
   build: { timeoutMinutes: 90 },
+  preview: { ttlHours: 24, buildTimeoutMinutes: 30 },
   deployment: {
     branch: 'main',
     siteWorkflow: 'pipeline.yml',
     mediaWorkflow: 'media.yml',
+    previewWorkflow: 'preview.yml',
     siteProject: 'mosaic',
     adminProject: 'mosaic-admin',
     workerName: 'mosaic-api',
@@ -159,6 +161,7 @@ export function normalizeConfig(raw = {}, env = {}) {
   config.deployment.branch = env.SITE_BRANCH || config.deployment.branch;
   config.deployment.siteWorkflow = env.SITE_WORKFLOW || config.deployment.siteWorkflow;
   config.deployment.mediaWorkflow = env.MEDIA_WORKFLOW || config.deployment.mediaWorkflow;
+  config.deployment.previewWorkflow = env.PREVIEW_WORKFLOW || config.deployment.previewWorkflow;
   return config;
 }
 
@@ -240,6 +243,8 @@ export function validateConfig(config) {
   for (const [name, value, min, max] of [
     ['pageSize', config.pageSize, 1, 10000],
     ['build.timeoutMinutes', config.build?.timeoutMinutes, 10, 360],
+    ['preview.ttlHours', config.preview?.ttlHours, 1, 168],
+    ['preview.buildTimeoutMinutes', config.preview?.buildTimeoutMinutes, 5, 60],
     ['media.timeoutMinutes', config.media?.timeoutMinutes, 10, 360],
     ['media.maxRetries', config.media?.maxRetries, 0, 20],
     ['media.deploymentHistory', config.media?.deploymentHistory, 1, 100],

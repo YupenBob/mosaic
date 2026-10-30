@@ -24,10 +24,12 @@
   "build": {
     "timeoutMinutes": 90
   },
+  "preview": { "ttlHours": 24, "buildTimeoutMinutes": 30 },
   "deployment": {
     "branch": "main",
     "siteWorkflow": "pipeline.yml",
     "mediaWorkflow": "media.yml",
+    "previewWorkflow": "preview.yml",
     "siteProject": "mosaic",
     "adminProject": "mosaic-admin",
     "workerName": "mosaic-api",

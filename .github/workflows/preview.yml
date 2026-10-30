@@ -1,0 +1,72 @@
+name: Mosaic Preview
+on:
+  workflow_dispatch:
+    inputs:
+      preview_id:
+        description: Preview id
+        required: true
+        type: string
+      draft_id:
+        description: Cloud draft id
+        required: true
+        type: string
+      api_base:
+        description: Worker API origin
+        required: true
+        type: string
+      build_token:
+        description: Short-lived preview build token
+        required: true
+        type: string
+      timeout_minutes:
+        description: Preview job timeout
+        default: '30'
+        type: string
+concurrency:
+  group: mosaic-preview-${{ inputs.preview_id }}
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: ${{ fromJSON(inputs.timeout_minutes || '30') }}
+    permissions: { contents: read }
+    env:
+      API_BASE: ${{ inputs.api_base }}
+      BUILD_TOKEN: ${{ inputs.build_token }}
+      PREVIEW_ID: ${{ inputs.preview_id }}
+      DRAFT_ID: ${{ inputs.draft_id }}
+      R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+      R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      SITE_BRANCH: ${{ vars.SITE_BRANCH }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version-file: '.nvmrc', cache: npm }
+      - name: Install dependencies
+        run: npm ci
+      - name: Read deployment configuration
+        run: node scripts/deployment-env.mjs
+      - name: Fetch cloud draft
+        run: |
+          curl --fail-with-body -sS -H "Accept: application/json" \
+            "$API_BASE/api/preview-build/draft?token=$BUILD_TOKEN" -o "$RUNNER_TEMP/draft.json"
+          node scripts/preview/write-draft.mjs "$RUNNER_TEMP/draft.json"
+      - name: Generate preview
+        run: npm run build
+      - name: Upload preview to R2
+        run: node scripts/preview/upload.mjs dist
+      - name: Report success
+        if: success()
+        run: |
+          curl --fail-with-body -sS -X POST "$API_BASE/api/preview-build/done" \
+            -H "Authorization: Bearer $BUILD_TOKEN" -H "Content-Type: application/json" \
+            -d '{"ok":true}'
+      - name: Report failure
+        if: failure()
+        run: |
+          curl -sS -X POST "$API_BASE/api/preview-build/done" \
+            -H "Authorization: Bearer $BUILD_TOKEN" -H "Content-Type: application/json" \
+            -d '{"ok":false,"error":"Preview workflow failed"}' || true

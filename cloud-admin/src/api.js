@@ -326,6 +326,12 @@ export const drafts = {
   publish: (id) => apiFetch(`/drafts/${encodeURIComponent(id)}/publish`, { method: 'POST' }),
 };
 
+// ── Previews ───────────────────────────────
+export const previews = {
+  create: (draftId) => apiFetch('/previews', { method: 'POST', body: JSON.stringify({ draftId }) }),
+  status: (id) => apiFetch(`/previews/${encodeURIComponent(id)}`),
+};
+
 // ── Build ──────────────────────────────────
 export const build = {
   status: (options = {}) => apiFetch('/build/status', options),

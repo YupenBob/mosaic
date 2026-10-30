@@ -12,6 +12,7 @@ import { registerStatsPublic, registerStatsProtected } from './routes/stats.js';
 import { registerMediaPublic, registerMediaProtected } from './routes/media.js';
 import { registerAssets, registerAssetsPublic } from './routes/assets.js';
 import { registerDrafts } from './routes/drafts.js';
+import { registerPreviewProtected, registerPreviewPublic } from './routes/preview.js';
 import { registerPosts } from './routes/posts.js';
 import { registerBuild } from './routes/build.js';
 import { registerConfig } from './routes/config.js';
@@ -49,6 +50,7 @@ registerHealth(app);
 registerStatsPublic(app);
 registerMediaPublic(app);
 registerAssetsPublic(app);
+registerPreviewPublic(app);
 registerInternalJobs(app);
 
 // ====== Protected routes ======
@@ -66,6 +68,7 @@ registerStatsProtected(app);
 registerMediaProtected(app);
 registerAssets(app);
 registerDrafts(app);
+registerPreviewProtected(app);
 registerPosts(app);
 registerBuild(app);
 registerConfig(app);

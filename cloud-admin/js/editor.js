@@ -2,7 +2,13 @@
  * Editor page — three-pane post editor with Markdown preview, autosave
  * drafts, cover picker, stats section and the media panel.
  */
-import { posts as postsApi, media as mediaApi, assets as assetsApi, drafts as draftsApi } from '../src/api.js';
+import {
+  posts as postsApi,
+  media as mediaApi,
+  assets as assetsApi,
+  drafts as draftsApi,
+  previews as previewsApi,
+} from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, loadLib, openModal, closeModal } from './ui.js?v=1';
@@ -18,6 +24,7 @@ let previewVisible = false;
 let previewTimer = null;
 let cloudDraftTimer = null;
 let cloudDraftBusy = false;
+let previewPollTimer = null;
 
 function getEditorMedia() {
   const refs = state.editor.mediaRefs;
@@ -452,7 +459,8 @@ export default async function renderEditor(signal) {
           <div class="page-header-actions">
             ${
               cloudDraft
-                ? `<button class="btn btn-secondary" onclick="window.saveDraftNow()"><i class="ri-save-line"></i> ${t('editor.saveDraft')}</button>
+                ? `<button class="btn btn-ghost" onclick="window.openPreview()"><i class="ri-eye-line"></i> ${t('editor.previewAction')}</button>
+                   <button class="btn btn-secondary" onclick="window.saveDraftNow()"><i class="ri-save-line"></i> ${t('editor.saveDraft')}</button>
                    <button class="btn btn-primary" id="editor-save-btn" onclick="window.publishDraft()"><i class="ri-send-plane-line"></i> ${t('editor.publish')}</button>`
                 : `<button class="btn btn-secondary" onclick="doSavePost(true)"><i class="ri-arrow-left-line"></i> ${t('editor.saveAndBack')}</button>
                    <button class="btn btn-primary" id="editor-save-btn" onclick="doSavePost()"><i class="ri-save-line"></i> ${t('editor.save')}</button>`
@@ -560,7 +568,7 @@ export default async function renderEditor(signal) {
               <span class="toolbar-sep"></span>
               <div class="tabs" role="tablist">
                 <button class="tab-btn active" data-mode="edit" role="tab" onclick="editorMode('edit')">${t('editor.edit')}</button>
-                <button class="tab-btn" data-mode="preview" role="tab" onclick="editorMode('preview')">${t('editor.preview')}</button>
+                <button class="tab-btn" data-mode="preview" role="tab" onclick="editorMode('preview')">${t('editor.previewAction')}</button>
                 <button class="tab-btn" data-mode="split" role="tab" onclick="editorMode('split')">${t('editor.split')}</button>
               </div>
             </div>
@@ -605,6 +613,7 @@ export default async function renderEditor(signal) {
           clearTimeout(previewTimer);
           clearTimeout(draftTimer);
           clearTimeout(cloudDraftTimer);
+          clearTimeout(previewPollTimer);
           state.editor.draftSnapshot = null;
         },
         { once: true },
@@ -840,6 +849,47 @@ window.publishDraft = async () => {
     if (error.status === 409) toast(t('editor.conflict'), 'error', 9000);
     else toast(t('editor.publishFailed') + ': ' + (error.message || ''), 'error');
   }
+};
+
+window.openPreview = async () => {
+  const saved = await persistDraft({ silent: true });
+  if (!saved) return;
+  const id = state.editor.cloudDraftId;
+  let created;
+  try {
+    created = await previewsApi.create(id);
+  } catch (error) {
+    toast(t('editor.previewFailed') + ': ' + (error.message || ''), 'error');
+    return;
+  }
+  toast(t('editor.previewBuilding'), 'info', 5000);
+  const url = `/api/preview/${created.token}/`;
+  const started = Date.now();
+  const poll = async () => {
+    if (state.page !== 'editor') return;
+    try {
+      const status = await previewsApi.status(created.previewId);
+      if (status.status === 'ready') {
+        toast(t('editor.previewReady'), 'success', 20000, {
+          label: t('editor.openPreview'),
+          onClick: () => window.open(url, '_blank', 'noopener'),
+        });
+        return;
+      }
+      if (status.status === 'failed') {
+        toast(t('editor.previewFailed') + ': ' + (status.error || ''), 'error', 10000);
+        return;
+      }
+      if (Date.now() - started > 5 * 60 * 1000) {
+        toast(t('editor.previewTimeout'), 'error');
+        return;
+      }
+      previewPollTimer = setTimeout(poll, 2500);
+    } catch {
+      previewPollTimer = setTimeout(poll, 4000);
+    }
+  };
+  poll();
 };
 
 // ── Drafts ─────────────────────────────────

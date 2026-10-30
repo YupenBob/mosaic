@@ -5,7 +5,13 @@ export async function dispatchWorkflow(c, kind, inputs = {}, config = null) {
   const path =
     kind === 'cancel'
       ? `actions/runs/${inputs.runId}/cancel`
-      : `actions/workflows/${kind === 'media' ? config.deployment.mediaWorkflow : config.deployment.siteWorkflow}/dispatches`;
+      : `actions/workflows/${
+          kind === 'media'
+            ? config.deployment.mediaWorkflow
+            : kind === 'preview'
+              ? config.deployment.previewWorkflow
+              : config.deployment.siteWorkflow
+        }/dispatches`;
   const payload =
     kind === 'cancel'
       ? undefined
@@ -13,7 +19,17 @@ export async function dispatchWorkflow(c, kind, inputs = {}, config = null) {
           ref: config.deployment.branch,
           inputs: {
             timeout_minutes: String(
-              Math.min(360, Math.max(10, kind === 'media' ? config.media.timeoutMinutes : config.build.timeoutMinutes)),
+              Math.min(
+                360,
+                Math.max(
+                  10,
+                  kind === 'media'
+                    ? config.media.timeoutMinutes
+                    : kind === 'preview'
+                      ? config.preview?.buildTimeoutMinutes || 30
+                      : config.build.timeoutMinutes,
+                ),
+              ),
             ),
             ...inputs,
           },
