@@ -316,6 +316,16 @@ export const upload = {
     }`,
 };
 
+// ── Drafts (R2) ─────────────────────────────
+export const drafts = {
+  list: () => apiFetch('/drafts'),
+  get: (id) => apiFetch(`/drafts/${encodeURIComponent(id)}`),
+  create: (data = {}) => apiFetch('/drafts', { method: 'POST', body: JSON.stringify(data) }),
+  save: (id, data) => apiFetch(`/drafts/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => apiFetch(`/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  publish: (id) => apiFetch(`/drafts/${encodeURIComponent(id)}/publish`, { method: 'POST' }),
+};
+
 // ── Build ──────────────────────────────────
 export const build = {
   status: (options = {}) => apiFetch('/build/status', options),

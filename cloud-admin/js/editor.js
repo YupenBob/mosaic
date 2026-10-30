@@ -2,7 +2,7 @@
  * Editor page — three-pane post editor with Markdown preview, autosave
  * drafts, cover picker, stats section and the media panel.
  */
-import { posts as postsApi, media as mediaApi, assets as assetsApi } from '../src/api.js';
+import { posts as postsApi, media as mediaApi, assets as assetsApi, drafts as draftsApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, loadLib, openModal, closeModal } from './ui.js?v=1';
@@ -16,6 +16,8 @@ const BLOCK_DRAG_PREFIX = '__mosaic_block:';
 let editorBlocks = [];
 let previewVisible = false;
 let previewTimer = null;
+let cloudDraftTimer = null;
+let cloudDraftBusy = false;
 
 function getEditorMedia() {
   const refs = state.editor.mediaRefs;
@@ -393,9 +395,25 @@ function draftKey(slug) {
 }
 
 export default async function renderEditor(signal) {
-  const slug = state.params.slug || '';
+  const draftId = state.params.draft || '';
+  let cloudDraft = null;
+  if (draftId) {
+    try {
+      cloudDraft = await draftsApi.get(draftId);
+    } catch {
+      cloudDraft = null;
+    }
+  }
+  const slug = cloudDraft?.slug || state.params.slug || '';
   let post = { slug: '', frontMatter: {}, body: '' };
-  if (slug) {
+  if (cloudDraft) {
+    post = {
+      slug: cloudDraft.slug || '',
+      frontMatter: cloudDraft.frontMatter || {},
+      body: cloudDraft.body || '',
+      sha: cloudDraft.baseSha,
+    };
+  } else if (slug) {
     try {
       post = await postsApi.get(slug);
     } catch {}
@@ -410,7 +428,11 @@ export default async function renderEditor(signal) {
   const fm = post.frontMatter || {};
   state.editor.mediaRefs = normalizeMediaRefs(fm.media);
   state.editor.assetCache = {};
-  const draft = loadDraft(slug);
+  state.editor.draftMode = Boolean(cloudDraft);
+  state.editor.cloudDraftId = draftId || cloudDraftKeyFor(slug);
+  state.editor.cloudDraftRevision = cloudDraft?.revision || null;
+  state.editor.cloudDraft = cloudDraft;
+  const draft = cloudDraft ? null : loadDraft(slug);
   const prefillCat = !slug ? state.params.cat || '' : '';
   const prefillTags = !slug ? state.params.tags || '' : '';
   const fmv = (key, fallback = '') =>
@@ -424,12 +446,17 @@ export default async function renderEditor(signal) {
       <div class="page-anim">
         <div class="page-header">
           <div>
-            <h1>${slug ? t('editor.editTitle') : t('editor.newPost')}</h1>
-            <p class="page-subtitle">${t('editor.draftHint')}</p>
+            <h1>${cloudDraft ? t('editor.draftTitle') : slug ? t('editor.editTitle') : t('editor.newPost')}</h1>
+            <p class="page-subtitle">${cloudDraft ? t('editor.cloudDraftHint') : t('editor.draftHint')}</p>
           </div>
           <div class="page-header-actions">
-            <button class="btn btn-secondary" onclick="doSavePost(true)"><i class="ri-arrow-left-line"></i> ${t('editor.saveAndBack')}</button>
-            <button class="btn btn-primary" id="editor-save-btn" onclick="doSavePost()"><i class="ri-save-line"></i> ${t('editor.save')}</button>
+            ${
+              cloudDraft
+                ? `<button class="btn btn-secondary" onclick="window.saveDraftNow()"><i class="ri-save-line"></i> ${t('editor.saveDraft')}</button>
+                   <button class="btn btn-primary" id="editor-save-btn" onclick="window.publishDraft()"><i class="ri-send-plane-line"></i> ${t('editor.publish')}</button>`
+                : `<button class="btn btn-secondary" onclick="doSavePost(true)"><i class="ri-arrow-left-line"></i> ${t('editor.saveAndBack')}</button>
+                   <button class="btn btn-primary" id="editor-save-btn" onclick="doSavePost()"><i class="ri-save-line"></i> ${t('editor.save')}</button>`
+            }
           </div>
         </div>
 
@@ -446,6 +473,15 @@ export default async function renderEditor(signal) {
           </div>`
             : ''
         }
+
+        <div class="draft-banner cloud-draft-banner" id="cloud-draft-banner" hidden>
+          <i class="ri-cloud-line" aria-hidden="true"></i>
+          <span id="cloud-draft-text"></span>
+          <span class="draft-actions">
+            <button class="btn btn-secondary btn-sm" onclick="window.restoreCloudDraft()"><i class="ri-download-cloud-line"></i> ${t('editor.cloudRestore')}</button>
+            <button class="btn btn-ghost btn-sm" onclick="window.discardCloudDraft()"><i class="ri-close-line"></i> ${t('editor.discard')}</button>
+          </span>
+        </div>
 
         <div class="editor-layout">
           <div class="editor-fields">
@@ -568,6 +604,7 @@ export default async function renderEditor(signal) {
         () => {
           clearTimeout(previewTimer);
           clearTimeout(draftTimer);
+          clearTimeout(cloudDraftTimer);
           state.editor.draftSnapshot = null;
         },
         { once: true },
@@ -588,6 +625,7 @@ export default async function renderEditor(signal) {
       renderSelectedMedia();
       loadSelectedAssets();
       document.querySelector('[data-open-asset-picker]')?.addEventListener('click', openAssetPicker);
+      if (!state.editor.draftMode) loadCloudDraft(signal);
       if (slug) loadExistingMedia(slug);
       state.editor.draftSnapshot = null;
       if (draft) {
@@ -606,6 +644,203 @@ export const editorSkeleton = () => `
     </div>
   </div>
 `;
+
+// ── Cloud drafts (R2) ──────────────────────
+function cloudDraftKeyFor(slug) {
+  try {
+    return localStorage.getItem('mosaic_cloud_draft_' + (slug || '__new')) || null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberCloudDraft(slug, id) {
+  try {
+    localStorage.setItem('mosaic_cloud_draft_' + (slug || '__new'), id);
+  } catch {}
+}
+
+function forgetCloudDraft(slug) {
+  try {
+    localStorage.removeItem('mosaic_cloud_draft_' + (slug || '__new'));
+  } catch {}
+}
+
+function cloudDraftPayload() {
+  const fields = (id) => document.getElementById(id)?.value || '';
+  return {
+    slug: getCurrentSlug(),
+    title: fields('fm-title'),
+    body: fields('fm-body'),
+    frontMatter: {
+      title: fields('fm-title'),
+      date: fields('fm-date'),
+      category: fields('fm-category'),
+      tags: fields('fm-tags')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      description: fields('fm-desc'),
+      cover: fields('fm-cover'),
+      views: parseInt(fields('fm-views')) || 0,
+      likes: parseInt(fields('fm-likes')) || 0,
+    },
+    media: state.editor.mediaRefs || normalizeMediaRefs(null),
+    revision: state.editor.cloudDraftRevision || undefined,
+  };
+}
+
+async function saveCloudDraft() {
+  if (cloudDraftBusy || !state.editorDirty) return;
+  cloudDraftBusy = true;
+  const slug = state.params.slug || '';
+  try {
+    let id = cloudDraftKeyFor(slug);
+    if (!id) {
+      const created = await draftsApi.create(cloudDraftPayload());
+      if (!created?.id) return;
+      id = created.id;
+      state.editor.cloudDraftId = id;
+      state.editor.cloudDraftRevision = created.revision;
+      rememberCloudDraft(slug, id);
+    } else {
+      const saved = await draftsApi.save(id, cloudDraftPayload());
+      state.editor.cloudDraftRevision = saved.revision;
+    }
+  } catch (error) {
+    if (error.status === 409) toast(t('editor.cloudDraftConflict'), 'warning', 6000);
+  } finally {
+    cloudDraftBusy = false;
+  }
+}
+
+function scheduleCloudDraft() {
+  clearTimeout(cloudDraftTimer);
+  cloudDraftTimer = setTimeout(saveCloudDraft, 2000);
+}
+
+async function loadCloudDraft(signal) {
+  const id = state.editor.cloudDraftId;
+  if (!id) return;
+  try {
+    const draft = await draftsApi.get(id);
+    if (signal.aborted) return;
+    state.editor.cloudDraft = draft;
+    state.editor.cloudDraftRevision = draft.revision;
+    const same =
+      draft.body === (document.getElementById('fm-body')?.value || '') &&
+      (draft.title || '') === (document.getElementById('fm-title')?.value || '');
+    if (same) return;
+    const banner = document.getElementById('cloud-draft-banner');
+    const text = document.getElementById('cloud-draft-text');
+    if (banner && text) {
+      text.textContent = t('editor.cloudDraftFound', { time: new Date(draft.updatedAt).toLocaleString() });
+      banner.hidden = false;
+    }
+  } catch {
+    /* cloud drafts are a backup; a missing one must not block editing */
+  }
+}
+
+window.restoreCloudDraft = () => {
+  const draft = state.editor.cloudDraft;
+  if (!draft) return;
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && value !== undefined && value !== null) el.value = value;
+  };
+  const fm = draft.frontMatter || {};
+  set('fm-slug', draft.slug || '');
+  set('fm-title', draft.title || fm.title || '');
+  set('fm-date', fm.date || '');
+  set('fm-category', fm.category || '');
+  set('fm-tags', Array.isArray(fm.tags) ? fm.tags.join(', ') : fm.tags || '');
+  set('fm-desc', fm.description || '');
+  set('fm-cover', fm.cover || '');
+  set('fm-views', fm.views || 0);
+  set('fm-likes', fm.likes || 0);
+  set('fm-body', draft.body || '');
+  state.editor.mediaRefs = normalizeMediaRefs(draft.media);
+  renderSelectedMedia();
+  loadSelectedAssets();
+  renderBlocksFromBody();
+  updateCoverPreview();
+  state.editorDirty = true;
+  document.getElementById('cloud-draft-banner').hidden = true;
+  toast(t('editor.cloudRestored'), 'success');
+};
+
+window.discardCloudDraft = async () => {
+  const id = state.editor.cloudDraftId;
+  if (id) await draftsApi.delete(id).catch(() => {});
+  forgetCloudDraft(state.params.slug || '');
+  state.editor.cloudDraft = null;
+  const banner = document.getElementById('cloud-draft-banner');
+  if (banner) banner.hidden = true;
+  toast(t('editor.cloudDraftDiscarded'), 'info', 3000);
+};
+
+async function cleanupCloudDraft() {
+  const id = state.editor.cloudDraftId || cloudDraftKeyFor(state.params.slug || '');
+  if (id) await draftsApi.delete(id).catch(() => {});
+  forgetCloudDraft(state.params.slug || '');
+  state.editor.cloudDraft = null;
+  const banner = document.getElementById('cloud-draft-banner');
+  if (banner) banner.hidden = true;
+}
+
+async function persistDraft({ silent = false } = {}) {
+  if (cloudDraftBusy) return null;
+  cloudDraftBusy = true;
+  const slug = state.params.slug || '';
+  try {
+    const payload = cloudDraftPayload();
+    let id = state.editor.cloudDraftId;
+    let saved;
+    if (!id) {
+      saved = await draftsApi.create(payload);
+      id = saved.id;
+      state.editor.cloudDraftId = id;
+      rememberCloudDraft(slug, id);
+    } else {
+      saved = await draftsApi.save(id, payload);
+    }
+    state.editor.cloudDraftRevision = saved.revision;
+    state.editor.cloudDraft = saved;
+    state.editorDirty = false;
+    if (!silent) toast(t('editor.draftSaved'), 'success');
+    return saved;
+  } catch (error) {
+    if (error.status === 409) toast(t('editor.cloudDraftConflict'), 'warning', 7000);
+    else toast(t('editor.saveFailed') + ': ' + (error.message || ''), 'error');
+    return null;
+  } finally {
+    cloudDraftBusy = false;
+  }
+}
+
+window.saveDraftNow = () => persistDraft();
+
+window.publishDraft = async () => {
+  const saved = await persistDraft({ silent: true });
+  if (!saved) return;
+  const id = state.editor.cloudDraftId;
+  try {
+    await draftsApi.publish(id);
+    forgetCloudDraft(state.params.slug || '');
+    state.editor.cloudDraftId = null;
+    state.editor.cloudDraft = null;
+    state.editorDirty = false;
+    try {
+      localStorage.removeItem(draftKey(state.params.slug || '__new'));
+    } catch {}
+    toast(t('editor.published'), 'success', 5000);
+    location.hash = 'posts';
+  } catch (error) {
+    if (error.status === 409) toast(t('editor.conflict'), 'error', 9000);
+    else toast(t('editor.publishFailed') + ': ' + (error.message || ''), 'error');
+  }
+};
 
 // ── Drafts ─────────────────────────────────
 function loadDraft(slug) {
@@ -642,6 +877,7 @@ function saveDraft() {
   try {
     localStorage.setItem(draftKey(key), JSON.stringify(data));
   } catch {}
+  scheduleCloudDraft();
 }
 
 function wireEditorInputs() {
@@ -864,6 +1100,10 @@ async function openAssetPicker() {
 
 // ── Save ───────────────────────────────────
 window.doSavePost = async (goBack) => {
+  if (state.editor.draftMode) {
+    await window.saveDraftNow?.();
+    return;
+  }
   let slug = document.getElementById('fm-slug').value.trim();
   const title = document.getElementById('fm-title').value.trim();
   if (!slug) {
@@ -908,6 +1148,7 @@ window.doSavePost = async (goBack) => {
       if (!state.params.slug) localStorage.removeItem(draftKey(slug));
     } catch {}
     state.editorDirty = false;
+    await cleanupCloudDraft();
     window.checkDirty && window.checkDirty();
     toast(t('editor.saved'), 'success');
     if (goBack) location.hash = 'posts';

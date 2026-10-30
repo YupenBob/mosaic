@@ -87,7 +87,49 @@ try {
       };
     else if (pathname.includes('/list')) body = { photos: [], videos: [], music: [], covers: [] };
     else if (pathname === '/trash') body = { items: [] };
-    else if (pathname === '/assets')
+    else if (pathname === '/drafts' && route.request().method() === 'GET')
+      body = {
+        drafts: [
+          {
+            id: 'drf_0123456789abcdefghjkmnpq',
+            title: 'Fixture draft',
+            slug: 'fixture-draft',
+            revision: 1,
+            updatedAt: new Date().toISOString(),
+            mediaCount: 1,
+          },
+        ],
+      };
+    else if (pathname === '/drafts' && route.request().method() === 'POST')
+      body = {
+        id: 'drf_0123456789abcdefghjkmnpq',
+        revision: 1,
+        updatedAt: new Date().toISOString(),
+        ...JSON.parse(route.request().postData() || '{}'),
+      };
+    else if (pathname === '/drafts/drf_0123456789abcdefghjkmnpq' && route.request().method() === 'GET')
+      body = {
+        id: 'drf_0123456789abcdefghjkmnpq',
+        revision: 2,
+        slug: 'fixture-draft',
+        title: 'Fixture cloud draft',
+        body: 'Cloud draft body',
+        frontMatter: { title: 'Fixture cloud draft', category: 'Fixture' },
+        media: { gallery: [], videos: [], music: [], cover: null },
+        baseSha: null,
+        updatedAt: new Date().toISOString(),
+      };
+    else if (pathname.endsWith('/publish') && route.request().method() === 'POST')
+      body = { ok: true, slug: 'fixture-draft', sha: 'published-sha' };
+    else if (pathname.startsWith('/drafts/drf_') && route.request().method() === 'PUT') {
+      const input = JSON.parse(route.request().postData() || '{}');
+      body = {
+        id: 'drf_0123456789abcdefghjkmnpq',
+        revision: (Number(input.revision) || 1) + 1,
+        updatedAt: new Date().toISOString(),
+        ...input,
+      };
+    } else if (pathname === '/assets')
       body = {
         assets: [
           {
@@ -144,6 +186,22 @@ try {
   await page.locator('.asset-detail').waitFor();
   assert.ok((await page.locator('.asset-detail').innerText()).includes('library-photo.jpg'), 'asset detail opens');
   await page.locator('.modal-overlay .btn-secondary').first().click();
+
+  // Draft mode: save goes to R2, publish writes Git and returns to the list.
+  await page.evaluate(() => {
+    location.hash = 'editor&draft=drf_0123456789abcdefghjkmnpq';
+  });
+  await page.locator('#fm-title').waitFor();
+  assert.equal(await page.locator('.page-header h1').innerText(), '草稿');
+  assert.equal(await page.locator('#fm-title').inputValue(), 'Fixture cloud draft');
+  await page.evaluate(() => window.saveDraftNow());
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.publishDraft());
+  await page.waitForTimeout(500);
+  assert.ok(
+    requests.includes('/drafts/drf_0123456789abcdefghjkmnpq/publish'),
+    'draft publish hits the publish endpoint',
+  );
 
   // Mobile posts are cards, never a squeezed table.
   await page.setViewportSize({ width: 390, height: 844 });
@@ -224,7 +282,7 @@ try {
   assert.deepEqual(errors, [], 'all admin routes must render without JavaScript errors');
   assert.ok(!requests.includes('/build/done'), 'browser polling cannot acknowledge a deployment');
   console.log(
-    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 9 pages × 2 themes accessibility passed',
+    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 10 pages × 2 themes accessibility passed',
   );
 } finally {
   await browser.close();
