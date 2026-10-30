@@ -66,6 +66,12 @@ export function emptyAssetManifest() {
   return { schemaVersion: ASSET_SCHEMA_VERSION, revision: 0, assets: {}, usageRevision: 0 };
 }
 
+function validGeneration(value) {
+  return (
+    (Number.isInteger(value) && value >= 0) || (typeof value === 'string' && /^[A-Za-z0-9._-]{1,128}$/.test(value))
+  );
+}
+
 function validOptionalKey(value, expectedPrefix) {
   return value === undefined || value === null || (typeof value === 'string' && value.startsWith(expectedPrefix));
 }
@@ -82,7 +88,7 @@ export function validateAssetManifest(value) {
     if (!ASSET_ID_RE.test(id) || asset.id !== id) throw new Error(`Invalid asset id: ${id}`);
     if (!validAssetFilename(asset.filename)) throw new Error(`Invalid asset filename: ${id}`);
     if (!FOLDERS.includes(asset.folder)) throw new Error(`Invalid asset folder: ${id}`);
-    if (!Number.isInteger(asset.generation) || asset.generation < 0) throw new Error(`Invalid asset generation: ${id}`);
+    if (!validGeneration(asset.generation)) throw new Error(`Invalid asset generation: ${id}`);
     if (!STATUSES.includes(asset.status)) throw new Error(`Invalid asset status: ${id}`);
     if (!asset.source || asset.source.key !== originalKey(asset)) throw new Error(`Invalid asset source key: ${id}`);
     if (asset.published) {

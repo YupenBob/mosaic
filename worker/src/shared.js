@@ -99,6 +99,9 @@ export async function scanOrphans(env, valid, mode) {
         if (cursor) opts.cursor = cursor;
         const list = await env.MEDIA.list(opts);
         for (const o of list.objects || []) {
+          // Media v2 stores originals/assets/<id>/...; "assets" is not a post
+          // slug. Those objects are owned by the asset lifecycle/purge path.
+          if (o.key.startsWith('originals/assets/') || o.key.startsWith('processed/assets/')) continue;
           const slug = o.key.split('/')[1];
           if (!slug || valid.has(slug) || protectedKeys.has(o.key)) continue;
           if (mode === 'delete') {

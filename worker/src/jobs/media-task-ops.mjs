@@ -162,10 +162,18 @@ export async function restoreAssets({ state, data, saveManifest }) {
     if (!asset.v2 || !ids.has(asset.id) || asset.lifecycle?.state !== 'deleting') continue;
     asset.lifecycle = {
       ...asset.lifecycle,
-      state: asset.lifecycle.previousState || (asset.published ? 'ready' : 'failed'),
+      state: asset.lifecycle.previousState || (asset.published ? 'ready' : 'pending'),
       previousState: null,
       purgeAfter: null,
     };
+    const job = state.jobs[asset.jobId];
+    if (job && job.status === 'cancelled') {
+      job.status = 'pending';
+      job.nextAt = 0;
+      job.error = '';
+      asset.status = 'pending';
+      if (asset.lifecycle) asset.lifecycle.state = 'processing';
+    } else asset.status = asset.published ? 'ready' : asset.status;
   }
   await saveManifest(state);
   return { ok: true };
@@ -406,10 +414,15 @@ export async function recordProgress({ state, data, env, operation, saveManifest
       job.source.etag = written.etag;
       asset.source = job.source;
     }
-    job.checkpoint = data.published;
-    const same = JSON.stringify(asset.published) === JSON.stringify(data.published);
-    if (!same && asset.published && data.complete) asset.previousPublished = asset.published;
-    asset.published = data.published;
+    const published = { ...data.published, generation: data.published.generation || job.generation };
+    job.checkpoint = published;
+    const same = JSON.stringify(asset.published) === JSON.stringify(published);
+    // Keep the previous *generation*, never a partial publish of the current
+    // one. Partial publishes are same-generation snapshots and must not replace
+    // the only rollback target.
+    if (!same && asset.published && data.complete && asset.published.generation !== published.generation)
+      asset.previousPublished = asset.published;
+    asset.published = published;
     asset.status = data.complete ? 'ready' : 'processing';
     if (asset.v2) asset.lifecycle = markPublished(asset.lifecycle, { complete: data.complete === true });
     if (!same) await saveManifest(state);

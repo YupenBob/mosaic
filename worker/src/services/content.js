@@ -126,6 +126,16 @@ export async function getPost(c, slug) {
   return { slug, frontMatter: fm, body, sha: md.sha };
 }
 
+function yamlValue(value) {
+  if (value === null || value === undefined) return 'null';
+  // JSON is a YAML 1.2 subset and handles nested `media`/`player` objects
+  // without writing "[object Object]" or losing array quoting.
+  if (typeof value === 'object' || Array.isArray(value)) return JSON.stringify(value);
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  return JSON.stringify(String(value));
+}
+
 export async function createOrUpdatePost(c, slug, frontMatter, body, message, baseSha) {
   assertPostSlug(slug);
   const existing = await getPost(c, slug);
@@ -147,7 +157,8 @@ export async function createOrUpdatePost(c, slug, frontMatter, body, message, ba
     }
   }
   const yaml = Object.entries(frontMatter)
-    .map(([k, v]) => (Array.isArray(v) ? `${k}: [${v.join(', ')}]` : `${k}: ${v}`))
+    .filter(([key]) => /^[A-Za-z0-9_-]+$/.test(key))
+    .map(([key, value]) => `${key}: ${yamlValue(value)}`)
     .join('\n');
   const content = `---\n${yaml}\n---\n\n${body || ''}`;
   const endpoint = contentsUrl(c, `content/posts/${slug}/index.md`);
@@ -163,7 +174,15 @@ export async function createOrUpdatePost(c, slug, frontMatter, body, message, ba
   return resp.json();
 }
 
+function assertContentPath(pathname) {
+  if (pathname !== 'content/posts' && !pathname.startsWith('content/posts/'))
+    throw Object.assign(new Error('Refusing to delete outside content/posts'), { status: 400 });
+  if (pathname.includes('..') || pathname.includes('//'))
+    throw Object.assign(new Error('Invalid content path'), { status: 400 });
+}
+
 async function deleteDir(c, dirPath, message) {
+  assertContentPath(dirPath);
   const resp = await fetch(contentsUrl(c, `${dirPath}`), { headers: headers(c) });
   if (!resp.ok) return 0;
   const items = await resp.json();
@@ -184,6 +203,7 @@ async function deleteDir(c, dirPath, message) {
 }
 
 export async function deletePost(c, slug, message) {
+  assertPostSlug(slug);
   const msg = message || `Delete ${slug}`;
   const count = await deleteDir(c, `content/posts/${slug}`, msg);
   bustCache();

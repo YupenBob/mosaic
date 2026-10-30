@@ -681,6 +681,7 @@ function cloudDraftPayload() {
     slug: getCurrentSlug(),
     title: fields('fm-title'),
     body: fields('fm-body'),
+    baseSha: state.editor.baseSha ?? null,
     frontMatter: {
       title: fields('fm-title'),
       date: fields('fm-date'),
@@ -699,12 +700,22 @@ function cloudDraftPayload() {
   };
 }
 
+async function refreshCloudDraftRevision(id) {
+  try {
+    const latest = await draftsApi.get(id);
+    state.editor.cloudDraftRevision = latest.revision;
+    return latest;
+  } catch {
+    return null;
+  }
+}
+
 async function saveCloudDraft() {
   if (cloudDraftBusy || !state.editorDirty) return;
   cloudDraftBusy = true;
   const slug = state.params.slug || '';
+  let id = cloudDraftKeyFor(slug);
   try {
-    let id = cloudDraftKeyFor(slug);
     if (!id) {
       const created = await draftsApi.create(cloudDraftPayload());
       if (!created?.id) return;
@@ -717,7 +728,10 @@ async function saveCloudDraft() {
       state.editor.cloudDraftRevision = saved.revision;
     }
   } catch (error) {
-    if (error.status === 409) toast(t('editor.cloudDraftConflict'), 'warning', 6000);
+    if (error.status === 409 && id) {
+      await refreshCloudDraftRevision(id);
+      toast(t('editor.cloudDraftConflict'), 'warning', 6000);
+    }
   } finally {
     cloudDraftBusy = false;
   }
@@ -820,8 +834,10 @@ async function persistDraft({ silent = false } = {}) {
     if (!silent) toast(t('editor.draftSaved'), 'success');
     return saved;
   } catch (error) {
-    if (error.status === 409) toast(t('editor.cloudDraftConflict'), 'warning', 7000);
-    else toast(t('editor.saveFailed') + ': ' + (error.message || ''), 'error');
+    if (error.status === 409) {
+      if (state.editor.cloudDraftId) await refreshCloudDraftRevision(state.editor.cloudDraftId);
+      toast(t('editor.cloudDraftConflict'), 'warning', 7000);
+    } else toast(t('editor.saveFailed') + ': ' + (error.message || ''), 'error');
     return null;
   } finally {
     cloudDraftBusy = false;

@@ -215,10 +215,21 @@ export async function finishPreview(c, token, body = {}) {
  * Delete expired preview sites from R2. Called by the cleanup page; preview
  * tokens are already invalid after expiry, this reclaims storage.
  */
+async function listAll(bucket, prefix) {
+  const objects = [];
+  let cursor;
+  do {
+    const listed = await bucket.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+    objects.push(...(listed.objects || []));
+    cursor = listed.truncated ? listed.cursor : null;
+  } while (cursor);
+  return objects;
+}
+
 export async function cleanupPreviews(c) {
-  const listed = await c.env.MEDIA.list({ prefix: 'previews/', limit: 1000 });
+  const listed = await listAll(c.env.MEDIA, 'previews/');
   const ids = new Set();
-  for (const object of listed.objects || []) {
+  for (const object of listed) {
     const id = object.key.split('/')[1];
     if (/^prv_[a-z0-9]{26}$/.test(id)) ids.add(id);
   }
@@ -229,8 +240,8 @@ export async function cleanupPreviews(c) {
     if (!metaObject) continue;
     const meta = JSON.parse(await metaObject.text());
     if (!meta.expiresAt || Date.parse(meta.expiresAt) > now) continue;
-    const objects = await c.env.MEDIA.list({ prefix: `previews/${id}/`, limit: 1000 });
-    const keys = (objects.objects || []).map((object) => object.key);
+    const objects = await listAll(c.env.MEDIA, `previews/${id}/`);
+    const keys = objects.map((object) => object.key);
     if (keys.length) await c.env.MEDIA.delete(keys);
     deleted.push(id);
   }

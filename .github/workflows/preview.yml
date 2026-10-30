@@ -49,10 +49,12 @@ jobs:
         run: npm ci
       - name: Read deployment configuration
         run: node scripts/deployment-env.mjs
+      - name: Fetch published media manifest
+        run: node scripts/preview/fetch-manifest.mjs
       - name: Fetch cloud draft
         run: |
-          curl --fail-with-body -sS -H "Accept: application/json" \
-            "$API_BASE/api/preview-build/draft?token=$BUILD_TOKEN" -o "$RUNNER_TEMP/draft.json"
+          curl --fail-with-body -sS -X POST -H "Accept: application/json" -H "Content-Type: application/json" \
+            -d "{\"token\":\"$BUILD_TOKEN\"}" "$API_BASE/api/preview-build/draft" -o "$RUNNER_TEMP/draft.json"
           node scripts/preview/write-draft.mjs "$RUNNER_TEMP/draft.json"
       - name: Generate preview
         run: npm run build

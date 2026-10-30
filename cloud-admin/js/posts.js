@@ -115,13 +115,16 @@ function coverOf(p) {
   const raw = String(p.cover || '');
   const resolved = String(p.coverResolved || '');
   const literal = raw && !/^(video|photo):/.test(raw) ? raw : '';
+  const assetCover = /^ast_[a-z0-9]{26,64}$/.test(raw);
   const url =
     resolved ||
-    (literal
-      ? /^(https?:\/\/|\/)/.test(literal)
-        ? literal
-        : '/api/media/file/' + encodeURIComponent(p.slug) + '/' + encodeURIComponent(literal)
-      : '');
+    (assetCover
+      ? '/api/assets/' + encodeURIComponent(raw) + '/preview'
+      : literal
+        ? /^(https?:\/\/|\/)/.test(literal)
+          ? literal
+          : '/api/media/file/' + encodeURIComponent(p.slug) + '/' + encodeURIComponent(literal)
+        : '');
   const srcset = p.coverSrcset?.['480'] || p.coverSrcset?.[480] || '';
   return { src: srcset || url, lqip: p.coverLqip || '', has: !!(srcset || url) };
 }

@@ -12,6 +12,7 @@ import {
   saveDraft,
 } from '../worker/src/services/drafts.js';
 import { DRAFT_ID_RE, draftRevisionKey } from '../shared/drafts.mjs';
+import matter from 'gray-matter';
 
 const runtime = createRuntime();
 const context = { env: runtime.env };
@@ -48,6 +49,16 @@ await assert.rejects(
   (error) => error.status === 409 && error.code === 'CONFLICT',
 );
 
+// Two concurrent saves at the same revision: exactly one wins the CAS.
+const race = await createDraft(context, { slug: 'race', title: 'Race', body: 'a' });
+const raceResults = await Promise.allSettled([
+  saveDraft(context, race.id, { revision: 1, slug: 'race', title: 'Race A', body: 'a2' }),
+  saveDraft(context, race.id, { revision: 1, slug: 'race', title: 'Race B', body: 'b2' }),
+]);
+assert.equal(raceResults.filter((result) => result.status === 'fulfilled').length, 1);
+assert.equal(raceResults.filter((result) => result.status === 'rejected' && result.reason.status === 409).length, 1);
+await deleteDraft(context, race.id);
+
 const list = await listDrafts(context);
 assert.equal(list.length, 1);
 assert.equal(list[0].id, created.id);
@@ -83,11 +94,18 @@ try {
     body: 'Published body',
     frontMatter: { title: 'Publish me' },
     baseSha: null,
+    media: { gallery: ['ast_0123456789abcdefghjkmnpq'], videos: [], music: [], cover: 'ast_0123456789abcdefghjkmnpq' },
   });
   const published = await publishDraft(context, publishable.id);
   assert.equal(published.slug, 'published-draft');
   assert.equal(published.sha, 'new-sha');
   assert.ok(putPayload?.sha === undefined, 'new posts are create-only');
+  const committed = Buffer.from(putPayload.content, 'base64').toString('utf8');
+  assert.match(committed, /media: \{"gallery":\["ast_0123456789abcdefghjkmnpq"\]/);
+  assert.match(committed, /cover: "ast_0123456789abcdefghjkmnpq"/);
+  assert.doesNotMatch(committed, /\[object Object\]/);
+  const parsed = matter(committed);
+  assert.deepEqual(parsed.data.media.gallery, ['ast_0123456789abcdefghjkmnpq']);
   await assert.rejects(
     () => getDraft(context, publishable.id),
     (error) => error.status === 404,

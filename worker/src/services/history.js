@@ -67,6 +67,7 @@ export async function getHistoryCommit(c, sha) {
     ...mapCommit(data),
     files: (data.files || []).map((file) => ({
       filename: file.filename,
+      previousFilename: file.previous_filename || '',
       status: file.status,
       additions: file.additions,
       deletions: file.deletions,
@@ -134,7 +135,7 @@ export async function restoreHistory(c, sha, path = '') {
         await deleteFile(c, file.filename, current.sha, `Restore ${detail.shortSha}: remove ${file.filename}`);
         results.push({ path: file.filename, status: 'deleted' });
       } else {
-        const original = await readFile(c, file.filename, sha);
+        const original = await readFile(c, file.previousFilename || file.filename, sha);
         if (!original?.content) {
           results.push({ path: file.filename, status: 'skipped' });
           continue;

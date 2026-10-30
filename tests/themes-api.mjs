@@ -44,6 +44,7 @@ try {
   );
   assert.equal(listed.themes[0].current, true);
   assert.equal(listed.themes[0].options.accent.type, 'select');
+  assert.equal(listed.themes[0].options.accent.label, '强调色', 'UTF-8 theme labels survive base64 decoding');
   const applied = await applyTheme(context, 'starter', { accent: '#112233', showDescription: false });
   assert.equal(applied.themePackage, 'starter');
   assert.equal(applied.themeOptions.accent, '#112233');

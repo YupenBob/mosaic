@@ -39,12 +39,12 @@ export function registerMediaPublic(app) {
 
 export function registerMediaProtected(app) {
   // Upload
-  app.post('/api/upload/presign', generatePresignedUrl);
-  app.post('/api/upload/complete/:slug/:filename', uploadComplete);
-  app.post('/api/upload/multipart/start', startMultipartUpload);
-  app.post('/api/upload/multipart/parts', listMultipartParts);
-  app.post('/api/upload/multipart/complete', completeMultipartUpload);
-  app.post('/api/upload/multipart/abort', abortMultipartUpload);
+  app.post('/api/upload/presign', (c) => generatePresignedUrl(c));
+  app.post('/api/upload/complete/:slug/:filename', (c) => uploadComplete(c));
+  app.post('/api/upload/multipart/start', (c) => startMultipartUpload(c));
+  app.post('/api/upload/multipart/parts', (c) => listMultipartParts(c));
+  app.post('/api/upload/multipart/complete', (c) => completeMultipartUpload(c));
+  app.post('/api/upload/multipart/abort', (c) => abortMultipartUpload(c));
 
   // Media list — from R2 (uses R2_PUBLIC_URL or falls back to config.mediaBase)
   app.get('/api/media/:slug/list', async (c) => {

@@ -1,14 +1,14 @@
 /** Installed theme packages and applying micro-options to mosaic.config.json. */
 import { DEFAULT_THEME, THEME_ID_RE, validateThemeManifest, validateThemeOptions } from '../../../shared/theme.mjs';
 import { getConfig, updateConfig } from './site-config.js';
-import { contentsUrl, headers } from './github-client.js';
+import { contentsUrl, decodeBase64, headers } from './github-client.js';
 import { markDirty } from './publication.js';
 
 async function fetchTheme(c, id) {
   const response = await fetch(contentsUrl(c, `themes/${id}/theme.json`), { headers: headers(c) });
   if (!response.ok) return null;
   const file = await response.json();
-  const manifest = JSON.parse(atob(file.content.replace(/\s/g, '')));
+  const manifest = JSON.parse(decodeBase64(file.content));
   return validateThemeManifest(manifest, id);
 }
 

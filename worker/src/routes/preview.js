@@ -18,9 +18,10 @@ export function registerPreviewPublic(app) {
   });
 
   // Workflow-only endpoints, authenticated by the build token.
-  app.get('/api/preview-build/draft', async (c) => {
+  app.post('/api/preview-build/draft', async (c) => {
     try {
-      return c.json(await readPreviewDraft(c, c.req.query('token')));
+      const body = await c.req.json().catch(() => ({}));
+      return c.json(await readPreviewDraft(c, body.token));
     } catch (error) {
       return c.json({ error: error.message }, error.status || 401);
     }

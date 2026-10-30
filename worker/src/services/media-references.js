@@ -7,11 +7,16 @@ export async function protectedMediaKeys(env) {
   const protect = (manifest) =>
     Object.values(manifest.assets)
       .filter((asset) => asset.status !== 'deleted')
-      .flatMap((asset) => objectKeys(asset.published))
-      .forEach((key) => keys.add(key));
+      .forEach((asset) => {
+        if (asset.source?.key) keys.add(asset.source.key);
+        objectKeys(asset.published).forEach((key) => keys.add(key));
+        objectKeys(asset.previousPublished).forEach((key) => keys.add(key));
+      });
   protect(state.manifest);
-  for (const job of state.jobs)
+  for (const job of state.jobs) {
+    if (job.source?.key) keys.add(job.source.key);
     if (['pending', 'running'].includes(job.status)) objectKeys(job.checkpoint).forEach((key) => keys.add(key));
+  }
   for (const deployment of [...state.deployments, ...state.builds.filter((build) => !build.finishedAt)]) {
     const object = await env.MEDIA.get(`site-data/media-manifests/${deployment.mediaRevision}.json`);
     if (!object) throw new Error('A referenced deployment snapshot is missing; media cleanup stopped');

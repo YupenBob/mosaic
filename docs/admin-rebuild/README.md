@@ -32,7 +32,7 @@
 node tests/security-smoke.mjs          # passed
 node tests/post-concurrency.mjs        # passed
 node tests/media-list.mjs              # passed
-node tests/admin-local.mjs             # passed (7 pages × 2 themes a11y)
+node tests/admin-local.mjs             # passed (13 pages × 2 themes a11y)
 npx eslint <changed files>             # passed
 npx prettier --check <changed files>   # passed
 ```
@@ -199,3 +199,12 @@ SITE_THEME_PACKAGE=starter npm run build
 - `scripts/media/apply-v2.mjs` 把复制、导入、文章改写、标记拆成注入效果；`tests/migrate-v2-apply.mjs` 覆盖顺序、25 条分批、失败即停。
 - `tests/preview-workflow.mjs` 覆盖草稿 JSON → 内容文件，以及不安全 slug 拒绝。
 - 真实 R2/Actions 联调仍需凭据；本地不执行迁移、不上传资源。
+
+## 独立审查修复（round 7）
+
+- v1 presign/multipart 路由改为 `(c) => fn(c)`，避免 Hono 把 `next` 当 body。
+- slug 拒绝 `% ? #`；GitHub contents 路径逐段编码；删除限制在 `content/posts/` 且拒绝 `..`。
+- 对象 frontmatter 用 JSON 序列化；草稿发布合并 `media`。
+- 孤儿清理跳过 `assets/` 命名空间；保护 v2 `source.key` 与 `previousPublished`。
+- 迁移统一字符串 generation、重映射 processed key、补齐 legacy cover source 并先校验。
+- purge 清理 DO 旧行；回滚仅在跨 generation 时保存上一代；asset-id 封面；预览拉取 media manifest；modal 标题转义；草稿 CAS。

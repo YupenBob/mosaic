@@ -9,12 +9,17 @@ export async function cleanupMedia({ config, state, store, now = Date.now() }) {
   const protect = (manifest) =>
     Object.values(manifest.assets)
       .filter((asset) => asset.status !== 'deleted')
-      .flatMap((asset) => objectKeys(asset.published))
-      .forEach((key) => protectedKeys.add(key));
+      .forEach((asset) => {
+        if (asset.source?.key) protectedKeys.add(asset.source.key);
+        objectKeys(asset.published).forEach((key) => protectedKeys.add(key));
+        objectKeys(asset.previousPublished).forEach((key) => protectedKeys.add(key));
+      });
   protect(state.manifest);
-  for (const job of state.jobs)
+  for (const job of state.jobs) {
+    if (job.source?.key) protectedKeys.add(job.source.key);
     if (['pending', 'running'].includes(job.status))
       objectKeys(job.checkpoint).forEach((key) => protectedKeys.add(key));
+  }
   // Retained deployments and in-flight builds hold references to immutable snapshots.
   for (const deployment of [...state.deployments, ...(state.builds || []).filter((build) => !build.finishedAt)]) {
     const key = `site-data/media-manifests/${deployment.mediaRevision}.json`;

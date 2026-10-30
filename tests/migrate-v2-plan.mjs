@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { planV2Migration } from '../scripts/media/plan-v2.mjs';
+import { validateAssetManifest } from '../shared/media-v2.mjs';
 import { assetIdFromLegacy, ASSET_ID_RE } from '../shared/media-v2.mjs';
 
 const manifest = {
@@ -40,7 +41,7 @@ const manifest = {
       folder: 'covers',
       order: 0,
       status: 'ready',
-      source: { key: 'originals/post/covers/cover.jpg', etag: 'e3', available: true },
+      source: { key: '', etag: '', available: false },
       published: { variants: { '480p': 'processed/post/covers/1/480p.jpg' } },
     },
   },
@@ -54,17 +55,17 @@ const posts = [
 ];
 const plan = await planV2Migration({ manifest, posts });
 assert.equal(plan.counts.assets, 3);
-assert.equal(plan.counts.copies, 7);
+assert.equal(plan.counts.copies, 6);
 const photo = plan.assets.find((asset) => asset.filename === 'a.jpg');
 assert.match(photo.id, ASSET_ID_RE);
 assert.equal(photo.id, await assetIdFromLegacy('post/photos/a.jpg'));
 assert.equal(photo.v2, true);
 assert.equal(photo.slug, null);
 assert.equal(photo.source.key, `originals/assets/${photo.id}/a.jpg`);
-assert.equal(photo.published.variants['480p'], `processed/assets/${photo.id}/1/480p.jpg`);
+assert.equal(photo.published.variants['480p'], `processed/assets/${photo.id}/legacy/1/480p.jpg`);
 assert.equal(photo.legacy.id, 'post/photos/a.jpg');
 const video = plan.assets.find((asset) => asset.folder === 'videos');
-assert.equal(video.published.poster, `processed/assets/${video.id}/2/poster.jpg`);
+assert.equal(video.published.poster, `processed/assets/${video.id}/legacy/2/poster.jpg`);
 const media = plan.posts.find((post) => post.slug === 'post').media;
 assert.deepEqual(media.gallery, [photo.id]);
 assert.deepEqual(media.videos, [video.id]);
@@ -79,8 +80,18 @@ assert.ok(plan.copies.some((copy) => copy.from === 'originals/post/photos/a.jpg'
 assert.ok(
   plan.copies.some(
     (copy) =>
-      copy.from === 'processed/post/videos/2/poster.jpg' && copy.to === `processed/assets/${video.id}/2/poster.jpg`,
+      copy.from === 'processed/post/videos/2/poster.jpg' &&
+      copy.to === `processed/assets/${video.id}/legacy/2/poster.jpg`,
   ),
 );
 
-console.log('Migrate v2 plan: ids, copy pairs and post media passed');
+const cover = plan.assets.find((asset) => asset.folder === 'covers');
+assert.equal(cover.source.key, `originals/assets/${cover.id}/cover.jpg`);
+assert.equal(cover.source.available, false);
+validateAssetManifest({
+  schemaVersion: 2,
+  revision: 0,
+  assets: Object.fromEntries(plan.assets.map((asset) => [asset.id, asset])),
+});
+
+console.log('Migrate v2 plan: ids, copy pairs, post media and validation passed');

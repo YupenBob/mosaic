@@ -27,7 +27,7 @@ export const CONTENT_TYPES = {
  * Quotes and angle brackets are rejected outright; such names are never valid
  * Mosaic media/post identities.
  */
-const UNSAFE_SEGMENT = /["'`<>\\\u2028\u2029]/;
+const UNSAFE_SEGMENT = /["'`<>\\%?#\u2028\u2029]/;
 
 function hasControlCharacter(value) {
   return [...value].some((character) => {

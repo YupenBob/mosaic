@@ -106,7 +106,11 @@ export class JobsDurableObject {
     ])
       for (const [id, value] of Object.entries(rows)) values[prefix + id] = value;
     const changed = Object.entries(values).filter(([key, value]) => this.persisted.get(key) !== JSON.stringify(value));
+    const stale = [...this.persisted.keys()].filter(
+      (key) => (key.startsWith('assets:') || key.startsWith('jobs:') || key.startsWith('builds:')) && !values[key],
+    );
     const write = async (storage) => {
+      if (stale.length) await storage.delete(stale);
       for (let offset = 0; offset < changed.length; offset += 128)
         await storage.put(Object.fromEntries(changed.slice(offset, offset + 128)));
       await this.schedule(state, storage);
@@ -115,6 +119,7 @@ export class JobsDurableObject {
     if (this.storage.transaction) await this.storage.transaction(write);
     else await write(this.storage);
     for (const [key, value] of changed) this.persisted.set(key, JSON.stringify(value));
+    for (const key of stale) this.persisted.delete(key);
   }
   config(state) {
     return state.config || DEFAULTS;

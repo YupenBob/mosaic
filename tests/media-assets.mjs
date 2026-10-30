@@ -3,11 +3,15 @@
  * v1 coexistence. Uses the in-memory Jobs DO runtime.
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createRuntime } from './helpers/runtime.mjs';
 import { newAssetId } from '../shared/media-v2.mjs';
 import { validateManifest } from '../shared/media-manifest.mjs';
 import { processedPrefixFor } from '../scripts/media/run.mjs';
 import { resolveMedia } from '../scripts/site/media.mjs';
+import { readPosts } from '../scripts/site/posts.mjs';
 
 const runtime = createRuntime();
 const id = newAssetId();
@@ -30,14 +34,6 @@ assert.equal(state.manifest.schemaVersion, 2, 'v2 registration upgrades the mixe
 assert.equal(state.manifest.assets[id].slug, null);
 assert.equal(state.manifest.assets[id].source.key, `originals/assets/${id}/clip.mp4`);
 
-// v1 assets still register and stay out of the v2 asset list.
-await runtime.enqueue('legacy-post', 'photo.jpg');
-const afterV1 = await runtime.call('assets-list', {});
-assert.equal(afterV1.total, 1, 'v1 assets do not leak into the v2 library');
-const legacy = await runtime.call('media-list', { slug: 'legacy-post' });
-assert.equal(legacy.length, 1, 'legacy slug list still sees its own asset');
-assert.equal(legacy[0].id, 'legacy-post/photos/photo.jpg', 'v2 assets do not leak into a legacy slug list');
-
 // Claim + publish exercises the v2 R2 prefix and publish-key validation.
 const claimed = await runtime.call('claim', { runId: 'run-asset' });
 assert.equal(claimed.job.assetId, id);
@@ -54,12 +50,15 @@ const publishedState = await runtime.call('state');
 assert.ok(publishedState.manifest.assets[id].published.variants['480p']);
 assert.equal(publishedState.manifest.assets[id].status, 'processing');
 assert.equal(publishedState.manifest.assets[id].lifecycle.lastPublishedAt !== null, true);
-await runtime.bucket.put(`processed/assets/${id}/${claimed.job.generation}/720p.mp4`, 'encoded-two');
+await runtime.enqueueAsset('clip.mp4', Buffer.from('source-v2'), { id, force: true });
+const claimedTwo = await runtime.call('claim', { runId: 'run-asset-2' });
+assert.notEqual(claimedTwo.job.generation, claimed.job.generation);
+await runtime.bucket.put(`processed/assets/${id}/${claimedTwo.job.generation}/720p.mp4`, 'encoded-two');
 await runtime.call('publish', {
-  id: claimed.job.id,
-  token: claimed.job.token,
-  runId: 'run-asset',
-  published: { variants: { '720p': `processed/assets/${id}/${claimed.job.generation}/720p.mp4` } },
+  id: claimedTwo.job.id,
+  token: claimedTwo.job.token,
+  runId: 'run-asset-2',
+  published: { variants: { '720p': `processed/assets/${id}/${claimedTwo.job.generation}/720p.mp4` } },
   complete: true,
 });
 const rolled = await runtime.call('rollback-asset', { id });
@@ -68,14 +67,23 @@ const rolledState = await runtime.call('state');
 assert.ok(rolledState.manifest.assets[id].published.variants['480p'], 'rollback restores the previous generation');
 assert.ok(rolledState.manifest.assets[id].previousPublished.variants['720p'], 'current generation is kept as previous');
 await runtime.call('failed', {
-  id: claimed.job.id,
-  token: claimed.job.token,
-  runId: 'run-asset',
+  id: claimedTwo.job.id,
+  token: claimedTwo.job.token,
+  runId: 'run-asset-2',
   error: 'fixture encode failure',
 });
 const degraded = await runtime.call('assets-list', {});
 assert.equal(degraded.assets[0].lifecycle.state, 'degraded');
 assert.ok(degraded.assets[0].lifecycle.health.reasons.includes('latest-job-failed'));
+
+// v1 assets still register and stay out of the v2 asset list. Enqueue this
+// after the v2 claim sequence so it cannot be the job returned by claim().
+await runtime.enqueue('legacy-post', 'photo.jpg');
+const afterV1 = await runtime.call('assets-list', {});
+assert.equal(afterV1.total, 1, 'v1 assets do not leak into the v2 library');
+const legacy = await runtime.call('media-list', { slug: 'legacy-post' });
+assert.equal(legacy.length, 1, 'legacy slug list still sees its own asset');
+assert.equal(legacy[0].id, 'legacy-post/photos/photo.jpg', 'v2 assets do not leak into a legacy slug list');
 
 const deleted = await runtime.call('delete-assets', { ids: [id] });
 assert.equal(deleted.ok, true);
@@ -90,7 +98,7 @@ const restoredAsset = await runtime.call('restore-assets', { ids: [id] });
 assert.equal(restoredAsset.ok, true);
 const afterRestore = await runtime.call('assets-list', {});
 assert.equal(afterRestore.total, 1, 'restore brings the asset back before purge');
-assert.equal(afterRestore.assets[0].lifecycle.state, 'degraded');
+assert.equal(afterRestore.assets[0].lifecycle.state, 'processing');
 
 await runtime.call('delete-assets', { ids: [id], soft: false });
 const hardDeleted = await runtime.call('assets-list', { includeDeleted: true });
@@ -177,5 +185,47 @@ assert.equal(
   afterPurge.assets.some((asset) => asset.id === purgeId),
   false,
 );
+runtime.restart();
+const afterPurgeRestart = await runtime.call('assets-list', { includeDeleted: true });
+assert.equal(
+  afterPurgeRestart.assets.some((asset) => asset.id === purgeId),
+  false,
+  'purged assets stay gone after a coordinator restart',
+);
 
 console.log('Media assets: purge due soft-deleted asset passed');
+
+// Asset-id covers survive the build resolver (not just filename/N covers).
+const coverDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mosaic-cover-'));
+fs.mkdirSync(path.join(coverDir, 'cover-post'), { recursive: true });
+fs.writeFileSync(
+  path.join(coverDir, 'cover-post', 'index.md'),
+  '---\ntitle: Cover post\nmedia:\n  gallery: [\"' + id + '\"]\ncover: \"' + id + '\"\n---\n\ncover body\n',
+);
+const coverManifest = {
+  schemaVersion: 2,
+  revision: 1,
+  assets: {
+    [id]: {
+      ...buildManifest.assets[id],
+      folder: 'photos',
+      published: { generation: '1', variants: { '480p': `processed/assets/${id}/1/480p.jpg` } },
+    },
+  },
+};
+const coverPosts = readPosts(
+  {
+    content: coverDir,
+    config: {
+      mediaBase: 'https://media.example',
+      coverAspectMin: 1,
+      coverAspectMax: 2,
+      author: { name: '' },
+    },
+  },
+  coverManifest,
+);
+assert.equal(coverPosts[0].cover, 'https://media.example/processed/assets/' + id + '/1/480p.jpg');
+fs.rmSync(coverDir, { recursive: true, force: true });
+
+console.log('Media assets: asset-id cover resolution passed');

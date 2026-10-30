@@ -7,6 +7,8 @@
 import assert from 'node:assert/strict';
 import { assetId, validSegment } from '../shared/media-manifest.mjs';
 import { jsStr } from '../cloud-admin/js/escape.js';
+import { contentsUrl } from '../worker/src/services/github-client.js';
+import { deletePost } from '../worker/src/services/content.js';
 
 const unsafe = [
   `x');alert(1)//`,
@@ -17,6 +19,11 @@ const unsafe = [
   'a\\b',
   'a/b',
   'a\nb',
+  'a%b',
+  'a?b',
+  'a#b',
+  '%2e%2e',
+  '%252e%252e',
   'a\rb',
   '.',
   '..',
@@ -29,6 +36,10 @@ for (const value of unsafe) assert.equal(validSegment(value), false, `must rejec
 for (const value of ['秋日的光.jpg', 'clip 01.mp4', 'photo-1.png', 'A&B.webp', 'cover.v2.jpg', '日本語.m4a'])
   assert.equal(validSegment(value), true, `must accept ${value}`);
 
+const url = contentsUrl({ env: { GITHUB_REPO: 'owner/repo' } }, 'content/posts/%3F/index.md');
+assert.ok(url.includes('/contents/content/posts/%253F/index.md'), 'contents paths are encoded per segment');
+await assert.rejects(() => deletePost({ env: { GITHUB_REPO: 'owner/repo' } }, '?'), /Invalid post slug/);
+await assert.rejects(() => deletePost({ env: { GITHUB_REPO: 'owner/repo' } }, '%252e%252e'), /Invalid post slug/);
 assert.throws(() => assetId('post', `x');alert(1)//`, 'photos'), /Invalid media name/);
 assert.equal(assetId('post', 'cover.jpg', 'covers'), 'post/covers/cover.jpg');
 

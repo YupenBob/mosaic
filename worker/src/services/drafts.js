@@ -22,17 +22,22 @@ function conflict() {
   return Object.assign(new Error('Draft changed elsewhere'), { status: 409, code: 'CONFLICT' });
 }
 
-async function read(c, id) {
+async function readMeta(c, id) {
   const object = await c.env.MEDIA.get(draftKey(id));
   if (!object) return null;
-  return validateDraftRecord(JSON.parse(await object.text()));
+  return { draft: validateDraftRecord(JSON.parse(await object.text())), etag: object.etag };
 }
 
-async function write(c, draft) {
+async function read(c, id) {
+  return (await readMeta(c, id))?.draft || null;
+}
+
+async function write(c, draft, etag = null) {
   const body = JSON.stringify(draft);
   if (new TextEncoder().encode(body).length > MAX_DRAFT_BYTES)
     throw Object.assign(new Error('Draft is too large'), { status: 413, code: 'PAYLOAD_TOO_LARGE' });
-  await c.env.MEDIA.put(draftKey(draft.id), body, {
+  return c.env.MEDIA.put(draftKey(draft.id), body, {
+    ...(etag ? { onlyIf: { etagMatches: etag } } : {}),
     httpMetadata: { contentType: 'application/json', cacheControl: 'no-store' },
   });
 }
@@ -83,8 +88,9 @@ export async function listDrafts(c) {
 
 export async function saveDraft(c, id, input = {}) {
   if (!validDraftId(id)) throw Object.assign(new Error('Invalid draft id'), { status: 400 });
-  const current = await read(c, id);
-  if (!current) throw notFound();
+  const currentMeta = await readMeta(c, id);
+  if (!currentMeta) throw notFound();
+  const current = currentMeta.draft;
   const expected = Number(input.revision);
   if (Number.isInteger(expected) && expected !== current.revision) throw conflict();
   const next = {
@@ -99,7 +105,8 @@ export async function saveDraft(c, id, input = {}) {
   await c.env.MEDIA.put(draftRevisionKey(id, current.revision), JSON.stringify(current), {
     httpMetadata: { contentType: 'application/json', cacheControl: 'no-store' },
   });
-  await write(c, next);
+  const written = await write(c, next, currentMeta.etag);
+  if (!written) throw conflict();
   return next;
 }
 
@@ -123,10 +130,17 @@ export async function publishDraft(c, id) {
   const draft = await read(c, id);
   if (!draft) throw notFound();
   if (!draft.slug) throw Object.assign(new Error('Draft has no slug'), { status: 400, code: 'INVALID_PARAMS' });
+  const frontMatter = { ...(draft.frontMatter || {}) };
+  if (
+    draft.media &&
+    (draft.media.gallery?.length || draft.media.videos?.length || draft.media.music?.length || draft.media.cover)
+  )
+    frontMatter.media = draft.media;
+  if (draft.media?.cover) frontMatter.cover = draft.media.cover;
   const result = await createOrUpdatePost(
     c,
     draft.slug,
-    draft.frontMatter || {},
+    frontMatter,
     draft.body || '',
     `Publish draft ${id}`,
     draft.baseSha,

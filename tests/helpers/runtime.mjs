@@ -66,6 +66,9 @@ export function createRuntime() {
           .slice(0, limit)
           .map(([key, value]) => [key, structuredClone(value)]),
       ),
+    delete: async (keys) => {
+      for (const key of Array.isArray(keys) ? keys : [keys]) persistent.delete(key);
+    },
     getAlarm: async () => alarmAt,
     setAlarm: async (value) => {
       alarmAt = value;

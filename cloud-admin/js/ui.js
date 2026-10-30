@@ -160,8 +160,8 @@ export function openModal({
   overlay.innerHTML = `
     <div class="modal-box ${wide ? 'modal-wide' : ''}">
       ${icon ? `<div class="modal-icon" style="${iconColor ? 'color:' + iconColor : ''}"><i class="${icon}"></i></div>` : ''}
-      ${title ? `<h3 class="modal-title">${title}</h3>` : ''}
-      ${desc ? `<p class="modal-desc">${desc}</p>` : ''}
+      ${title ? `<h3 class="modal-title">${escHtml(title)}</h3>` : ''}
+      ${desc ? `<p class="modal-desc">${escHtml(desc)}</p>` : ''}
       ${content || ''}
       <div class="modal-actions"></div>
     </div>

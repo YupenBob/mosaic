@@ -127,7 +127,7 @@ try {
           {
             sha: 'a'.repeat(40),
             shortSha: 'aaaaaaa',
-            message: 'Fixture edit',
+            message: 'Fixture edit <img src=x onerror="window.__historyXss=1">',
             author: 'Fixture',
             date: new Date().toISOString(),
           },
@@ -263,6 +263,15 @@ try {
   await page.locator('.asset-card').first().click();
   await page.locator('.asset-detail').waitFor();
   assert.ok((await page.locator('.asset-detail').innerText()).includes('library-photo.jpg'), 'asset detail opens');
+  await page.locator('.modal-overlay .btn-secondary').first().click();
+
+  await page.evaluate(() => {
+    location.hash = 'history';
+  });
+  await page.locator('.history-row').first().waitFor();
+  await page.locator('.history-row').first().click();
+  await page.locator('.modal-title').waitFor();
+  assert.equal(await page.evaluate(() => window.__historyXss), undefined, 'commit messages cannot execute scripts');
   await page.locator('.modal-overlay .btn-secondary').first().click();
 
   // Draft mode: save goes to R2, publish writes Git and returns to the list.

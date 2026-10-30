@@ -18,6 +18,7 @@ import { createPipelineClient } from '../lib/pipeline-client.mjs';
 import { createStorage } from './storage.mjs';
 import { planV2Migration } from './plan-v2.mjs';
 import { applyV2Migration, uniqueCopies } from './apply-v2.mjs';
+import { validateAssetManifest } from '../../shared/media-v2.mjs';
 
 const args = new Set(process.argv.slice(2));
 const apply = args.has('--apply');
@@ -83,14 +84,19 @@ async function main() {
   const posts = readPosts();
   const plan = await planV2Migration({ manifest: state.manifest, posts });
   const copies = uniqueCopies(plan);
+  // Validate before touching R2; a bad generation/source shape must fail here.
+  validateAssetManifest({
+    schemaVersion: 2,
+    revision: 0,
+    assets: Object.fromEntries(plan.assets.map((asset) => [asset.id, asset])),
+  });
   console.log(
     `Media v2 plan: ${plan.counts.assets} assets, ${copies.length} object copies, ${plan.counts.posts} posts, ${plan.counts.references} references`,
   );
   if (args.has('--write-plan')) {
-    fs.writeFileSync(
-      path.join(context.root, '.mosaic/media-v2-plan.json'),
-      JSON.stringify({ counts: plan.counts, copies, posts: plan.posts }, null, 2),
-    );
+    const planFile = path.join(context.root, '.mosaic/media-v2-plan.json');
+    fs.mkdirSync(path.dirname(planFile), { recursive: true });
+    fs.writeFileSync(planFile, JSON.stringify({ counts: plan.counts, copies, posts: plan.posts }, null, 2));
   }
   if (!apply) {
     console.log('Dry run. Re-run with --apply and MIGRATION_CONFIRM=media-v2 to migrate.');

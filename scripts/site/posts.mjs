@@ -18,7 +18,9 @@ export function readPosts(context, manifest) {
       const indexed = /^(video|photo):(\d+)$/.exec(coverRef);
       let selected = indexed ? (indexed[1] === 'video' ? videos : photos)[Number(indexed[2])] : null;
       if (!indexed && coverRef && !/^(https?:\/\/|\/)/.test(coverRef))
-        selected = covers.find((c) => c.file === coverRef) || photos.find((c) => c.file === coverRef);
+        selected =
+          covers.find((c) => c.id === coverRef || c.file === coverRef) ||
+          photos.find((item) => item.id === coverRef || item.file === coverRef);
       if (!coverRef)
         selected =
           videos.find((v) => v.poster) ||

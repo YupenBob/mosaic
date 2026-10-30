@@ -16,7 +16,7 @@ function mapObject(value, map) {
   return value;
 }
 
-function mapKey(asset, newId, key) {
+function mapKey(asset, newId, key, generation) {
   if (typeof key !== 'string') return key;
   const oldPrefix = `originals/${asset.slug}/`;
   if (key.startsWith(oldPrefix)) return `originals/assets/${newId}/${asset.filename}`;
@@ -24,7 +24,7 @@ function mapKey(asset, newId, key) {
   if (key.startsWith(processed)) {
     const rest = key.slice(processed.length);
     const afterFolder = rest.split('/').slice(1).join('/');
-    return `processed/assets/${newId}/${afterFolder}`;
+    return `processed/assets/${newId}/${generation}/${afterFolder}`;
   }
   return key;
 }
@@ -43,10 +43,19 @@ export async function planV2Migration({ manifest, posts = [] }) {
   const copies = [];
   for (const asset of legacyAssets) {
     const id = idByLegacy.get(asset.id);
-    const map = (key) => mapKey(asset, id, key);
-    const source = { ...asset.source, key: map(asset.source.key) };
-    const published = asset.published ? mapObject(asset.published, map) : null;
-    const oldKeys = new Set([asset.source.key, ...(asset.published ? objectKeys(asset.published) : [])]);
+    const generation = String(asset.generation ?? 'legacy');
+    const map = (key) => mapKey(asset, id, key, generation);
+    const oldSourceKey = asset.source?.key || '';
+    const mappedSourceKey = oldSourceKey ? map(oldSourceKey) : `originals/assets/${id}/${asset.filename}`;
+    const source = {
+      ...asset.source,
+      key: mappedSourceKey,
+      available: asset.source?.available !== false && !!oldSourceKey,
+    };
+    const published = asset.published
+      ? { ...mapObject(asset.published, map), generation: asset.published.generation ?? generation }
+      : null;
+    const oldKeys = new Set([oldSourceKey, ...(asset.published ? objectKeys(asset.published) : [])]);
     const newKeys = new Set([source.key, ...(published ? objectKeys(published) : [])]);
     for (const oldKey of oldKeys) {
       const newKey = map(oldKey);
@@ -55,6 +64,7 @@ export async function planV2Migration({ manifest, posts = [] }) {
     assets.push({
       ...asset,
       id,
+      generation,
       v2: true,
       slug: null,
       source,

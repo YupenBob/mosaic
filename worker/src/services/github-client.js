@@ -1,6 +1,10 @@
 export const GITHUB_API = 'https://api.github.com';
 export function contentsUrl(c, repoPath) {
-  const url = new URL(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${repoPath}`);
+  const encodedPath = String(repoPath)
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  const url = new URL(`${GITHUB_API}/repos/${c.env.GITHUB_REPO}/contents/${encodedPath}`);
   if (c.env.SITE_BRANCH) url.searchParams.set('ref', c.env.SITE_BRANCH);
   return url.href;
 }

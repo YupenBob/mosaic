@@ -831,11 +831,15 @@ await record('GET /api/disk (parallel usage)', async () => {
 
 await record('cleanup scan/delete orphan (R2)', async () => {
   store.set('originals/ghost-post/x.jpg', 'x');
+  const assetKey = 'originals/assets/ast_0123456789abcdefghjkmnpq/clip.mp4';
+  store.set(assetKey, 'asset-source');
   const scan = await (await call('/api/cleanup', { token: TOKEN })).json();
   assert.ok(scan.totalOrphans >= 1 && scan.orphans.some((o) => o.key.includes('ghost-post')));
+  assert.ok(!scan.orphans.some((o) => o.key === assetKey), 'v2 asset source is never an orphan');
   const del = await (await call('/api/cleanup', { method: 'DELETE', token: TOKEN })).json();
   assert.ok(del.deleted >= 1);
   assert.ok(!store.has('originals/ghost-post/x.jpg'));
+  assert.ok(store.has(assetKey), 'cleanup leaves v2 originals to the asset lifecycle');
 });
 
 await record('GET /api/dirty (count state)', async () => {
