@@ -9,6 +9,7 @@
  * hooks, so behavior is identical to the previous inline implementation.
  */
 import { fingerprint, objectKeys, validateManifest } from '../../../shared/media-manifest.mjs';
+import { ASSET_ID_RE } from '../../../shared/media-v2.mjs';
 import { failJob, isJobDue } from './job-state.mjs';
 import { isProcessedMode, normalizeJobOptions } from './media-options.mjs';
 import { applySourceRetention } from './source-retention.mjs';
@@ -29,10 +30,13 @@ import { applySourceRetention } from './source-retention.mjs';
  * @returns {Promise<object>} task summary for the upload response
  */
 export async function registerAsset({ state, data, config, saveManifest }) {
+  const v2 = data.v2 === true || ASSET_ID_RE.test(data.id);
   // Legacy root covers now upload through photos/: retain their stable identity.
-  const legacyCover = state.manifest.assets[`${data.slug}/covers/${data.filename}`];
-  if (data.folder === 'photos' && legacyCover && legacyCover.status !== 'deleted' && !state.manifest.assets[data.id])
-    data = { ...data, id: legacyCover.id, folder: 'covers' };
+  if (!v2 && data.slug && data.folder === 'photos') {
+    const legacyCover = state.manifest.assets[`${data.slug}/covers/${data.filename}`];
+    if (legacyCover && legacyCover.status !== 'deleted' && !state.manifest.assets[data.id])
+      data = { ...data, id: legacyCover.id, folder: 'covers' };
+  }
   // `state.config` tracks the site-wide config; per-job overrides live on the job.
   state.config = data.stateConfig || data.config;
   const normalizedOptions = normalizeJobOptions(data.options, data.stateConfig || data.config || config);
@@ -73,7 +77,7 @@ export async function registerAsset({ state, data, config, saveManifest }) {
   state.jobs[id] = job;
   state.manifest.assets[data.id] = {
     id: data.id,
-    slug: data.slug,
+    slug: v2 ? null : data.slug,
     filename: data.filename,
     order: previous?.order ?? data.order ?? data.filename,
     folder: data.folder,
@@ -84,7 +88,9 @@ export async function registerAsset({ state, data, config, saveManifest }) {
     status: 'pending',
     jobId: id,
     published: previous?.published || null,
+    ...(v2 ? { v2: true, createdAt: previous?.createdAt || new Date().toISOString() } : {}),
   };
+  if (v2) state.manifest.schemaVersion = 2;
   await saveManifest(state);
   return {
     taskId: id,
@@ -100,8 +106,12 @@ export async function registerAsset({ state, data, config, saveManifest }) {
  * @returns {Promise<{ok:boolean}>}
  */
 export async function removeAssets({ state, data, saveManifest }) {
+  const ids = new Set(Array.isArray(data.assetIds) ? data.assetIds : []);
   for (const asset of Object.values(state.manifest.assets)) {
-    if (asset.slug !== data.slug || (data.filename && asset.filename !== data.filename)) continue;
+    const matches = ids.size
+      ? ids.has(asset.id)
+      : asset.slug === data.slug && (!data.filename || asset.filename === data.filename);
+    if (!matches) continue;
     asset.status = 'deleted';
     const job = state.jobs[asset.jobId];
     if (job) {
@@ -224,6 +234,7 @@ export async function interpolateAssets({ state, data, env, config, saveManifest
   const all = data.all === true;
   const slug = typeof data.slug === 'string' ? data.slug : '';
   const filename = typeof data.filename === 'string' && data.filename ? data.filename : '';
+  const assetIds = new Set(Array.isArray(data.assetIds) ? data.assetIds : []);
   const jobConfig = data.config || config;
   const baseConfig = data.stateConfig || config;
   const interpolation = jobConfig.videoQuality?.interpolation || {
@@ -233,7 +244,7 @@ export async function interpolateAssets({ state, data, env, config, saveManifest
   const candidates = Object.values(state.manifest.assets).filter(
     (asset) =>
       asset.status !== 'deleted' &&
-      (all || asset.slug === slug) &&
+      (all || (assetIds.size ? assetIds.has(asset.id) : asset.slug === slug)) &&
       (filename ? asset.filename === filename : asset.folder === 'videos'),
   );
   const tasks = [];
@@ -262,7 +273,8 @@ export async function interpolateAssets({ state, data, env, config, saveManifest
         state,
         data: {
           id: asset.id,
-          slug: asset.slug,
+          v2: asset.v2 === true,
+          slug: asset.slug || null,
           filename: asset.filename,
           folder: asset.folder,
           order: asset.order,
@@ -318,7 +330,8 @@ export async function recordProgress({ state, data, env, operation, saveManifest
         throw Object.assign(new Error('Source changed'), { status: 409 });
     }
     const keys = objectKeys(data.published);
-    if (!keys.length || keys.some((key) => !key.startsWith(`processed/${job.slug}/`)))
+    const processedRoot = job.v2 ? `processed/assets/${job.assetId}/` : `processed/${job.slug}/`;
+    if (!keys.length || keys.some((key) => !key.startsWith(processedRoot)))
       throw new Error('Invalid published objects');
     for (const key of keys) if (!(await env.MEDIA.head(key))) throw new Error(`Missing processed object: ${key}`);
     // Sanitized image originals are written conditionally: never overwrite a newer upload.

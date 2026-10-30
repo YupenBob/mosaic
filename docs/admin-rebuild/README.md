@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | P0 安全热修 | 完成 | `validSegment`、`jsStr`、`baseSha`、XSS 回归 |
 | P1 框架/视觉/动效/预览图 | 进行中 | 壳层、状态胶囊、账户菜单、动效、概览、文章筛选、编辑器两栏、预览图 |
-| P2 Media v2 | 进行中 | 资产身份/manifest v2/引用索引纯模块与测试已落地；上传、任务、构建迁移待接 |
+| P2 Media v2 | 进行中 | 资产身份/manifest v2、v2 上传 API、Jobs 双读、v2 构建解析、素材库初版已落地；迁移脚本与编辑器中引用待接 |
 | P3 任务中心/生命周期 | 进行中 | 任务中心页已基于现有 `/api/media-jobs` 落地；资产生命周期待 Media v2 |
 | P4 草稿/预览 | 未开始 | |
 | P5 视频增强 | 未开始 | |
@@ -68,3 +68,12 @@ npx prettier --check <changed files>   # passed
 - `shared/media-v2.mjs`：独立 `ast_` 资产 ID、迁移确定性 ID、R2 `originals/assets`/`processed/assets` 路径、v2 manifest 校验、文章 `media` 引用、素材使用索引。
 - `tests/media-v2-smoke.mjs`：ID/路径/校验/v1 兼容/引用/使用索引。
 - 未切换线上路径；v1 manifest、R2 目录、Jobs DO、构建和后台仍按原逻辑运行。
+
+## P2 第二批（v2 上传链）
+
+- `POST /api/assets` 预签名、`/api/assets/:id/complete`、分片上传/parts/complete/abort；素材 ID 与文章解耦。
+- Jobs DO 支持 v2 `enqueue`、`assets-list`、`asset-preview`、`delete-assets`；混合 manifest（v1 slug + v2 `ast_`）通过校验。
+- 媒体 runner 支持 `processed/assets/<id>/<generation>`，publish 校验按 v2 前缀。
+- 构建 `resolveMedia` 支持 frontmatter `media` 数组，正文继续用 `photo:N` / `video:N`。
+- 后台新增 `#library` 素材库初版：列表/筛选/小文件预签名上传/轮询；`/api/assets/:id/preview` 公共缩略图。
+- 新增 `tests/media-assets.mjs`、`tests/assets-api.mjs`；`test:unit` 已接入。

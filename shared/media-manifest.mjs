@@ -1,4 +1,5 @@
 /** Media identities and published manifests; no filesystem or SDK dependencies. */
+import { ASSET_ID_RE } from './media-v2.mjs';
 export const MANIFEST_VERSION = 1;
 export const FOLDERS = {
   photos: ['jpg', 'jpeg', 'png', 'webp', 'tiff', 'tif', 'gif', 'svg', 'avif'],
@@ -63,7 +64,7 @@ export function emptyManifest() {
 }
 export function validateManifest(value) {
   if (
-    value?.schemaVersion !== MANIFEST_VERSION ||
+    ![1, 2].includes(value?.schemaVersion) ||
     !Number.isInteger(value.revision) ||
     value.revision < 0 ||
     !value.assets ||
@@ -71,6 +72,13 @@ export function validateManifest(value) {
   )
     throw new Error('Unsupported or corrupt media manifest');
   for (const [id, entry] of Object.entries(value.assets)) {
+    // Mixed manifests are the migration window: legacy slug ids coexist with
+    // independent `ast_...` assets. v2 entries carry `v2:true` so a malformed
+    // legacy entry can never masquerade as a v2 asset.
+    if (ASSET_ID_RE.test(id)) {
+      if (entry.id !== id || entry.v2 !== true) throw new Error('Invalid media manifest identity');
+      continue;
+    }
     if (id !== assetId(entry.slug, entry.filename, entry.folder)) throw new Error('Invalid media manifest identity');
   }
   return value;

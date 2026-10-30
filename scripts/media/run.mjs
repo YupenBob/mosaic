@@ -9,6 +9,14 @@ import { processImage } from './images.mjs';
 import { processVideo } from './videos.mjs';
 import { processAudio } from './audio.mjs';
 import { hashFile } from './process.mjs';
+
+/** R2 prefix for a task's generated objects: legacy slug or independent asset. */
+export function processedPrefixFor(job) {
+  return job.v2
+    ? `processed/assets/${job.assetId}/${job.generation}`
+    : `processed/${job.slug}/${job.folder}/${job.generation}`;
+}
+
 export async function processTask(
   job,
   { request, store, workRoot, now = Date.now, deadline = Infinity, published = null },
@@ -42,7 +50,7 @@ export async function processTask(
     } else if (!published?.sources || !Object.keys(published.sources).length) {
       throw new Error('Processed source has no published tiers to re-encode');
     }
-    const prefix = `processed/${job.slug}/${job.folder}/${job.generation}`;
+    const prefix = processedPrefixFor(job);
     const publish = async (payload, complete, sanitized = false, extra = {}) => {
       if (heartbeatError) throw heartbeatError;
       controller.signal.throwIfAborted();

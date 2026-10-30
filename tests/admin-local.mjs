@@ -176,7 +176,7 @@ try {
   assert.deepEqual(errors, [], 'all admin routes must render without JavaScript errors');
   assert.ok(!requests.includes('/build/done'), 'browser polling cannot acknowledge a deployment');
   console.log(
-    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 8 pages × 2 themes accessibility passed',
+    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 9 pages × 2 themes accessibility passed',
   );
 } finally {
   await browser.close();

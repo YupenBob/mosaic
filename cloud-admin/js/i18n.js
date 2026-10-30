@@ -3,6 +3,19 @@
  */
 export const I18N = {
   'zh-CN': {
+    library: {
+      subtitle: '{total} 个素材 · {active} 个处理中',
+      upload: '上传素材',
+      filter: '筛选素材',
+      count: '{n} 个素材',
+      emptyTitle: '还没有素材',
+      emptyDesc: '上传图片、视频或音频；素材可以先于文章存在。',
+      loadFailed: '素材加载失败',
+      uploading: '正在上传 {name}',
+      uploaded: '已上传 {name}',
+      uploadFailed: '{name} 上传失败',
+      uploadUnsupported: '这个文件需要分片上传，将在上传中心里完成',
+    },
     tasks: {
       title: '任务中心',
       subtitle: '{active} 个处理中 · {failed} 个失败',
@@ -68,6 +81,7 @@ export const I18N = {
       dashboard: '概览',
       posts: '文章',
       editor: '写文章',
+      library: '素材库',
       build: '上线',
       config: '设置',
       taxonomy: '分类与标签',
@@ -726,6 +740,19 @@ export const I18N = {
   },
 
   en: {
+    library: {
+      subtitle: '{total} assets · {active} processing',
+      upload: 'Upload assets',
+      filter: 'Filter assets',
+      count: '{n} assets',
+      emptyTitle: 'No assets yet',
+      emptyDesc: 'Upload images, videos or audio. Assets can exist before a post.',
+      loadFailed: 'Could not load assets',
+      uploading: 'Uploading {name}',
+      uploaded: 'Uploaded {name}',
+      uploadFailed: '{name} failed to upload',
+      uploadUnsupported: 'This file needs multipart upload; it will be handled by the upload center',
+    },
     tasks: {
       title: 'Task Center',
       subtitle: '{active} processing · {failed} failed',

@@ -90,6 +90,29 @@ export function publicJobView(job, asset) {
 }
 
 /**
+ * Admin projection for a Media v2 asset (job state is exposed separately).
+ * @param {object} asset
+ * @param {object} [job]
+ */
+export function publicAssetView(asset, job) {
+  return {
+    id: asset.id,
+    filename: asset.filename,
+    folder: asset.folder,
+    status: asset.status,
+    generation: asset.generation,
+    jobId: asset.jobId || null,
+    sourceAvailable: asset.source?.available !== false,
+    sourceDeletedAt: asset.sourceDeletedAt || asset.source?.deletedAt || null,
+    published: !!asset.published,
+    publishedGeneration: asset.published?.generation || null,
+    options: job?.options || {},
+    v2: asset.v2 === true,
+    createdAt: asset.createdAt || null,
+  };
+}
+
+/**
  * @param {object} job
  * @param {object} asset
  * @returns {boolean} true when the runner's final publish may delete originals

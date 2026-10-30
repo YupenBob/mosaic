@@ -205,6 +205,29 @@ export const posts = {
     apiFetch(`/posts/${slug}/duplicate`, { method: 'POST', body: JSON.stringify({ newSlug }) }),
 };
 
+// ── Assets (Media v2) ───────────────────────
+export const assets = {
+  list: (params = {}) => apiFetch('/assets' + qs(params)),
+
+  /** Create an independent asset id + a direct R2 PUT URL. */
+  create: (data) => apiFetch('/assets', { method: 'POST', body: JSON.stringify(data) }),
+
+  /** Verify the object landed and enqueue its processing task. */
+  complete: (id, data = {}) =>
+    apiFetch(`/assets/${encodeURIComponent(id)}/complete`, { method: 'POST', body: JSON.stringify(data) }),
+
+  multipartStart: (id, data) =>
+    apiFetch(`/assets/${encodeURIComponent(id)}/multipart/start`, { method: 'POST', body: JSON.stringify(data) }),
+  multipartParts: (id, data) =>
+    apiFetch(`/assets/${encodeURIComponent(id)}/multipart/parts`, { method: 'POST', body: JSON.stringify(data) }),
+  multipartComplete: (id, data) =>
+    apiFetch(`/assets/${encodeURIComponent(id)}/multipart/complete`, { method: 'POST', body: JSON.stringify(data) }),
+  multipartAbort: (id, data) =>
+    apiFetch(`/assets/${encodeURIComponent(id)}/multipart/abort`, { method: 'POST', body: JSON.stringify(data) }),
+
+  delete: (id) => apiFetch(`/assets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
 // ── Media ──────────────────────────────────
 export const media = {
   list: (slug) => apiFetch(`/media/${encodeURIComponent(slug)}/list`),

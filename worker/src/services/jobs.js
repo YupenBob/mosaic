@@ -1,6 +1,7 @@
 /** Coordinator client + upload registration helpers used by the Worker routes. */
 import { normalizeConfig, processingConfig } from '../../../shared/config.mjs';
 import { assetId, fingerprint, folderFor, validSegment } from '../../../shared/media-manifest.mjs';
+import { ASSET_ID_RE } from '../../../shared/media-v2.mjs';
 import { getConfig } from './site-config.js';
 
 /**
@@ -53,6 +54,38 @@ export async function registerUpload(c, key, object, extra = {}) {
     slug,
     filename,
     folder,
+    ...rest,
+    ...(Object.keys(jobOptions).length ? { options: jobOptions } : {}),
+    source: { key, etag: object.etag, size: object.size },
+    config,
+    configHash: await fingerprint(processingConfig(config, folder)),
+  });
+}
+
+/**
+ * Register a Media v2 upload: the asset identity is independent of any post.
+ *
+ * @param {object} c
+ * @param {string} assetIdValue - `ast_...`
+ * @param {string} key - `originals/assets/<id>/<filename>`
+ * @param {{etag:string, size:number}} object
+ * @param {{filename:string, folder:string, keepSource?:boolean, uploadId?:string, options?:object}} extra
+ */
+export async function registerAssetUpload(c, assetIdValue, key, object, extra = {}) {
+  if (!c.env.JOBS) throw new Error('JOBS binding is not configured');
+  if (!ASSET_ID_RE.test(assetIdValue)) throw new Error('Invalid asset id');
+  const { filename, folder, keepSource, uploadId, options, ...rest } = extra;
+  if (!filename || !folder) throw new Error('filename and folder required');
+  const config = normalizeConfig(await getConfig(c), c.env);
+  const jobOptions = { ...(options || {}) };
+  if (keepSource !== undefined) jobOptions.keepSource = keepSource;
+  return jobsRequest(c.env, 'enqueue', {
+    id: assetIdValue,
+    v2: true,
+    slug: null,
+    filename,
+    folder,
+    ...(uploadId ? { uploadId } : {}),
     ...rest,
     ...(Object.keys(jobOptions).length ? { options: jobOptions } : {}),
     source: { key, etag: object.etag, size: object.size },

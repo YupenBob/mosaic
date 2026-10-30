@@ -13,7 +13,7 @@ export function readPosts(context, manifest) {
       const { data, content } = matter(
         fs.readFileSync(path.join(context.content, slug, 'index.md'), 'utf8').replace(/\r\n/g, '\n'),
       );
-      const { photos, videos, music, covers } = resolveMedia(manifest, slug, site);
+      const { photos, videos, music, covers } = resolveMedia(manifest, { slug, media: data.media }, site);
       const coverRef = String(data.cover || '');
       const indexed = /^(video|photo):(\d+)$/.exec(coverRef);
       let selected = indexed ? (indexed[1] === 'video' ? videos : photos)[Number(indexed[2])] : null;

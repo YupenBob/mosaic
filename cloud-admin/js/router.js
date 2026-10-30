@@ -14,6 +14,7 @@ import renderTaxonomy, { taxonomySkeleton } from './taxonomy.js?v=1';
 import renderCleanup, { cleanupSkeleton } from './cleanup.js?v=1';
 import renderTrash, { renderDeployRedirect, trashSkeleton } from './trash.js?v=1';
 import renderTasks, { tasksSkeleton } from './tasks.js?v=1';
+import renderLibrary, { librarySkeleton } from './library.js?v=1';
 
 export const pages = {
   dashboard: {
@@ -39,6 +40,12 @@ export const pages = {
   },
   cleanup: { render: renderCleanup, skeleton: cleanupSkeleton, label: () => t('nav.cleanup'), icon: 'ri-broom-line' },
   tasks: { render: renderTasks, skeleton: tasksSkeleton, label: () => t('nav.tasks'), icon: 'ri-list-check-2' },
+  library: {
+    render: renderLibrary,
+    skeleton: librarySkeleton,
+    label: () => t('nav.library'),
+    icon: 'ri-hard-drive-3-line',
+  },
   trash: { render: renderTrash, skeleton: trashSkeleton, label: () => t('nav.trash'), icon: 'ri-delete-bin-6-line' },
   deploy: { render: () => renderDeployRedirect(), skeleton: null, label: () => 'Deploy', icon: 'ri-tools-line' },
 };

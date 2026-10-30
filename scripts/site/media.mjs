@@ -1,13 +1,27 @@
 import fs from 'node:fs';
 import { emptyManifest, validateManifest, mediaUrl, compareMediaOrder } from '../../shared/media-manifest.mjs';
+import { ASSET_ID_RE, normalizePostMedia } from '../../shared/media-v2.mjs';
 export function loadManifest(file) {
   return fs.existsSync(file) ? validateManifest(JSON.parse(fs.readFileSync(file, 'utf8'))) : emptyManifest();
 }
-export function resolveMedia(manifest, slug, site) {
+export function resolveMedia(manifest, postOrSlug, site) {
   const result = { photos: [], videos: [], music: [], covers: [] };
-  const entries = Object.values(manifest.assets)
-    .filter((entry) => entry.slug === slug && entry.status !== 'deleted')
-    .sort(compareMediaOrder);
+  const post = typeof postOrSlug === 'string' ? { slug: postOrSlug } : postOrSlug || {};
+  const slug = post.slug;
+  const media = post.media && typeof post.media === 'object' ? normalizePostMedia(post.media) : null;
+  let entries;
+  if (media) {
+    const ids = [
+      ...new Set([...media.gallery, ...media.videos, ...media.music, ...(media.cover ? [media.cover] : [])]),
+    ];
+    entries = ids
+      .map((id) => (ASSET_ID_RE.test(id) ? manifest.assets[id] : null))
+      .filter((entry) => entry && entry.status !== 'deleted');
+  } else {
+    entries = Object.values(manifest.assets)
+      .filter((entry) => entry.slug === slug && entry.status !== 'deleted')
+      .sort(compareMediaOrder);
+  }
   const url = (key) => mediaUrl(key, site.mediaBase);
   for (const entry of entries) {
     const output = entry.published;

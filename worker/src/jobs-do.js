@@ -20,7 +20,7 @@ import {
   mediaDispatchWakeAt,
   normalizeMediaDispatch,
 } from './jobs/media-dispatch.mjs';
-import { publicJobView } from './jobs/media-options.mjs';
+import { publicAssetView, publicJobView } from './jobs/media-options.mjs';
 import {
   claimTask,
   importAssets,
@@ -208,6 +208,32 @@ export class JobsDurableObject {
       batchManifest: (target, work) => this.batchManifest(target, work),
     };
   }
+  assetPreview(state, data) {
+    const asset = state.manifest.assets[data.id];
+    if (!asset || asset.status === 'deleted') return { key: '' };
+    const published = asset.published || {};
+    const key =
+      published.poster ||
+      published.variants?.['480p'] ||
+      Object.values(published.variants || {})[0] ||
+      published.placeholder ||
+      published.cover ||
+      (asset.source?.available !== false ? asset.source?.key : '') ||
+      '';
+    return { key };
+  }
+  assetsList(state, data) {
+    const wanted = new Set(Array.isArray(data.ids) ? data.ids : []);
+    const assets = Object.values(state.manifest.assets)
+      .filter((asset) => asset.v2 === true)
+      .filter((asset) => !wanted.size || wanted.has(asset.id))
+      .filter((asset) => !data.status || asset.status === data.status)
+      .filter((asset) => !data.folder || asset.folder === data.folder)
+      .filter((asset) => (data.includeDeleted ? true : asset.status !== 'deleted'))
+      .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+      .map((asset) => publicAssetView(asset, state.jobs[asset.jobId]));
+    return { assets, total: assets.length };
+  }
   mediaList(state, data) {
     return Object.values(state.manifest.assets)
       .filter((asset) => asset.slug === data.slug && asset.status !== 'deleted')
@@ -247,6 +273,8 @@ export class JobsDurableObject {
       state.reconcile = { after: '', force: data.force || state.reconcile?.force || false };
       return { pending: true, queued: 0 };
     }
+    if (operation === 'assets-list') return this.assetsList(state, data);
+    if (operation === 'asset-preview') return this.assetPreview(state, data);
     if (operation === 'jobs-list')
       return {
         jobs: Object.values(state.jobs).map((job) => publicJobView(job, state.manifest.assets[job.assetId])),
@@ -270,6 +298,7 @@ export class JobsDurableObject {
       };
     if (operation === 'enqueue') return registerAsset(this.context(state, data));
     if (operation === 'delete') return removeAssets(this.context(state, data));
+    if (operation === 'delete-assets') return removeAssets(this.context(state, { ...data, assetIds: data.ids }));
     if (operation === 'import') return importAssets(this.context(state, data));
     if (operation === 'interpolate') return interpolateAssets(this.context(state, data));
     if (operation === 'claim') return claimTask(this.context(state, data));

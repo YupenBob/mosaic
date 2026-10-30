@@ -10,6 +10,7 @@ import { DEFAULT_ALLOWED_ORIGINS, isPublicPath } from './shared.js';
 import { registerHealth } from './routes/health.js';
 import { registerStatsPublic, registerStatsProtected } from './routes/stats.js';
 import { registerMediaPublic, registerMediaProtected } from './routes/media.js';
+import { registerAssets, registerAssetsPublic } from './routes/assets.js';
 import { registerPosts } from './routes/posts.js';
 import { registerBuild } from './routes/build.js';
 import { registerConfig } from './routes/config.js';
@@ -46,6 +47,7 @@ app.post('/api/auth/login', loginHandler);
 registerHealth(app);
 registerStatsPublic(app);
 registerMediaPublic(app);
+registerAssetsPublic(app);
 registerInternalJobs(app);
 
 // ====== Protected routes ======
@@ -61,6 +63,7 @@ app.use('/api/*', async (c, next) => {
 app.post('/api/auth/refresh', async (c) => c.json({ ok: true }));
 registerStatsProtected(app);
 registerMediaProtected(app);
+registerAssets(app);
 registerPosts(app);
 registerBuild(app);
 registerConfig(app);

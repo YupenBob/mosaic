@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { JobsDurableObject } from '../../worker/src/jobs-do.js';
 import { normalizeConfig, processingConfig } from '../../shared/config.mjs';
 import { assetId, fingerprint } from '../../shared/media-manifest.mjs';
+import { newAssetId } from '../../shared/media-v2.mjs';
 export class MemoryBucket {
   constructor() {
     this.objects = new Map();
@@ -115,6 +116,24 @@ export function createRuntime() {
     alarm: () => coordinator.alarm(),
     restart: () => {
       coordinator = new JobsDurableObject({ storage }, env);
+    },
+    async enqueueAsset(filename, bytes = Buffer.from('source'), patch = {}) {
+      const folder =
+        patch.folder || (filename.endsWith('.mp4') ? 'videos' : filename.endsWith('.flac') ? 'music' : 'photos');
+      const id = patch.id || newAssetId();
+      const key = `originals/assets/${id}/${filename}`;
+      const object = await bucket.put(key, bytes);
+      return call('enqueue', {
+        id,
+        v2: true,
+        slug: null,
+        filename,
+        folder,
+        source: { key, etag: object.etag, size: object.size },
+        config,
+        configHash: await fingerprint(processingConfig(config, folder)),
+        ...patch,
+      });
     },
     async enqueue(slug, filename, bytes = Buffer.from('source'), patch = {}) {
       const folder =

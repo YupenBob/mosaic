@@ -23,9 +23,10 @@ import { adjustUsage } from './usage.js';
 import { markDirty } from './github.js';
 import { DEFAULTS } from '../../shared/config.mjs';
 import { getConfig } from './services/site-config.js';
-import { registerUpload, invalidateMedia, jobsRequest } from './services/jobs.js';
+import { registerAssetUpload, registerUpload, invalidateMedia, jobsRequest } from './services/jobs.js';
 import { parseKeepSource } from './jobs/media-options.mjs';
 import { folderFor, validSegment, mediaUrl, compareMediaOrder } from '../../shared/media-manifest.mjs';
+import { ASSET_ID_RE } from '../../shared/media-v2.mjs';
 import { protectedMediaKeys } from './services/media-references.js';
 
 // Workers platform request-body limit (~100MB). Larger files must use the
@@ -156,6 +157,41 @@ export function mediaKey(slug, filename) {
   return slug === 'site-data' ? `site-data/${filename}` : `originals/${slug}/${folderForExt(ext)}/${filename}`;
 }
 
+/** Media v2 keys are independent of any post slug. */
+export function assetOriginalKey(assetId, filename) {
+  if (!ASSET_ID_RE.test(assetId) || !validSegment(filename)) throw new Error('Invalid asset name');
+  return `originals/assets/${assetId}/${filename}`;
+}
+
+/** Resolve either a legacy slug upload or a v2 asset upload from a request body. */
+function uploadTarget(body = {}) {
+  const filename = typeof body.filename === 'string' ? body.filename : '';
+  if (body.assetId) {
+    if (!ASSET_ID_RE.test(body.assetId) || !filename) throw new Error('Invalid asset upload');
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    return {
+      assetId: body.assetId,
+      filename,
+      folder: folderForExt(ext),
+      key: assetOriginalKey(body.assetId, filename),
+    };
+  }
+  const slug = body.slug;
+  if (!validSegment(slug) || !validSegment(filename)) throw new Error('Invalid media name');
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return { slug, filename, folder: folderForExt(ext), key: mediaKey(slug, filename) };
+}
+
+async function registerTarget(c, target, key, object, extra = {}) {
+  if (target.assetId)
+    return registerAssetUpload(c, target.assetId, key, object, {
+      filename: target.filename,
+      folder: target.folder,
+      ...extra,
+    });
+  return registerUpload(c, key, object, extra);
+}
+
 // Direct upload via Worker R2 binding — no CORS issues (<=100MB)
 export async function uploadDirect(c) {
   const slug = c.req.param('slug');
@@ -223,6 +259,42 @@ export async function uploadComplete(c) {
     if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj.size ?? 0, task?.objectDelta ?? 1);
     return c.json({
       ok: true,
+      key,
+      size: obj.size,
+      ...(keepSource === undefined ? {} : { keepSource }),
+      ...(task || {}),
+    });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 500);
+  }
+}
+
+// Complete a Media v2 upload and register an independent asset task.
+export async function completeAssetUpload(c) {
+  const assetIdValue = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const filename = typeof body.filename === 'string' ? body.filename : '';
+  if (!ASSET_ID_RE.test(assetIdValue) || !validSegment(filename))
+    return c.json({ error: 'assetId and filename required', code: 'INVALID_PARAMS' }, 400);
+  const key = assetOriginalKey(assetIdValue, filename);
+  try {
+    const obj = await c.env.MEDIA.head(key);
+    if (!obj) return c.json({ error: 'Object not found', code: 'NOT_FOUND' }, 404);
+    const config = await getConfig(c);
+    if (obj.size > config.upload.maxFileBytes)
+      return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
+    const keepSource = uploadKeepSource(c, body || {});
+    const folder = folderForExt(filename.split('.').pop()?.toLowerCase() || '');
+    const task = await registerAssetUpload(c, assetIdValue, key, obj, {
+      filename,
+      folder,
+      ...(body.uploadId ? { uploadId: body.uploadId } : {}),
+      ...(keepSource === undefined ? {} : { keepSource }),
+    });
+    if (!task?.duplicate) await adjustUsage(c.env, task?.usageDelta ?? obj.size ?? 0, task?.objectDelta ?? 1);
+    return c.json({
+      ok: true,
+      assetId: assetIdValue,
       key,
       size: obj.size,
       ...(keepSource === undefined ? {} : { keepSource }),
@@ -399,10 +471,16 @@ export async function serveMediaFile(c) {
 }
 
 // Presigned direct upload: browser → R2 S3 endpoint (single hop, >100MB capable)
-export async function generatePresignedUrl(c) {
-  const { slug, filename, contentType, keepSource: rawKeepSource } = await c.req.json().catch(() => ({}));
-  if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
-  const keepSource = parseKeepSource(rawKeepSource);
+export async function generatePresignedUrl(c, input) {
+  const body = input || (await c.req.json().catch(() => ({})));
+  let target;
+  try {
+    target = uploadTarget(body);
+  } catch (error) {
+    return c.json({ error: error.message, code: 'INVALID_PARAMS' }, 400);
+  }
+  const { filename } = target;
+  const keepSource = parseKeepSource(body.keepSource);
 
   const client = s3Client(c);
   if (!client) {
@@ -411,20 +489,20 @@ export async function generatePresignedUrl(c) {
 
   const config = await getConfig(c);
   const bucket = config.mediaSource.bucket;
-  const key = mediaKey(slug, filename);
+  const key = target.key;
   // ContentType intentionally NOT signed so the browser may send its own
   // Content-Type without breaking the SigV4 signature match.
   const url = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: key }), {
     expiresIn: config.upload.presignSeconds,
   });
   const ext = filename.split('.').pop()?.toLowerCase() || '';
-  const folder = slug === 'site-data' ? 'site-data' : folderForExt(ext);
   return c.json({
     url,
     key,
-    folder,
+    ...(target.assetId ? { assetId: target.assetId } : { slug: target.slug }),
+    folder: target.folder,
     expires: config.upload.presignSeconds,
-    contentType: contentType || EXT_CONTENT_TYPE[ext] || 'application/octet-stream',
+    contentType: body.contentType || EXT_CONTENT_TYPE[ext] || 'application/octet-stream',
     // Registration happens at /upload/complete; echo the choice for the client.
     ...(keepSource === undefined ? {} : { keepSource }),
   });
@@ -435,24 +513,22 @@ export async function generatePresignedUrl(c) {
  * Pass an existing uploadId to re-sign part URLs for that upload (resume);
  * otherwise a new multipart upload is created.
  */
-export async function startMultipartUpload(c) {
-  const {
-    slug,
-    filename,
-    contentType,
-    size,
-    partSize,
-    uploadId,
-    keepSource: rawKeepSource,
-  } = await c.req.json().catch(() => ({}));
-  if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
+export async function startMultipartUpload(c, input) {
+  const body = input || (await c.req.json().catch(() => ({})));
+  let target;
+  try {
+    target = uploadTarget(body);
+  } catch (error) {
+    return c.json({ error: error.message, code: 'INVALID_PARAMS' }, 400);
+  }
+  const { contentType, size, partSize, uploadId } = body;
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
-  const keepSource = parseKeepSource(rawKeepSource);
+  const keepSource = parseKeepSource(body.keepSource);
 
   const config = await getConfig(c);
   const bucket = config.mediaSource.bucket;
-  const key = mediaKey(slug, filename);
+  const key = target.key;
   const partBytes = Math.min(MAX_PART_BYTES, Math.max(MIN_PART_BYTES, parseInt(partSize) || config.upload.partSize));
   const totalSize = Math.max(1, parseInt(size) || 0);
   if (totalSize > config.upload.maxFileBytes)
@@ -496,6 +572,8 @@ export async function startMultipartUpload(c) {
       ok: true,
       uploadId: id,
       key,
+      ...(target.assetId ? { assetId: target.assetId } : { slug: target.slug }),
+      folder: target.folder,
       partSize: partBytes,
       partCount,
       parts,
@@ -508,16 +586,21 @@ export async function startMultipartUpload(c) {
 }
 
 // List already-uploaded parts (client uses this to skip them on resume).
-export async function listMultipartParts(c) {
-  const { slug, filename, uploadId } = await c.req.json().catch(() => ({}));
-  if (!slug || !filename || !uploadId) {
-    return c.json({ error: 'slug, filename and uploadId required', code: 'INVALID_PARAMS' }, 400);
+export async function listMultipartParts(c, input) {
+  const body = input || (await c.req.json().catch(() => ({})));
+  let target;
+  try {
+    target = uploadTarget(body);
+  } catch (error) {
+    return c.json({ error: error.message, code: 'INVALID_PARAMS' }, 400);
   }
+  const { uploadId } = body;
+  if (!uploadId) return c.json({ error: 'uploadId required', code: 'INVALID_PARAMS' }, 400);
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
   const config = await getConfig(c);
   const bucket = config.mediaSource.bucket;
-  const key = mediaKey(slug, filename);
+  const key = target.key;
   try {
     const parts = await listUploadedParts(client, bucket, key, uploadId, config.upload.presignSeconds);
     return c.json({ ok: true, parts });
@@ -527,17 +610,22 @@ export async function listMultipartParts(c) {
 }
 
 // Complete a multipart upload (server assembles parts from R2) and mark dirty.
-export async function completeMultipartUpload(c) {
-  const { slug, filename, uploadId, keepSource: rawKeepSource } = await c.req.json().catch(() => ({}));
-  if (!slug || !filename || !uploadId) {
-    return c.json({ error: 'slug, filename and uploadId required', code: 'INVALID_PARAMS' }, 400);
+export async function completeMultipartUpload(c, input) {
+  const body = input || (await c.req.json().catch(() => ({})));
+  let target;
+  try {
+    target = uploadTarget(body);
+  } catch (error) {
+    return c.json({ error: error.message, code: 'INVALID_PARAMS' }, 400);
   }
-  const keepSource = parseKeepSource(rawKeepSource);
+  const { uploadId } = body;
+  if (!uploadId) return c.json({ error: 'uploadId required', code: 'INVALID_PARAMS' }, 400);
+  const keepSource = parseKeepSource(body.keepSource);
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
   const config = await getConfig(c);
   const bucket = config.mediaSource.bucket;
-  const key = mediaKey(slug, filename);
+  const key = target.key;
   try {
     if (c.env.JOBS) {
       const receipt = await jobsRequest(c.env, 'upload-receipt', { uploadId, key });
@@ -580,7 +668,7 @@ export async function completeMultipartUpload(c) {
     if (!obj) throw new Error('Completed multipart object is missing');
     if (obj.size > config.upload.maxFileBytes)
       return c.json({ error: 'File exceeds upload.maxFileBytes', code: 'PAYLOAD_TOO_LARGE' }, 413);
-    const task = await registerUpload(c, key, obj, {
+    const task = await registerTarget(c, target, key, obj, {
       uploadId,
       ...(keepSource === undefined ? {} : { keepSource }),
     });
@@ -589,6 +677,7 @@ export async function completeMultipartUpload(c) {
     return c.json({
       ok: true,
       key,
+      ...(target.assetId ? { assetId: target.assetId } : { slug: target.slug }),
       size: obj.size,
       ...(keepSource === undefined ? {} : { keepSource }),
       ...(task || {}),
@@ -599,16 +688,21 @@ export async function completeMultipartUpload(c) {
 }
 
 // Abort a multipart upload (cleanup when the client cancels).
-export async function abortMultipartUpload(c) {
-  const { slug, filename, uploadId } = await c.req.json().catch(() => ({}));
-  if (!slug || !filename || !uploadId) {
-    return c.json({ error: 'slug, filename and uploadId required', code: 'INVALID_PARAMS' }, 400);
+export async function abortMultipartUpload(c, input) {
+  const body = input || (await c.req.json().catch(() => ({})));
+  let target;
+  try {
+    target = uploadTarget(body);
+  } catch (error) {
+    return c.json({ error: error.message, code: 'INVALID_PARAMS' }, 400);
   }
+  const { uploadId } = body;
+  if (!uploadId) return c.json({ error: 'uploadId required', code: 'INVALID_PARAMS' }, 400);
   const client = s3Client(c);
   if (!client) return c.json({ error: 'R2 credentials not configured', code: 'CONFIG_ERROR' }, 500);
   const config = await getConfig(c);
   const bucket = config.mediaSource.bucket;
-  const key = mediaKey(slug, filename);
+  const key = target.key;
   try {
     const url = await getSignedUrl(
       client,
