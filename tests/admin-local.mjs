@@ -349,12 +349,24 @@ try {
       await page.evaluate((value) => {
         location.hash = value;
       }, route);
+      await page.waitForFunction(
+        (page) => document.querySelector('.nav-item.active')?.dataset.page === page,
+        route.split('&')[0],
+      );
       await page.waitForTimeout(350);
       await page.locator('#main-content .page-anim').first().waitFor();
       await page.evaluate(async () => {
         const element = document.querySelector('#main-content .page-anim');
         await Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => {})));
       });
+      if (process.env.ADMIN_SHOTS) {
+        const shotDir = process.env.ADMIN_SHOTS;
+        fs.mkdirSync(shotDir, { recursive: true });
+        await page.screenshot({
+          path: path.join(shotDir, `${route.replace(/[^a-z0-9]+/gi, '-')}-${theme}.png`),
+          fullPage: true,
+        });
+      }
       await page.addScriptTag({ path: path.join(ROOT, 'node_modules/axe-core/axe.min.js') });
       const violations = await page.evaluate(async () =>
         (await window.axe.run(document)).violations.map((item) => ({

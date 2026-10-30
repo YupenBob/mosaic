@@ -1,7 +1,7 @@
 /**
  * Dashboard page — health bar, stat cards, charts, leaderboard, activity.
  */
-import { posts as postsApi, stats, health, disk, config, build, taxonomy } from '../src/api.js';
+import { posts as postsApi, stats, health, disk, config, build, taxonomy, mediaJobs, apiFetch } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, formatTime, loadLib, emptyState } from './ui.js?v=1';
@@ -20,6 +20,7 @@ export default function renderDashboard(signal) {
     taxData: { categories: [], tags: [] },
     postList: [],
     bs: null,
+    attention: { dirty: 0, failed: 0 },
     settled: new Set(),
     loaded: new Set(),
   };
@@ -41,6 +42,7 @@ export default function renderDashboard(signal) {
         taxData: ['.dash-charts'],
         postList: ['.dash-bottom', '[data-dashboard-quickstart]'],
         bs: ['.dash-bottom'],
+        attention: ['[data-dashboard-attention]'],
       };
       const update = (key, value) => {
         if (signal.aborted) return;
@@ -97,6 +99,16 @@ export default function renderDashboard(signal) {
         taxData: () => taxonomy.get(),
         postList: async () => (await postsApi.list()).posts || [],
         bs: () => build.status(),
+        attention: async () => {
+          const [dirty, jobs] = await Promise.all([
+            apiFetch('/dirty').catch(() => ({ count: 0 })),
+            mediaJobs.list({ signal: null }).catch(() => ({ jobs: [] })),
+          ]);
+          return {
+            dirty: dirty?.count || 0,
+            failed: (jobs.jobs || []).filter((job) => job.status === 'failed').length,
+          };
+        },
       };
       for (const [key, request] of Object.entries(requests)) run(key, request);
       const refresh = () => {
@@ -124,7 +136,21 @@ export default function renderDashboard(signal) {
 }
 
 function renderSnapshot(
-  { dashData, healthData, trafficData, healthGithub, healthR2, diskData, cfg, taxData, postList, bs, settled, loaded },
+  {
+    dashData,
+    healthData,
+    trafficData,
+    healthGithub,
+    healthR2,
+    diskData,
+    cfg,
+    taxData,
+    postList,
+    bs,
+    attention,
+    settled,
+    loaded,
+  },
   signal,
 ) {
   if (cfg.mediaBase) state.mediaBase = cfg.mediaBase;
@@ -155,6 +181,11 @@ function renderSnapshot(
     });
   activities.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
 
+  const attentionItems = [];
+  if (attention?.dirty)
+    attentionItems.push({ href: '#build', label: t('dashboard.attentionDirty'), count: attention.dirty });
+  if (attention?.failed)
+    attentionItems.push({ href: '#tasks', label: t('dashboard.attentionFailed'), count: attention.failed });
   const healthItems = [
     {
       name: t('dashboard.healthWorker'),
@@ -233,6 +264,24 @@ function renderSnapshot(
             )
             .join('')}
         </div>
+
+        ${
+          attentionItems.length
+            ? `<div class="dash-attention" data-dashboard-attention>
+          <div class="dash-attention-head"><i class="ri-error-warning-line" aria-hidden="true"></i><strong>${t('dashboard.attention')}</strong></div>
+          <div class="dash-attention-list">
+            ${attentionItems
+              .map(
+                (item) => `<a class="dash-attention-item" href="${item.href}">
+                  <span>${escHtml(item.label)}</span>
+                  <span class="dash-attention-count">${item.count}</span>
+                </a>`,
+              )
+              .join('')}
+          </div>
+        </div>`
+            : '<div data-dashboard-attention></div>'
+        }
 
         <div class="dash-cards">
           <div class="dash-big-card dash-kpi">

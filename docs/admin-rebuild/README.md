@@ -2,7 +2,7 @@
 
 计划：`Mosaic 后台重构执行计划 v3.1`（Media v2、草稿/预览、主题、视频增强、任务中心、资产生命周期、版本历史、界面重构）。
 
-当前阶段：**P7 版本历史（进行中）**
+当前阶段：**P8 收口（进行中）**
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
@@ -14,7 +14,7 @@
 | P5 视频增强 | 进行中 | 独立页面、补帧/重编码/两者、processed/original 来源、任务选项与测试已落地；真实 FFmpeg 长任务待联调 |
 | P6 主题系统 | 进行中 | 主题包契约、构建时布局/资源解析、default 微调项、starter 示例、后台主题页/API 已落地；主题上传/市场与更多主题待做 |
 | P7 版本历史 | 进行中 | Git 提交列表/详情/diff/按文件或整次恢复、后台页面已落地；真实 GitHub 联调待做 |
-| P8 收口 | 未开始 | |
+| P8 收口 | 进行中 | 概览「需要处理」、设置吸顶、上线页收口、13 页 axe、截图回归已落地；真实迁移/预览 Actions 待凭据联调 |
 
 ## P0 已落地
 
@@ -159,3 +159,37 @@ npx prettier --check <changed files>   # passed
 - P1：设置页保存头吸顶；上线页移除媒体任务面板，任务统一到任务中心。
 - P4：预览过期清理；`previews/` 不再无限增长。
 - 真实迁移/预览 Actions 仍需凭据联调；未在本地执行 R2 迁移。
+
+## 文档索引
+
+- [Media v2 与迁移](../media-v2.md)
+- [私密预览](../preview.md)
+- [视频增强](../video-enhance.md)
+- [主题包开发](../themes.md)
+- [版本历史](../history.md)
+
+## 最终验证命令
+
+```bash
+npm run test:unit
+node tests/admin-local.mjs
+ADMIN_SHOTS=/tmp/mosaic-shots node tests/admin-local.mjs
+npm run build
+SITE_THEME_PACKAGE=starter npm run build
+```
+
+真实环境还需要：
+
+1. `migrate-v2.mjs --write-plan` 核对后 `--apply`（R2/Worker 凭据）。
+2. 触发一次 `preview.yml`，确认草稿读取、R2 上传、状态回调。
+3. 主题页应用一次，确认 config 提交与构建。
+
+## 截图
+
+- [概览（亮）](../screenshots/dashboard-light.png)
+- [概览（暗）](../screenshots/dashboard-dark.png)
+- [编辑器](../screenshots/editor-light.png)
+- [主题](../screenshots/themes-light.png)
+- [素材库](../screenshots/library-light.png)
+
+由 `ADMIN_SHOTS=/tmp/mosaic-shots node tests/admin-local.mjs` 生成。
