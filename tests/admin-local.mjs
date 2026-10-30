@@ -121,6 +121,35 @@ try {
       };
     else if (pathname.endsWith('/publish') && route.request().method() === 'POST')
       body = { ok: true, slug: 'fixture-draft', sha: 'published-sha' };
+    else if (pathname === '/themes' && route.request().method() === 'GET')
+      body = {
+        themes: [
+          {
+            id: 'default',
+            name: 'Mosaic Default',
+            version: '1.0.0',
+            description: 'Built-in theme',
+            current: true,
+            values: { accent: 'blue', defaultMode: 'auto', showThemeMenu: true, allowVisitorToggle: true },
+            options: {
+              accent: { type: 'select', default: 'blue', options: ['blue', 'rose'], label: '强调色' },
+              showThemeMenu: { type: 'boolean', default: true, label: '显示主题菜单' },
+            },
+          },
+          {
+            id: 'starter',
+            name: 'Starter',
+            version: '1.0.0',
+            description: 'Tiny theme',
+            current: false,
+            values: {},
+            options: { accent: { type: 'color', default: '#4361ee', label: '强调色' } },
+          },
+        ],
+        current: { package: 'default', options: {} },
+      };
+    else if (pathname === '/themes/apply' && route.request().method() === 'POST')
+      body = { ok: true, themePackage: 'starter', themeOptions: {} };
     else if (pathname === '/media/interpolate' && route.request().method() === 'POST')
       body = { ok: true, enqueued: 1, tasks: [], skipped: [] };
     else if (pathname === '/previews' && route.request().method() === 'POST')
@@ -305,7 +334,7 @@ try {
   assert.deepEqual(errors, [], 'all admin routes must render without JavaScript errors');
   assert.ok(!requests.includes('/build/done'), 'browser polling cannot acknowledge a deployment');
   console.log(
-    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 11 pages × 2 themes accessibility passed',
+    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 12 pages × 2 themes accessibility passed',
   );
 } finally {
   await browser.close();

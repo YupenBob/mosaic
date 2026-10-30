@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= pageTitle %></title>
+    <meta name="description" content="<%= pageDescription %>" />
+    <link rel="stylesheet" href="<%= rp %>theme/theme.css" />
+  </head>
+  <body style="--accent: <%= theme.options.accent %>">
+    <header class="wrap site-head">
+      <a class="brand" href="<%= rp %>"><%= site.title %></a>
+      <p><%= site.description %></p>
+    </header>
+    <main class="wrap">
+      <% if (typeof activeCategory !== 'undefined' && activeCategory) { %><p class="crumb">分类：<%= activeCategory %></p><% } %>
+      <% if (typeof activeTag !== 'undefined' && activeTag) { %><p class="crumb">标签：<%= activeTag %></p><% } %>
+      <div class="grid">
+        <% for (const post of posts) { %>
+        <article class="card">
+          <% if (post.cover) { %><a href="<%= rp %>posts/<%= encodeURIComponent(post.slug) %>/"><img src="<%= post.cover %>" alt="" loading="lazy" /></a><% } %>
+          <h2><a href="<%= rp %>posts/<%= encodeURIComponent(post.slug) %>/"><%= post.title %></a></h2>
+          <time><%= post.date ? post.date.slice(0, 10) : '' %></time>
+          <% if (theme.options.showDescription) { %><p><%= post.description %></p><% } %>
+        </article>
+        <% } %>
+      </div>
+      <% if (totalPages > 1) { %>
+      <nav class="pager">
+        <% if (page > 1) { %><a href="<%= rp %><%= page === 2 ? '' : 'page/' + (page - 1) + '/' %>">上一页</a><% } %>
+        <span><%= page %> / <%= totalPages %></span>
+        <% if (page < totalPages) { %><a href="<%= rp %>page/<%= page + 1 %>/">下一页</a><% } %>
+      </nav>
+      <% } %>
+    </main>
+    <footer class="wrap"><p><%= site.author && site.author.name ? site.author.name : site.title %></p></footer>
+  </body>
+</html>

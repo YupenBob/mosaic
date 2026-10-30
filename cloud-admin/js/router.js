@@ -17,6 +17,7 @@ import renderTasks, { tasksSkeleton } from './tasks.js?v=1';
 import renderLibrary, { librarySkeleton } from './library.js?v=1';
 import renderDrafts, { draftsSkeleton } from './drafts.js?v=1';
 import renderEnhance, { enhanceSkeleton } from './enhance.js?v=1';
+import renderThemes, { themesSkeleton } from './themes.js?v=1';
 
 export const pages = {
   dashboard: {
@@ -59,6 +60,12 @@ export const pages = {
     skeleton: enhanceSkeleton,
     label: () => t('nav.enhance'),
     icon: 'ri-magic-line',
+  },
+  themes: {
+    render: renderThemes,
+    skeleton: themesSkeleton,
+    label: () => t('nav.themes'),
+    icon: 'ri-palette-line',
   },
   trash: { render: renderTrash, skeleton: trashSkeleton, label: () => t('nav.trash'), icon: 'ri-delete-bin-6-line' },
   deploy: { render: () => renderDeployRedirect(), skeleton: null, label: () => 'Deploy', icon: 'ri-tools-line' },

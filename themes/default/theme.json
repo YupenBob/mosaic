@@ -1,52 +1,35 @@
 {
-  "name": "default",
-  "version": "0.8.0",
-  "description": "Default Mosaic theme — clean, minimal, focused on media",
-  "author": "Mosaic",
-  "tokens": {
-    "colors": {
-      "accent": "#4361ee",
-      "bg": "#f5f5f7",
-      "surface": "#ffffff",
-      "text-primary": "#1d1d1f",
-      "text-secondary": "#86868b",
-      "text-tertiary": "#aeaeb2",
-      "border": "#d2d2d7",
-      "border-light": "#e5e5ea",
-      "tag-bg": "#f0f0f5",
-      "tag-text": "#515154",
-      "card-shadow": "rgba(0, 0, 0, 0.06)"
+  "id": "default",
+  "name": "Mosaic Default",
+  "version": "1.0.0",
+  "description": "The built-in Mosaic theme. Layouts live in src/layouts; these options tune the default look without forking the theme.",
+  "engine": "ejs",
+  "options": {
+    "accent": {
+      "type": "select",
+      "default": "blue",
+      "options": ["blue", "violet", "emerald", "rose", "amber", "slate"],
+      "label": "强调色",
+      "description": "链接、按钮和选中态的主色。"
     },
-    "darkColors": {
-      "accent": "#4361ee",
-      "bg": "#1c1c1e",
-      "surface": "#2c2c2e",
-      "text-primary": "#f5f5f7",
-      "text-secondary": "#98989d",
-      "text-tertiary": "#6e6e73",
-      "border": "#48484a",
-      "border-light": "#38383a",
-      "tag-bg": "#3a3a3c",
-      "tag-text": "#d1d1d6",
-      "card-shadow": "rgba(0, 0, 0, 0.3)"
+    "defaultMode": {
+      "type": "select",
+      "default": "auto",
+      "options": ["auto", "light", "dark"],
+      "label": "默认明暗",
+      "description": "访客第一次打开时的模式；仍可在站点菜单切换。"
     },
-    "fonts": {
-      "sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif",
-      "mono": "'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace"
+    "showThemeMenu": {
+      "type": "boolean",
+      "default": true,
+      "label": "显示主题菜单",
+      "description": "在前台显示明暗/强调色菜单。"
     },
-    "radii": {
-      "card": "12px",
-      "card-sm": "8px",
-      "button": "8px"
-    },
-    "layout": {
-      "maxWidth": "1200px",
-      "postWidth": "840px",
-      "headerHeight": "56px"
+    "allowVisitorToggle": {
+      "type": "boolean",
+      "default": true,
+      "label": "允许访客切换",
+      "description": "关闭后只使用默认明暗，不显示切换入口。"
     }
-  },
-  "templates": {
-    "extends": "src/layouts",
-    "overrides": []
   }
 }

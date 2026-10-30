@@ -37,6 +37,8 @@
   },
 
   "theme": "auto",
+  "themePackage": "default",
+  "themeOptions": {},
   "themeMode": {
     "default": "auto",
     "accent": "blue",

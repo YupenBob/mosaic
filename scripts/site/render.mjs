@@ -2,9 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ejs from 'ejs';
 import { renderCard, renderCards, renderEmptyState } from '../../src/assets/js/cards/render.js';
+import { resolveTheme } from './theme.mjs';
 export function renderSite(context, posts, indexes) {
   ejs.clearCache();
-  const { config: SITE, src: SRC, dist: DIST } = context;
+  const { src: SRC, dist: DIST } = context;
+  const theme = resolveTheme(context);
+  const SITE = theme.config;
   const { categories, tags, categoryPages } = indexes;
   const i18n = JSON.parse(fs.readFileSync(path.join(SRC, 'data/i18n.json'), 'utf8'));
   const t = (key) => i18n[key]?.[SITE.language] || key;
@@ -98,7 +101,19 @@ export function renderSite(context, posts, indexes) {
   }
 
   // ── EJS rendering ──
-  const viewsDir = path.join(SRC, 'layouts');
+  if (theme.assetsDir) {
+    const copy = (from, to) => {
+      fs.mkdirSync(to, { recursive: true });
+      for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+        if (entry.name.startsWith('.')) continue;
+        const source = path.join(from, entry.name);
+        const target = path.join(to, entry.name);
+        if (entry.isDirectory()) copy(source, target);
+        else fs.copyFileSync(source, target);
+      }
+    };
+    copy(theme.assetsDir, path.join(DIST, 'theme'));
+  }
   // Prefix from the output page's directory back to dist/ root ('' | '../' | '../../')
   const relativePath = (outPath) => {
     let rel = path.relative(path.dirname(outPath), DIST).replace(/\\/g, '/');
@@ -108,15 +123,16 @@ export function renderSite(context, posts, indexes) {
 
   function renderFile(template, outPath, data) {
     const rp = relativePath(outPath);
-    if (!compiled.has(template))
+    const templatePath = theme.layoutPath(template);
+    if (!compiled.has(templatePath))
       compiled.set(
-        template,
-        ejs.compile(fs.readFileSync(path.join(viewsDir, template), 'utf8'), {
-          filename: path.join(viewsDir, template),
+        templatePath,
+        ejs.compile(fs.readFileSync(templatePath, 'utf8'), {
+          filename: templatePath,
           cache: true,
         }),
       );
-    const html = compiled.get(template)({
+    const html = compiled.get(templatePath)({
       ...data,
       rp,
       site: SITE,
@@ -127,6 +143,7 @@ export function renderSite(context, posts, indexes) {
       renderCard,
       renderCards,
       renderEmptyState,
+      theme: { id: theme.id, name: theme.manifest.name, version: theme.manifest.version, options: theme.options },
       lang: SITE.language || 'zh-CN',
       activeCategory: data.activeCategory || '',
       activeTag: data.activeTag || '',

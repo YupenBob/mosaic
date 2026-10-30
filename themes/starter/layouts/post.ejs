@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="<%= lang %>">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= post.title %> · <%= site.title %></title>
+    <meta name="description" content="<%= post.description %>" />
+    <link rel="stylesheet" href="<%= rp %>theme/theme.css" />
+  </head>
+  <body style="--accent: <%= theme.options.accent %>">
+    <header class="wrap site-head">
+      <a class="brand" href="<%= rp %>"><%= site.title %></a>
+    </header>
+    <main class="wrap article">
+      <p class="crumb"><a href="<%= rp %>">← 返回</a></p>
+      <h1><%= post.title %></h1>
+      <p class="meta"><time><%= post.date ? post.date.slice(0, 10) : '' %></time> · <%= post.category %></p>
+      <% if (post.cover) { %><img class="cover" src="<%= post.cover %>" alt="" /> <% } %>
+      <div class="prose"><%- post.bodyHTML %></div>
+    </main>
+    <footer class="wrap"><p><%= site.author && site.author.name ? site.author.name : site.title %></p></footer>
+  </body>
+</html>

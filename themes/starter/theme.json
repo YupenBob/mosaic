@@ -1,0 +1,26 @@
+{
+  "id": "starter",
+  "name": "Starter",
+  "version": "1.0.0",
+  "description": "A tiny readable theme to copy when writing your own. No client JavaScript; EJS layouts and one CSS file.",
+  "engine": "ejs",
+  "layouts": {
+    "index.ejs": "layouts/index.ejs",
+    "post.ejs": "layouts/post.ejs",
+    "404.ejs": "layouts/404.ejs"
+  },
+  "options": {
+    "accent": {
+      "type": "color",
+      "default": "#4361ee",
+      "label": "强调色",
+      "description": "链接和标题装饰色。"
+    },
+    "showDescription": {
+      "type": "boolean",
+      "default": true,
+      "label": "显示摘要",
+      "description": "在列表卡片上显示文章摘要。"
+    }
+  }
+}

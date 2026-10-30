@@ -2,7 +2,7 @@
 
 计划：`Mosaic 后台重构执行计划 v3.1`（Media v2、草稿/预览、主题、视频增强、任务中心、资产生命周期、版本历史、界面重构）。
 
-当前阶段：**P5 视频增强（进行中）**
+当前阶段：**P6 主题系统（进行中）**
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
@@ -12,7 +12,7 @@
 | P3 任务中心/生命周期 | 进行中 | 任务中心页已落地；v2 资产生命周期（processing/ready/degraded/failed/deleting）、软删除/恢复、健康原因已落地 |
 | P4 草稿/预览 | 进行中 | R2 草稿、草稿模式/发布、草稿列表、私密预览 token/R2/预览 workflow 已落地；需真实 Actions 联调 |
 | P5 视频增强 | 进行中 | 独立页面、补帧/重编码/两者、processed/original 来源、任务选项与测试已落地；真实 FFmpeg 长任务待联调 |
-| P6 主题系统 | 未开始 | |
+| P6 主题系统 | 进行中 | 主题包契约、构建时布局/资源解析、default 微调项、starter 示例、后台主题页/API 已落地；主题上传/市场与更多主题待做 |
 | P7 版本历史 | 未开始 | |
 | P8 收口 | 未开始 | |
 
@@ -134,3 +134,13 @@ npx prettier --check <changed files>   # passed
 - `original` 来源要求原文件可用；`processed` 来源要求已发布分层。
 - 新页面 `#enhance`：视频选择、三种操作、来源、帧率、CRF/preset/音频码率。
 - 新增 `tests/enhance-jobs.mjs`（三种操作、两种来源、参数拒绝）、`docs/video-enhance.md`。
+
+## P6 第一批（主题包）
+
+- 主题契约 `shared/theme.mjs`：id 校验、manifest、选项 schema、默认值合并与校验。
+- 构建 `scripts/site/theme.mjs`：default 复用 `src/layouts`，外部主题用 `themes/<id>/layouts` + `assets/` → `dist/theme/`。
+- 默认主题微调：accent、defaultMode、showThemeMenu、allowVisitorToggle 映射到 `themeMode`。
+- 新增 `themes/default/theme.json` 和完整示例 `themes/starter/`（三份 EJS + CSS）。
+- 后台 `#themes`：主题卡片、动态选项表单、应用；`GET /api/themes`、`POST /api/themes/apply`。
+- 测试：`theme-smoke`（契约/解析/default/starter）、`themes-api`（列表/应用/校验）；admin-local 12 页 axe。
+- 文档：`docs/themes.md`。

@@ -1,0 +1,148 @@
+:root {
+  color-scheme: light;
+  --accent: #4361ee;
+  --fg: #17171a;
+  --muted: #6b6b76;
+  --bg: #f7f7f8;
+  --line: #e5e5ea;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    16px/1.7 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.wrap {
+  width: min(760px, calc(100% - 40px));
+  margin: 0 auto;
+}
+.site-head {
+  padding: 48px 0 24px;
+}
+.brand {
+  color: var(--fg);
+  font-size: 22px;
+  font-weight: 650;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+.site-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
+  padding-bottom: 48px;
+}
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  padding-bottom: 14px;
+}
+.card img {
+  width: 100%;
+  aspect-ratio: 1.6;
+  object-fit: cover;
+  display: block;
+}
+.card h2 {
+  margin: 14px 14px 4px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.card h2 a {
+  color: var(--fg);
+  text-decoration: none;
+}
+.card time,
+.card p {
+  display: block;
+  margin: 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.article {
+  padding: 48px 0;
+}
+.article h1 {
+  font-size: 38px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 8px 0 12px;
+}
+.meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cover {
+  width: 100%;
+  border-radius: 14px;
+  margin: 18px 0;
+}
+.prose {
+  margin-top: 28px;
+}
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+.prose pre {
+  overflow: auto;
+  padding: 16px;
+  border-radius: 10px;
+  background: #17171a;
+  color: #f4f4f6;
+}
+.prose blockquote {
+  margin: 20px 0;
+  padding-left: 16px;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+.crumb {
+  color: var(--muted);
+  font-size: 13px;
+}
+.pager {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding-bottom: 48px;
+  font-size: 14px;
+}
+footer {
+  padding: 24px 0 48px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --fg: #f2f2f4;
+    --muted: #a0a0aa;
+    --bg: #141416;
+    --line: #2a2a30;
+  }
+  .card {
+    background: #1b1b1f;
+  }
+}

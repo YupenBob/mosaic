@@ -14,6 +14,8 @@ export const INTERPOLATION_ME_MODES = ['bidir', 'epzs', 'esa'];
 export const DEFAULTS = {
   language: 'zh-CN',
   theme: 'auto',
+  themePackage: 'default',
+  themeOptions: {},
   themeMode: {
     default: 'auto',
     accent: 'blue',
@@ -150,6 +152,7 @@ export function normalizeConfig(raw = {}, env = {}) {
   if (raw.themeMode?.default === undefined && THEME_MODES.includes(raw.theme)) config.themeMode.default = raw.theme;
   // Keep emitting the legacy scalar for older templates/consumers.
   config.theme = config.themeMode.default;
+  config.themePackage = env.SITE_THEME_PACKAGE || config.themePackage;
   config.plugins = deepMerge(
     { 'compress-images': { enabled: true }, 'compress-videos': { enabled: raw.enableVideoCompression !== false } },
     raw.plugins || {},
@@ -225,6 +228,10 @@ export function mergeInterpolation(base = {}, override) {
 
 export function validateConfig(config) {
   const errors = [];
+  if (!/^[a-z][a-z0-9-]{1,40}$/.test(String(config.themePackage || '')))
+    errors.push('themePackage must be a lowercase theme id');
+  if (!config.themeOptions || typeof config.themeOptions !== 'object' || Array.isArray(config.themeOptions))
+    errors.push('themeOptions must be an object');
   checkEnum(errors, 'themeMode.default', config.themeMode?.default, THEME_MODES);
   checkEnum(errors, 'themeMode.accent', config.themeMode?.accent, THEME_ACCENTS);
   checkBoolean(errors, 'themeMode.allowVisitorToggle', config.themeMode?.allowVisitorToggle);
