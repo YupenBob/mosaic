@@ -129,7 +129,7 @@ function coverOf(p) {
 function thumbHtml(p) {
   const cover = coverOf(p);
   return cover.has
-    ? `<span class="cell-thumb"><i class="ri-article-line" aria-hidden="true"></i><img src="${escHtml(cover.src)}" alt="" loading="lazy" decoding="async" onerror="this.remove()" /></span>`
+    ? `<span class="cell-thumb"><i class="ri-article-line" aria-hidden="true"></i><img src="${escHtml(cover.src)}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" /></span>`
     : `<span class="cell-thumb" aria-hidden="true"><i class="ri-article-line"></i></span>`;
 }
 

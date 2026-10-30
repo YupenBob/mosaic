@@ -143,7 +143,16 @@ try {
 
   for (const theme of ['light', 'dark']) {
     await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
-    for (const route of ['dashboard', 'posts', 'editor&slug=fixture', 'build', 'config', 'taxonomy', 'cleanup']) {
+    for (const route of [
+      'dashboard',
+      'posts',
+      'editor&slug=fixture',
+      'build',
+      'tasks',
+      'config',
+      'taxonomy',
+      'cleanup',
+    ]) {
       await page.evaluate((value) => {
         location.hash = value;
       }, route);
@@ -167,7 +176,7 @@ try {
   assert.deepEqual(errors, [], 'all admin routes must render without JavaScript errors');
   assert.ok(!requests.includes('/build/done'), 'browser polling cannot acknowledge a deployment');
   console.log(
-    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 7 pages × 2 themes accessibility passed',
+    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 8 pages × 2 themes accessibility passed',
   );
 } finally {
   await browser.close();

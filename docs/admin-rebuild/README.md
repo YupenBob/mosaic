@@ -9,7 +9,7 @@
 | P0 安全热修 | 完成 | `validSegment`、`jsStr`、`baseSha`、XSS 回归 |
 | P1 框架/视觉/动效/预览图 | 进行中 | 壳层、状态胶囊、账户菜单、动效、概览、文章筛选、编辑器两栏、预览图 |
 | P2 Media v2 | 未开始 | |
-| P3 任务中心/生命周期 | 未开始 | |
+| P3 任务中心/生命周期 | 进行中 | 任务中心页已基于现有 `/api/media-jobs` 落地；资产生命周期待 Media v2 |
 | P4 草稿/预览 | 未开始 | |
 | P5 视频增强 | 未开始 | |
 | P6 主题系统 | 未开始 | |
@@ -54,6 +54,7 @@ npx prettier --check <changed files>   # passed
 - 预览图：`/api/posts` 透传构建索引的封面/LQIP/比例/srcset；新增 `/api/media/object` 代理兜底；视频/音频素材格渲染 poster；表格行增加封面缩略图与失败图标。
 - 文案：状态胶囊、账户菜单、概览、文章排序/空筛选、编辑器字段等中英同步。
 - 测试：`tests/security-smoke.mjs`、`tests/post-concurrency.mjs`、`tests/post-filter.mjs`；admin-local 增加状态胶囊、账户菜单、390px 卡片/无横滚断言。
+- 任务中心：新增 `#tasks` 页与 `/api/media-jobs` 过滤/重试/取消/轮询，接入系统分组；上线页暂保留旧的媒体任务面板，待 P3 搬迁。
 
 ## P1 待办
 

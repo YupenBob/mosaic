@@ -3,6 +3,24 @@
  */
 export const I18N = {
   'zh-CN': {
+    tasks: {
+      title: '任务中心',
+      subtitle: '{active} 个处理中 · {failed} 个失败',
+      refresh: '刷新',
+      filter: '筛选任务',
+      all: '全部',
+      active: '进行中',
+      failed: '失败',
+      done: '已完成',
+      count: '{n} 个任务',
+      attempts: '第 {n} 次',
+      emptyTitle: '没有任务',
+      emptyDesc: '上传素材后，处理进度会出现在这里。',
+      loadFailed: '任务加载失败',
+      refreshed: '已刷新',
+      retryQueued: '已重新排队',
+      cancelRequested: '已请求取消',
+    },
     jobs: {
       title: '媒体处理',
       pending: '排队中',
@@ -53,6 +71,7 @@ export const I18N = {
       build: '上线',
       config: '设置',
       taxonomy: '分类与标签',
+      tasks: '任务中心',
       cleanup: '清理',
       trash: '回收站',
       signOut: '退出登录',
@@ -707,6 +726,24 @@ export const I18N = {
   },
 
   en: {
+    tasks: {
+      title: 'Task Center',
+      subtitle: '{active} processing · {failed} failed',
+      refresh: 'Refresh',
+      filter: 'Filter tasks',
+      all: 'All',
+      active: 'Active',
+      failed: 'Failed',
+      done: 'Completed',
+      count: '{n} tasks',
+      attempts: 'attempt {n}',
+      emptyTitle: 'No tasks',
+      emptyDesc: 'Processing progress appears here after you upload assets.',
+      loadFailed: 'Could not load tasks',
+      refreshed: 'Refreshed',
+      retryQueued: 'Queued again',
+      cancelRequested: 'Cancellation requested',
+    },
     jobs: {
       title: 'Media processing',
       pending: 'Queued',
@@ -759,6 +796,7 @@ export const I18N = {
       build: 'Build',
       config: 'Settings',
       taxonomy: 'Taxonomy',
+      tasks: 'Tasks',
       cleanup: 'Cleanup',
       trash: 'Trash',
       signOut: 'Sign Out',
