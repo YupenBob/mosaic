@@ -18,6 +18,7 @@ import renderLibrary, { librarySkeleton } from './library.js?v=1';
 import renderDrafts, { draftsSkeleton } from './drafts.js?v=1';
 import renderEnhance, { enhanceSkeleton } from './enhance.js?v=1';
 import renderThemes, { themesSkeleton } from './themes.js?v=1';
+import renderHistory, { historySkeleton } from './history.js?v=1';
 
 export const pages = {
   dashboard: {
@@ -66,6 +67,12 @@ export const pages = {
     skeleton: themesSkeleton,
     label: () => t('nav.themes'),
     icon: 'ri-palette-line',
+  },
+  history: {
+    render: renderHistory,
+    skeleton: historySkeleton,
+    label: () => t('nav.history'),
+    icon: 'ri-git-commit-line',
   },
   trash: { render: renderTrash, skeleton: trashSkeleton, label: () => t('nav.trash'), icon: 'ri-delete-bin-6-line' },
   deploy: { render: () => renderDeployRedirect(), skeleton: null, label: () => 'Deploy', icon: 'ri-tools-line' },

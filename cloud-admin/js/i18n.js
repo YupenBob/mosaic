@@ -146,6 +146,7 @@ export const I18N = {
       drafts: '草稿',
       enhance: '视频增强',
       themes: '主题',
+      history: '版本历史',
       editor: '写文章',
       library: '素材库',
       build: '上线',

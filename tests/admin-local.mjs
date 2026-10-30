@@ -121,6 +121,36 @@ try {
       };
     else if (pathname.endsWith('/publish') && route.request().method() === 'POST')
       body = { ok: true, slug: 'fixture-draft', sha: 'published-sha' };
+    else if (pathname === '/history' && route.request().method() === 'GET')
+      body = {
+        commits: [
+          {
+            sha: 'a'.repeat(40),
+            shortSha: 'aaaaaaa',
+            message: 'Fixture edit',
+            author: 'Fixture',
+            date: new Date().toISOString(),
+          },
+        ],
+      };
+    else if (pathname === '/history/' + 'a'.repeat(40) && route.request().method() === 'GET')
+      body = {
+        sha: 'a'.repeat(40),
+        shortSha: 'aaaaaaa',
+        message: 'Fixture edit',
+        author: 'Fixture',
+        date: new Date().toISOString(),
+        files: [
+          {
+            filename: 'content/posts/fixture/index.md',
+            status: 'modified',
+            additions: 1,
+            deletions: 1,
+            patch: '@@ -1 +1 @@',
+          },
+        ],
+      };
+    else if (pathname.endsWith('/restore') && route.request().method() === 'POST') body = { ok: true, files: [] };
     else if (pathname === '/themes' && route.request().method() === 'GET')
       body = {
         themes: [
@@ -334,7 +364,7 @@ try {
   assert.deepEqual(errors, [], 'all admin routes must render without JavaScript errors');
   assert.ok(!requests.includes('/build/done'), 'browser polling cannot acknowledge a deployment');
   console.log(
-    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 12 pages × 2 themes accessibility passed',
+    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 13 pages × 2 themes accessibility passed',
   );
 } finally {
   await browser.close();

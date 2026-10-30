@@ -2,7 +2,7 @@
 
 计划：`Mosaic 后台重构执行计划 v3.1`（Media v2、草稿/预览、主题、视频增强、任务中心、资产生命周期、版本历史、界面重构）。
 
-当前阶段：**P6 主题系统（进行中）**
+当前阶段：**P7 版本历史（进行中）**
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
@@ -13,7 +13,7 @@
 | P4 草稿/预览 | 进行中 | R2 草稿、草稿模式/发布、草稿列表、私密预览 token/R2/预览 workflow 已落地；需真实 Actions 联调 |
 | P5 视频增强 | 进行中 | 独立页面、补帧/重编码/两者、processed/original 来源、任务选项与测试已落地；真实 FFmpeg 长任务待联调 |
 | P6 主题系统 | 进行中 | 主题包契约、构建时布局/资源解析、default 微调项、starter 示例、后台主题页/API 已落地；主题上传/市场与更多主题待做 |
-| P7 版本历史 | 未开始 | |
+| P7 版本历史 | 进行中 | Git 提交列表/详情/diff/按文件或整次恢复、后台页面已落地；真实 GitHub 联调待做 |
 | P8 收口 | 未开始 | |
 
 ## P0 已落地
@@ -144,3 +144,11 @@ npx prettier --check <changed files>   # passed
 - 后台 `#themes`：主题卡片、动态选项表单、应用；`GET /api/themes`、`POST /api/themes/apply`。
 - 测试：`theme-smoke`（契约/解析/default/starter）、`themes-api`（列表/应用/校验）；admin-local 12 页 axe。
 - 文档：`docs/themes.md`。
+
+## P7 第一批（版本历史）
+
+- `GET /api/history`、`GET /api/history/:sha`、`POST /api/history/:sha/restore`。
+- 恢复基于 GitHub Contents API，创建新提交，不改写历史；最多 20 个文件/次。
+- 后台 `#history`：提交列表、文件 patch、恢复整次/单文件。
+- 测试：`tests/history-api.mjs`；admin-local 历史页 axe。
+- 文档：`docs/history.md`。

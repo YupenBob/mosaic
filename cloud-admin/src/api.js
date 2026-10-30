@@ -326,6 +326,14 @@ export const drafts = {
   publish: (id) => apiFetch(`/drafts/${encodeURIComponent(id)}/publish`, { method: 'POST' }),
 };
 
+// ── History ────────────────────────────────
+export const history = {
+  list: (limit = 30) => apiFetch(`/history?limit=${encodeURIComponent(limit)}`),
+  get: (sha) => apiFetch(`/history/${encodeURIComponent(sha)}`),
+  restore: (sha, path = '') =>
+    apiFetch(`/history/${encodeURIComponent(sha)}/restore`, { method: 'POST', body: JSON.stringify({ path }) }),
+};
+
 // ── Themes ─────────────────────────────────
 export const themes = {
   list: () => apiFetch('/themes'),
