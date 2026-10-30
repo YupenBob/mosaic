@@ -105,3 +105,4 @@ npx prettier --check <changed files>   # passed
 - `getEditorMedia()` 合并 v2 引用，块预览/插入索引校验不再只依赖旧 slug 媒体。
 - 保存请求携带 `frontMatter.media`；admin-local 断言保存 payload 与占位符。
 - 素材库缩略图走 `/api/assets/:id/preview`；封面预览支持 assetId。
+- 素材详情：生命周期/健康原因、复制 ID、软删除（7 天）与恢复；素材库新增「待删除」筛选。
