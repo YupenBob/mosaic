@@ -2,7 +2,7 @@
 
 计划：`Mosaic 后台重构执行计划 v3.1`（Media v2、草稿/预览、主题、视频增强、任务中心、资产生命周期、版本历史、界面重构）。
 
-当前阶段：**P4 草稿与预览（进行中）**
+当前阶段：**P5 视频增强（进行中）**
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
@@ -11,7 +11,7 @@
 | P2 Media v2 | 进行中 | 资产身份/manifest v2、上传 API、Jobs 双读、v2 构建解析、素材库、生命周期、迁移 CLI、编辑器素材选择器已落地；待真实迁移执行 |
 | P3 任务中心/生命周期 | 进行中 | 任务中心页已落地；v2 资产生命周期（processing/ready/degraded/failed/deleting）、软删除/恢复、健康原因已落地 |
 | P4 草稿/预览 | 进行中 | R2 草稿、草稿模式/发布、草稿列表、私密预览 token/R2/预览 workflow 已落地；需真实 Actions 联调 |
-| P5 视频增强 | 未开始 | |
+| P5 视频增强 | 进行中 | 独立页面、补帧/重编码/两者、processed/original 来源、任务选项与测试已落地；真实 FFmpeg 长任务待联调 |
 | P6 主题系统 | 未开始 | |
 | P7 版本历史 | 未开始 | |
 | P8 收口 | 未开始 | |
@@ -126,3 +126,11 @@ npx prettier --check <changed files>   # passed
 - 编辑器草稿模式新增「预览文章」，轮询完成后 toast 打开。
 - 新增 `scripts/preview/{write-draft,upload}.mjs`、`.github/workflows/preview.yml`、`docs/preview.md`、`tests/preview-api.mjs`。
 - 未真实触发 Actions；需要 R2/Worker 凭据与 `PREVIEW_SECRET`。
+
+## P5 第一批（视频增强）
+
+- `POST /api/media/interpolate` 扩展 `assetIds`、`operation`、`sourceMode`、`reencode`；兼容旧 slug/all。
+- Jobs 选项保留 `operation/sourceMode/reencode`；`reencode` 关闭插值但强制重新编码。
+- `original` 来源要求原文件可用；`processed` 来源要求已发布分层。
+- 新页面 `#enhance`：视频选择、三种操作、来源、帧率、CRF/preset/音频码率。
+- 新增 `tests/enhance-jobs.mjs`（三种操作、两种来源、参数拒绝）、`docs/video-enhance.md`。

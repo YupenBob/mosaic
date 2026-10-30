@@ -57,7 +57,15 @@ export function normalizeJobOptions(options, config = DEFAULTS) {
   const source = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
   /** @type {{keepSource:boolean, sourceMode?:string, interpolation?:object}} */
   const normalized = { keepSource: resolveKeepSource(source.keepSource, config) };
-  if (source.sourceMode === 'processed') normalized.sourceMode = 'processed';
+  if (source.sourceMode === 'processed' || source.sourceMode === 'original') normalized.sourceMode = source.sourceMode;
+  if (['interpolate', 'reencode', 'both'].includes(source.operation)) normalized.operation = source.operation;
+  if (source.reencode && typeof source.reencode === 'object') {
+    const reencode = {};
+    if (Number.isInteger(source.reencode.crf)) reencode.crf = source.reencode.crf;
+    if (typeof source.reencode.preset === 'string') reencode.preset = source.reencode.preset;
+    if (typeof source.reencode.audioBitrate === 'string') reencode.audioBitrate = source.reencode.audioBitrate;
+    if (Object.keys(reencode).length) normalized.reencode = reencode;
+  }
   const interpolation = normalizeInterpolationOptions(source.interpolation);
   if (interpolation) normalized.interpolation = interpolation;
   return normalized;

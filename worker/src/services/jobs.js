@@ -115,19 +115,49 @@ export async function interpolateMedia(c, body = {}) {
     throw Object.assign(new Error('slug is required unless all=true'), { status: 400, code: 'INVALID_PARAMS' });
   if (filename !== undefined && (typeof filename !== 'string' || !validSegment(filename)))
     throw Object.assign(new Error('filename is not a valid media name'), { status: 400, code: 'INVALID_PARAMS' });
+  const assetIds = Array.isArray(body.assetIds) ? body.assetIds : [];
+  if (assetIds.length > 100 || assetIds.some((id) => !ASSET_ID_RE.test(id)))
+    throw Object.assign(new Error('assetIds must be valid ast_ ids (max 100)'), {
+      status: 400,
+      code: 'INVALID_PARAMS',
+    });
   if (body.fps !== undefined && (!Number.isInteger(body.fps) || body.fps < 24 || body.fps > 120))
     throw Object.assign(new Error('fps must be an integer in 24..120'), { status: 400, code: 'INVALID_PARAMS' });
+  const operation = body.operation || 'interpolate';
+  if (!['interpolate', 'reencode', 'both'].includes(operation))
+    throw Object.assign(new Error('operation must be interpolate, reencode or both'), {
+      status: 400,
+      code: 'INVALID_PARAMS',
+    });
+  const sourceMode = body.sourceMode === 'original' ? 'original' : 'processed';
+  const reencode = body.reencode && typeof body.reencode === 'object' ? body.reencode : {};
+  if (reencode.crf !== undefined && (!Number.isInteger(reencode.crf) || reencode.crf < 0 || reencode.crf > 51))
+    throw Object.assign(new Error('reencode.crf must be 0..51'), { status: 400, code: 'INVALID_PARAMS' });
+  if (reencode.preset !== undefined && !/^[a-z]+$/.test(String(reencode.preset)))
+    throw Object.assign(new Error('reencode.preset is invalid'), { status: 400, code: 'INVALID_PARAMS' });
+  if (reencode.audioBitrate !== undefined && !/^\d{2,3}k$/.test(String(reencode.audioBitrate)))
+    throw Object.assign(new Error('reencode.audioBitrate is invalid'), { status: 400, code: 'INVALID_PARAMS' });
   const config = normalizeConfig(await getConfig(c), c.env);
   const effective = structuredClone(config);
   effective.videoQuality.interpolation = {
     ...config.videoQuality.interpolation,
-    enabled: true,
+    enabled: operation !== 'reencode',
     ...(body.fps !== undefined ? { fps: body.fps } : {}),
   };
+  if (reencode.crf !== undefined) effective.videoQuality.crf = reencode.crf;
+  if (reencode.preset !== undefined) effective.videoQuality.preset = reencode.preset;
+  if (reencode.audioBitrate !== undefined) effective.videoQuality.audioBitrate = reencode.audioBitrate;
   return jobsRequest(c.env, 'interpolate', {
     all,
     slug: all ? '' : slug,
     filename: filename || '',
+    assetIds,
+    operation,
+    sourceMode,
+    reencode:
+      reencode.crf !== undefined || reencode.preset !== undefined || reencode.audioBitrate !== undefined
+        ? reencode
+        : null,
     fps: body.fps ?? 0,
     config: effective,
     stateConfig: config,

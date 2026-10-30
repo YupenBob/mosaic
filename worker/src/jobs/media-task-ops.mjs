@@ -269,11 +269,13 @@ export async function interpolateAssets({ state, data, env, config, saveManifest
   const slug = typeof data.slug === 'string' ? data.slug : '';
   const filename = typeof data.filename === 'string' && data.filename ? data.filename : '';
   const assetIds = new Set(Array.isArray(data.assetIds) ? data.assetIds : []);
+  const sourceMode = data.sourceMode === 'original' ? 'original' : 'processed';
+  const operation = ['interpolate', 'reencode', 'both'].includes(data.operation) ? data.operation : 'interpolate';
   const jobConfig = data.config || config;
   const baseConfig = data.stateConfig || config;
   const interpolation = jobConfig.videoQuality?.interpolation || {
     ...config.videoQuality.interpolation,
-    enabled: true,
+    enabled: operation !== 'reencode',
   };
   const candidates = Object.values(state.manifest.assets).filter(
     (asset) =>
@@ -289,15 +291,21 @@ export async function interpolateAssets({ state, data, env, config, saveManifest
         skipped.push({ assetId: asset.id, reason: 'not-a-video' });
         continue;
       }
-      if (!asset.published?.sources || !Object.keys(asset.published.sources).length) {
+      if (sourceMode === 'processed' && (!asset.published?.sources || !Object.keys(asset.published.sources).length)) {
         skipped.push({ assetId: asset.id, reason: 'not-decoded' });
+        continue;
+      }
+      if (sourceMode === 'original' && (!asset.source?.key || asset.source.available === false)) {
+        skipped.push({ assetId: asset.id, reason: 'source-missing' });
         continue;
       }
       const existing = state.jobs[asset.jobId];
       if (
         existing &&
         ['pending', 'running'].includes(existing.status) &&
-        existing.options?.sourceMode === 'processed' &&
+        existing.options?.sourceMode === sourceMode &&
+        existing.options?.operation === operation &&
+        JSON.stringify(existing.options?.reencode || null) === JSON.stringify(data.reencode || null) &&
         existing.options?.interpolation?.fps === interpolation.fps
       ) {
         skipped.push({ assetId: asset.id, reason: 'already-queued' });
@@ -315,12 +323,17 @@ export async function interpolateAssets({ state, data, env, config, saveManifest
           source: { ...asset.source, available: asset.source?.available !== false },
           // Input snapshot: the runner re-encodes these exact objects even after a
           // budget-interrupted partial publish replaced asset.published.
-          processedSources: { ...asset.published.sources },
+          ...(sourceMode === 'processed' ? { processedSources: { ...asset.published.sources } } : {}),
           config: jobConfig,
           stateConfig: baseConfig,
           configHash: data.configHash,
           force: true,
-          options: { sourceMode: 'processed', interpolation },
+          options: {
+            sourceMode,
+            operation,
+            interpolation: operation === 'reencode' ? { ...interpolation, enabled: false } : interpolation,
+            reencode: data.reencode || null,
+          },
         },
         env,
         config: baseConfig,

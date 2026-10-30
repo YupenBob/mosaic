@@ -103,6 +103,8 @@ export function registerMediaJobs(app) {
       return c.json({
         ok: true,
         supported: true,
+        operations: ['interpolate', 'reencode', 'both'],
+        sourceModes: ['processed', 'original'],
         defaults: {
           fps: interpolation.fps,
           mode: interpolation.mode,

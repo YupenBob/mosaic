@@ -121,6 +121,8 @@ try {
       };
     else if (pathname.endsWith('/publish') && route.request().method() === 'POST')
       body = { ok: true, slug: 'fixture-draft', sha: 'published-sha' };
+    else if (pathname === '/media/interpolate' && route.request().method() === 'POST')
+      body = { ok: true, enqueued: 1, tasks: [], skipped: [] };
     else if (pathname === '/previews' && route.request().method() === 'POST')
       body = {
         previewId: 'prv_0123456789abcdefghjkmnpq',
@@ -148,8 +150,16 @@ try {
             status: 'ready',
             published: true,
           },
+          {
+            id: 'ast_0123456789abcdefghjkmnpr',
+            filename: 'clip.mp4',
+            folder: 'videos',
+            status: 'ready',
+            published: true,
+            sourceAvailable: true,
+          },
         ],
-        total: 1,
+        total: 2,
       };
     await route.fulfill({ json: body });
   });
@@ -295,7 +305,7 @@ try {
   assert.deepEqual(errors, [], 'all admin routes must render without JavaScript errors');
   assert.ok(!requests.includes('/build/done'), 'browser polling cannot acknowledge a deployment');
   console.log(
-    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 10 pages × 2 themes accessibility passed',
+    'Local admin: authentication, editor/routes, media retry/cancel, polling cleanup and 11 pages × 2 themes accessibility passed',
   );
 } finally {
   await browser.close();
