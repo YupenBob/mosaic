@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | P0 安全热修 | 完成 | `validSegment`、`jsStr`、`baseSha`、XSS 回归 |
 | P1 框架/视觉/动效/预览图 | 进行中 | 壳层、状态胶囊、账户菜单、动效、概览、文章筛选、编辑器两栏、预览图 |
-| P2 Media v2 | 未开始 | |
+| P2 Media v2 | 进行中 | 资产身份/manifest v2/引用索引纯模块与测试已落地；上传、任务、构建迁移待接 |
 | P3 任务中心/生命周期 | 进行中 | 任务中心页已基于现有 `/api/media-jobs` 落地；资产生命周期待 Media v2 |
 | P4 草稿/预览 | 未开始 | |
 | P5 视频增强 | 未开始 | |
@@ -62,3 +62,9 @@ npx prettier --check <changed files>   # passed
 - 分类/清理/上线页完整视觉重构（P5/P4）。
 - 去除剩余静态内联处理器并启用 CSP（P8 前置）。
 - 概览「需要处理」「最近上线」卡片、图表条形化（P1 收尾）。
+
+## P2 已落地（底层）
+
+- `shared/media-v2.mjs`：独立 `ast_` 资产 ID、迁移确定性 ID、R2 `originals/assets`/`processed/assets` 路径、v2 manifest 校验、文章 `media` 引用、素材使用索引。
+- `tests/media-v2-smoke.mjs`：ID/路径/校验/v1 兼容/引用/使用索引。
+- 未切换线上路径；v1 manifest、R2 目录、Jobs DO、构建和后台仍按原逻辑运行。
