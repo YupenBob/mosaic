@@ -136,6 +136,15 @@ try {
   await page.waitForTimeout(1200);
   assert.equal(savedPost?.frontMatter?.media?.gallery?.length, 1, 'save carries the picked library asset');
 
+  await page.evaluate(() => {
+    location.hash = 'library';
+  });
+  await page.locator('.asset-card').first().waitFor();
+  await page.locator('.asset-card').first().click();
+  await page.locator('.asset-detail').waitFor();
+  assert.ok((await page.locator('.asset-detail').innerText()).includes('library-photo.jpg'), 'asset detail opens');
+  await page.locator('.modal-overlay .btn-secondary').first().click();
+
   // Mobile posts are cards, never a squeezed table.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => {

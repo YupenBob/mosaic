@@ -5,12 +5,13 @@
  */
 import { assets } from '../src/api.js';
 import { t } from './i18n.js?v=1';
-import { escHtml, toast, emptyState, formatTime } from './ui.js?v=1';
+import { escHtml, toast, emptyState, formatTime, openModal, closeModal, modalConfirm, copyText } from './ui.js?v=1';
 
 const ACTIVE = new Set(['pending', 'running', 'processing']);
 
 function statusBadge(asset) {
-  const status = asset.status === 'deleted' ? 'deleted' : asset.status;
+  const lifecycle = asset.lifecycle?.state;
+  const status = lifecycle === 'deleting' ? 'deleting' : asset.status === 'deleted' ? 'deleted' : asset.status;
   const cls =
     {
       ready: 'badge-success',
@@ -27,7 +28,7 @@ function statusBadge(asset) {
 function assetCard(asset) {
   const icon =
     asset.folder === 'videos' ? 'ri-video-line' : asset.folder === 'music' ? 'ri-music-line' : 'ri-image-line';
-  return `<article class="asset-card" data-asset-id="${escHtml(asset.id)}">
+  return `<article class="asset-card" data-asset-id="${escHtml(asset.id)}" tabindex="0" role="button">
     <div class="asset-thumb">${asset.published ? `<img src="/api/assets/${encodeURIComponent(asset.id)}/preview" alt="" loading="lazy" onerror="this.style.display='none'" />` : `<i class="${icon}" aria-hidden="true"></i>`}</div>
     <div class="asset-body">
       <strong class="asset-name" title="${escHtml(asset.filename)}">${escHtml(asset.filename)}</strong>
@@ -37,10 +38,71 @@ function assetCard(asset) {
   </article>`;
 }
 
+function lifecycleText(asset) {
+  const state = asset.lifecycle?.state || asset.status;
+  const reasons = asset.lifecycle?.health?.reasons || [];
+  return `${t('library.lifecycle.' + state) || state}${reasons.length ? ' · ' + reasons.map((reason) => t('library.reason.' + reason) || reason).join('、') : ''}`;
+}
+
+function openAssetDetail(asset, onChanged) {
+  const preview = asset.published
+    ? `<img class="asset-detail-preview" src="/api/assets/${encodeURIComponent(asset.id)}/preview" alt="" loading="lazy" onerror="this.style.display='none'" />`
+    : `<div class="asset-detail-preview asset-detail-placeholder"><i class="ri-file-line" aria-hidden="true"></i></div>`;
+  const lifecycle = asset.lifecycle || { state: asset.status, health: { reasons: [] } };
+  const deleting = lifecycle.state === 'deleting';
+  const content = `
+    <div class="asset-detail">
+      ${preview}
+      <div class="asset-detail-meta">
+        <strong>${escHtml(asset.filename)}</strong>
+        <span>${escHtml(asset.folder)} · ${asset.createdAt ? escHtml(formatTime(asset.createdAt)) : ''}</span>
+        <span>${escHtml(lifecycleText(asset))}</span>
+        <code>${escHtml(asset.id)}</code>
+      </div>
+    </div>`;
+  const actions = [
+    { label: t('common.close'), className: 'btn-secondary' },
+    {
+      label: t('library.copyId'),
+      className: 'btn-secondary',
+      closeOnClick: false,
+      onClick: () => copyText(asset.id),
+    },
+  ];
+  if (deleting) {
+    actions.push({
+      label: t('library.restore'),
+      className: 'btn-primary',
+      closeOnClick: false,
+      onClick: async () => {
+        await assets.restore(asset.id);
+        toast(t('library.restored'), 'success');
+        closeModal();
+        onChanged();
+      },
+    });
+  } else if (asset.status !== 'deleted') {
+    actions.push({
+      label: t('library.delete'),
+      className: 'btn-danger',
+      closeOnClick: false,
+      onClick: () => {
+        closeModal();
+        modalConfirm(t('library.deleteTitle', { name: asset.filename }), t('library.deleteDesc'), async () => {
+          await assets.delete(asset.id);
+          toast(t('library.deletedToast'), 'success');
+          onChanged();
+        });
+      },
+    });
+  }
+  openModal({ title: t('library.detail'), content, actions, wide: true });
+}
+
 export default async function renderLibrary(signal) {
   let assetsData = [];
   try {
-    const result = await assets.list({});
+    const result = await assets.list({ includeDeleted: 1 });
     assetsData = result.assets || [];
   } catch {}
   if (signal.aborted) return '';
@@ -65,6 +127,7 @@ export default async function renderLibrary(signal) {
             <button type="button" class="task-filter-btn active" data-asset-filter="all">${t('tasks.all')}</button>
             <button type="button" class="task-filter-btn" data-asset-filter="active">${t('tasks.active')}</button>
             <button type="button" class="task-filter-btn" data-asset-filter="failed">${t('tasks.failed')}</button>
+            <button type="button" class="task-filter-btn" data-asset-filter="deleted">${t('library.deleted')}</button>
           </div>
           <span class="search-count" id="library-count"></span>
         </div>
@@ -79,7 +142,13 @@ export default async function renderLibrary(signal) {
       const visible = () => {
         if (filter === 'active') return list.filter((asset) => ACTIVE.has(asset.status));
         if (filter === 'failed') return list.filter((asset) => asset.status === 'failed');
-        return list;
+        if (filter === 'deleted')
+          return list.filter(
+            (asset) => ['deleting', 'deleted'].includes(asset.lifecycle?.state) || asset.status === 'deleted',
+          );
+        return list.filter(
+          (asset) => !['deleting', 'deleted'].includes(asset.lifecycle?.state) && asset.status !== 'deleted',
+        );
       };
 
       const render = () => {
@@ -96,7 +165,7 @@ export default async function renderLibrary(signal) {
 
       const load = async () => {
         try {
-          const result = await assets.list({});
+          const result = await assets.list({ includeDeleted: 1 });
           if (signal.aborted) return;
           list = result.assets || [];
           const subtitle = document.querySelector('.page-subtitle');
@@ -165,6 +234,20 @@ export default async function renderLibrary(signal) {
           });
           render();
         });
+      });
+      document.getElementById('asset-grid')?.addEventListener('click', (event) => {
+        const card = event.target.closest('.asset-card');
+        if (!card) return;
+        const asset = list.find((item) => item.id === card.dataset.assetId);
+        if (asset) openAssetDetail(asset, load);
+      });
+      document.getElementById('asset-grid')?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        const card = event.target.closest('.asset-card');
+        if (!card) return;
+        event.preventDefault();
+        const asset = list.find((item) => item.id === card.dataset.assetId);
+        if (asset) openAssetDetail(asset, load);
       });
       signal.addEventListener(
         'abort',

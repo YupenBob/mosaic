@@ -145,6 +145,9 @@ await runtime.call('import-v2', {
 });
 const imported = await runtime.call('assets-list', {});
 assert.ok(imported.assets.some((asset) => asset.id === importedId));
-await assert.rejects(() => runtime.call('import-v2', { assets: [{ id: 'not-an-asset', v2: true }] }), /Invalid v2 asset/);
+await assert.rejects(
+  () => runtime.call('import-v2', { assets: [{ id: 'not-an-asset', v2: true }] }),
+  /Invalid v2 asset/,
+);
 
 console.log('Media assets: migration import path passed');
