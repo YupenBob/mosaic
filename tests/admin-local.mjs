@@ -13,6 +13,7 @@ const server = await serveDirectory(path.join(staged, 'dist'));
 const browser = await chromium.launch({ headless: true });
 const requests = [],
   errors = [];
+let savedPost = null;
 const config = normalizeConfig({
   title: 'Fixture',
   url: server.url,
@@ -36,6 +37,9 @@ try {
     if (!url.pathname.startsWith('/api/')) return route.continue();
     const pathname = url.pathname.slice(4);
     requests.push(pathname);
+    if (pathname === '/posts' && route.request().method() === 'POST') {
+      savedPost = JSON.parse(route.request().postData() || '{}');
+    }
     let body = { ok: true };
     if (pathname === '/auth/login') body = { token: 'fixture-token' };
     else if (pathname === '/config' && route.request().method() === 'PUT') {
@@ -83,6 +87,19 @@ try {
       };
     else if (pathname.includes('/list')) body = { photos: [], videos: [], music: [], covers: [] };
     else if (pathname === '/trash') body = { items: [] };
+    else if (pathname === '/assets')
+      body = {
+        assets: [
+          {
+            id: 'ast_0123456789abcdefghjkmnpq',
+            filename: 'library-photo.jpg',
+            folder: 'photos',
+            status: 'ready',
+            published: true,
+          },
+        ],
+        total: 1,
+      };
     await route.fulfill({ json: body });
   });
   await page.goto(server.url);
@@ -96,6 +113,28 @@ try {
   assert.equal(await page.locator('#account-theme-options button').count(), 3, 'account menu owns appearance');
   await page.keyboard.press('Escape');
   await page.locator('#account-menu').waitFor({ state: 'hidden' });
+
+  // Editor can attach a v2 library asset without a slug-bound media list.
+  await page.evaluate(() => {
+    location.hash = 'editor&slug=fixture';
+  });
+  await page.locator('[data-open-asset-picker]').waitFor();
+  await page.locator('[data-open-asset-picker]').click();
+  await page.locator('.asset-pick').first().click();
+  await page.locator('.modal-overlay .btn-primary').click();
+  await page.locator('.modal-overlay').waitFor({ state: 'hidden' });
+  assert.ok(
+    (await page.locator('#fm-body').inputValue()).includes('{{photo:0}}'),
+    'picked library asset inserts a photo placeholder',
+  );
+  assert.equal(
+    await page.locator('#v2-media-list .v2-media-chip').count(),
+    1,
+    'picked library asset is tracked in the post media refs',
+  );
+  await page.evaluate(() => window.doSavePost());
+  await page.waitForTimeout(1200);
+  assert.equal(savedPost?.frontMatter?.media?.gallery?.length, 1, 'save carries the picked library asset');
 
   // Mobile posts are cards, never a squeezed table.
   await page.setViewportSize({ width: 390, height: 844 });

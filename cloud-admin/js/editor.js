@@ -2,7 +2,7 @@
  * Editor page — three-pane post editor with Markdown preview, autosave
  * drafts, cover picker, stats section and the media panel.
  */
-import { posts as postsApi, media as mediaApi } from '../src/api.js';
+import { posts as postsApi, media as mediaApi, assets as assetsApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, loadLib, openModal, closeModal } from './ui.js?v=1';
@@ -18,6 +18,25 @@ let previewVisible = false;
 let previewTimer = null;
 
 function getEditorMedia() {
+  const refs = state.editor.mediaRefs;
+  if (refs && refsIds(refs).length) {
+    const view = (id) => {
+      const asset = state.editor.assetCache?.[id];
+      if (!asset) return null;
+      return {
+        name: asset.filename,
+        previewUrl: assetPreview(asset),
+        url: asset.previewUrl || assetPreview(asset),
+        status: asset.status,
+        published: asset.published,
+      };
+    };
+    const photos = (refs.gallery || []).map(view).filter(Boolean);
+    const videos = (refs.videos || []).map(view).filter(Boolean);
+    const music = (refs.music || []).map(view).filter(Boolean);
+    const covers = refs.cover ? [view(refs.cover)].filter(Boolean) : [];
+    if (photos.length || videos.length || music.length || covers.length) return { photos, videos, music, covers };
+  }
   return state.editor.media || { photos: [], videos: [], music: [] };
 }
 
@@ -389,6 +408,8 @@ export default async function renderEditor(signal) {
   state.editor.baseSha = slug ? post.sha || null : null;
 
   const fm = post.frontMatter || {};
+  state.editor.mediaRefs = normalizeMediaRefs(fm.media);
+  state.editor.assetCache = {};
   const draft = loadDraft(slug);
   const prefillCat = !slug ? state.params.cat || '' : '';
   const prefillTags = !slug ? state.params.tags || '' : '';
@@ -516,6 +537,11 @@ export default async function renderEditor(signal) {
           <div class="editor-media-panel">
             <h2 class="media-panel-collapse" onclick="toggleMediaPanel()"><i class="ri-upload-cloud-2-line"></i> ${t('editor.mediaPanel')} <i class="ri-arrow-down-s-line" id="media-panel-caret" style="margin-left:auto"></i></h2>
             <div id="media-panel-body" class="media-panel-body">
+              <div class="editor-section-title">${t('editor.assetLibrary')}</div>
+              <button type="button" class="btn btn-secondary btn-sm" data-open-asset-picker>
+                <i class="ri-hard-drive-3-line" aria-hidden="true"></i> ${t('editor.pickAssets')}
+              </button>
+              <div id="v2-media-list" class="v2-media-list"></div>
               <label class="upload-keep-source" for="upload-keep-source">
                 <input type="checkbox" id="upload-keep-source" ${state.config.media?.keepSourceFiles !== false ? 'checked' : ''} />
                 <span class="upload-keep-copy">
@@ -559,6 +585,9 @@ export default async function renderEditor(signal) {
       wireBodyDnD();
       renderBlocksFromBody();
       updateCoverPreview();
+      renderSelectedMedia();
+      loadSelectedAssets();
+      document.querySelector('[data-open-asset-picker]')?.addEventListener('click', openAssetPicker);
       if (slug) loadExistingMedia(slug);
       state.editor.draftSnapshot = null;
       if (draft) {
@@ -680,6 +709,159 @@ window.discardDraft = () => {
   );
 };
 
+// ── Media v2 asset picker ──────────────────
+function normalizeMediaRefs(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const list = (input) => (Array.isArray(input) ? input.filter((id) => typeof id === 'string' && id) : []);
+  return {
+    gallery: list(source.gallery),
+    videos: list(source.videos),
+    music: list(source.music),
+    cover: typeof source.cover === 'string' && source.cover ? source.cover : null,
+  };
+}
+
+function assetPreview(asset) {
+  return `/api/assets/${encodeURIComponent(asset.id)}/preview`;
+}
+
+function refsIds(refs = state.editor.mediaRefs) {
+  return [
+    ...new Set([
+      ...(refs.gallery || []),
+      ...(refs.videos || []),
+      ...(refs.music || []),
+      ...(refs.cover ? [refs.cover] : []),
+    ]),
+  ];
+}
+
+function renderSelectedMedia() {
+  const el = document.getElementById('v2-media-list');
+  if (!el) return;
+  const refs = state.editor.mediaRefs || normalizeMediaRefs(null);
+  const ids = refsIds(refs);
+  if (!ids.length) {
+    el.innerHTML = `<p class="field-hint">${t('editor.pickAssetsHint')}</p>`;
+    return;
+  }
+  el.innerHTML = ids
+    .map((id) => {
+      const asset = state.editor.assetCache?.[id];
+      return `<span class="v2-media-chip" title="${escHtml(asset?.filename || id)}">
+        ${asset ? `<img src="${escHtml(assetPreview(asset))}" alt="" loading="lazy" onerror="this.style.display='none'" />` : '<i class="ri-file-line" aria-hidden="true"></i>'}
+        <span>${escHtml(asset?.filename || id)}</span>
+      </span>`;
+    })
+    .join('');
+}
+
+async function loadSelectedAssets() {
+  const ids = refsIds();
+  if (!ids.length) return;
+  try {
+    const result = await assetsApi.list({ ids: ids.join(',') });
+    if (state.page !== 'editor') return;
+    for (const asset of result.assets || []) state.editor.assetCache[asset.id] = asset;
+    renderSelectedMedia();
+    updateCoverPreview();
+    refreshBlockMedia();
+  } catch {
+    /* previews degrade to file labels */
+  }
+}
+
+function attachAssets(ids) {
+  const refs = state.editor.mediaRefs || normalizeMediaRefs(null);
+  let changed = false;
+  let musicPlaceholderAdded = false;
+  for (const id of ids) {
+    const asset = state.editor.assetCache?.[id];
+    if (!asset) continue;
+    if (asset.folder === 'videos') {
+      if (refs.videos.includes(id)) continue;
+      refs.videos.push(id);
+      window.insertPlaceholder?.(`{{video:${refs.videos.length - 1}}}`);
+      changed = true;
+    } else if (asset.folder === 'music') {
+      if (refs.music.includes(id)) continue;
+      refs.music.push(id);
+      if (!musicPlaceholderAdded) {
+        window.insertPlaceholder?.('{{music}}');
+        musicPlaceholderAdded = true;
+      }
+      changed = true;
+    } else {
+      if (refs.gallery.includes(id)) continue;
+      refs.gallery.push(id);
+      window.insertPlaceholder?.(`{{photo:${refs.gallery.length - 1}}}`);
+      changed = true;
+    }
+  }
+  if (changed) {
+    state.editor.mediaRefs = refs;
+    state.editorDirty = true;
+    renderSelectedMedia();
+  }
+}
+
+async function openAssetPicker() {
+  let result;
+  try {
+    result = await assetsApi.list({});
+  } catch (error) {
+    toast(t('editor.loadError') + ': ' + (error.message || ''), 'error');
+    return;
+  }
+  const list = (result.assets || []).filter((asset) => asset.status !== 'deleted');
+  if (!list.length) {
+    toast(t('editor.assetLibraryEmpty'), 'info');
+    return;
+  }
+  for (const asset of list) state.editor.assetCache[asset.id] = asset;
+  const selected = new Set();
+  const content = list.length
+    ? `<div class="asset-pick-grid">${list
+        .map(
+          (
+            asset,
+          ) => `<button type="button" class="asset-pick" data-asset-id="${escHtml(asset.id)}" aria-pressed="false">
+            <span class="asset-pick-thumb"><img src="${escHtml(assetPreview(asset))}" alt="" loading="lazy" onerror="this.style.display='none'" /><i class="ri-file-line" aria-hidden="true"></i></span>
+            <span class="asset-pick-name">${escHtml(asset.filename)}</span>
+            <span class="asset-pick-meta">${escHtml(asset.folder)} · ${escHtml(t('jobs.' + asset.status) || asset.status)}</span>
+          </button>`,
+        )
+        .join('')}</div>`
+    : '';
+  const overlay = openModal({
+    title: t('editor.pickAssetsTitle'),
+    desc: t('editor.pickAssetsDesc'),
+    content,
+    wide: true,
+    actions: [
+      { label: t('common.cancel'), className: 'btn-secondary' },
+      {
+        label: t('editor.insertSelected'),
+        className: 'btn-primary',
+        closeOnClick: false,
+        onClick: () => {
+          attachAssets([...selected]);
+          closeModal();
+        },
+      },
+    ],
+  });
+  overlay?.addEventListener('click', (event) => {
+    const button = event.target.closest('.asset-pick');
+    if (!button) return;
+    const id = button.dataset.assetId;
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    button.classList.toggle('is-selected', selected.has(id));
+    button.setAttribute('aria-pressed', selected.has(id) ? 'true' : 'false');
+  });
+}
+
 // ── Save ───────────────────────────────────
 window.doSavePost = async (goBack) => {
   let slug = document.getElementById('fm-slug').value.trim();
@@ -699,10 +881,12 @@ window.doSavePost = async (goBack) => {
       .map((s) => s.trim())
       .filter(Boolean),
     description: document.getElementById('fm-desc').value,
-    cover: document.getElementById('fm-cover').value.trim(),
+    cover: state.editor.mediaRefs?.cover || document.getElementById('fm-cover').value.trim(),
     views: parseInt(document.getElementById('fm-views')?.value) || 0,
     likes: parseInt(document.getElementById('fm-likes')?.value) || 0,
   };
+  const media = state.editor.mediaRefs;
+  if (media && refsIds(media).length) frontMatter.media = media;
   const body = document.getElementById('fm-body').value;
   const btn = document.getElementById('editor-save-btn');
   btn.disabled = true;
@@ -906,6 +1090,12 @@ export function updateCoverPreview() {
   const val = document.getElementById('fm-cover')?.value || '';
   if (!el) return;
   const media = state.editor.media || { photos: [], videos: [] };
+  const asset = state.editor.assetCache?.[val];
+  if (asset) {
+    el.style.display = 'block';
+    el.innerHTML = `<img src="${escHtml(assetPreview(asset))}" alt="cover" />`;
+    return;
+  }
   const match = /^(video|photo):(\d+)$/.exec(val);
   const selected = match
     ? media[match[1] === 'video' ? 'videos' : 'photos'][Number(match[2])]

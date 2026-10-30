@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | P0 安全热修 | 完成 | `validSegment`、`jsStr`、`baseSha`、XSS 回归 |
 | P1 框架/视觉/动效/预览图 | 进行中 | 壳层、状态胶囊、账户菜单、动效、概览、文章筛选、编辑器两栏、预览图 |
-| P2 Media v2 | 进行中 | 资产身份/manifest v2、v2 上传 API、Jobs 双读、v2 构建解析、素材库初版已落地；迁移脚本与编辑器中引用待接 |
+| P2 Media v2 | 进行中 | 资产身份/manifest v2、上传 API、Jobs 双读、v2 构建解析、素材库、生命周期、迁移 CLI、编辑器素材选择器已落地；待真实迁移执行 |
 | P3 任务中心/生命周期 | 进行中 | 任务中心页已落地；v2 资产生命周期（processing/ready/degraded/failed/deleting）、软删除/恢复、健康原因已落地 |
 | P4 草稿/预览 | 未开始 | |
 | P5 视频增强 | 未开始 | |
@@ -98,3 +98,10 @@ npx prettier --check <changed files>   # passed
 - 流程：复制 R2 对象（S3 CopyObject）→ 分批 `media/import-v2` → 逐篇重写 frontmatter。
 - `scripts/media/plan-v2.mjs` + `tests/migrate-v2-plan.mjs` 覆盖 ID、复制对、文章引用。
 - 迁移文档：`docs/media-v2.md`；旧 key 不删除，文章可按提交回滚。
+
+## P2 第四批（编辑器接入）
+
+- 编辑器新增「从素材库选择」：列出 v2 资产、预览、选择后插入正文占位符，并写入 frontmatter `media`。
+- `getEditorMedia()` 合并 v2 引用，块预览/插入索引校验不再只依赖旧 slug 媒体。
+- 保存请求携带 `frontMatter.media`；admin-local 断言保存 payload 与占位符。
+- 素材库缩略图走 `/api/assets/:id/preview`；封面预览支持 assetId。
