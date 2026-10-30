@@ -52,9 +52,7 @@ export async function planV2Migration({ manifest, posts = [] }) {
       key: mappedSourceKey,
       available: asset.source?.available !== false && !!oldSourceKey,
     };
-    const published = asset.published
-      ? { ...mapObject(asset.published, map), generation: asset.published.generation ?? generation }
-      : null;
+    const published = asset.published ? { ...mapObject(asset.published, map), generation } : null;
     const oldKeys = new Set([oldSourceKey, ...(asset.published ? objectKeys(asset.published) : [])]);
     const newKeys = new Set([source.key, ...(published ? objectKeys(published) : [])]);
     for (const oldKey of oldKeys) {
