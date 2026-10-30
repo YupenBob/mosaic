@@ -31,7 +31,7 @@ export function registerInternalJobs(app) {
   app.post('/api/internal/media/:operation', async (c) => {
     try {
       const operation = c.req.param('operation');
-      if (!['claim', 'heartbeat', 'publish', 'complete', 'failed', 'import', 'state'].includes(operation))
+      if (!['claim', 'heartbeat', 'publish', 'complete', 'failed', 'import', 'import-v2', 'state'].includes(operation))
         return c.json({ error: 'Unknown operation' }, 404);
       return c.json(await jobsRequest(c.env, operation, await c.req.json()));
     } catch (error) {

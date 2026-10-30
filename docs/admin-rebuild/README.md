@@ -91,3 +91,10 @@ npx prettier --check <changed files>   # passed
 - 新增 `scripts/media/plan-v2.mjs`：纯函数，把 v1 资产映射为确定性的 v2 资产 ID、R2 复制对、文章 `media` 引用（含 `photo:N` / `video:N` / 文件名封面）。
 - `tests/migrate-v2-plan.mjs`：确定性 ID、复制对、文章引用、已迁移文章跳过。
 - 尚未执行实际 R2 复制与文章提交；`migrate-v2.mjs` CLI/apply 是下一轮。
+
+## P2 迁移 CLI（准备执行）
+
+- `scripts/media/migrate-v2.mjs`：默认 dry-run；`--write-plan` 输出计划；`--apply` 需 `MIGRATION_CONFIRM=media-v2`。
+- 流程：复制 R2 对象（S3 CopyObject）→ 分批 `media/import-v2` → 逐篇重写 frontmatter。
+- `scripts/media/plan-v2.mjs` + `tests/migrate-v2-plan.mjs` 覆盖 ID、复制对、文章引用。
+- 迁移文档：`docs/media-v2.md`；旧 key 不删除，文章可按提交回滚。

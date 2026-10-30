@@ -124,3 +124,27 @@ const legacyResolved = resolveMedia({ schemaVersion: 1, revision: 0, assets: {} 
 assert.equal(legacyResolved.photos.length, 0);
 
 console.log('Media assets: v2 build resolution passed');
+
+// Import path used by the migration CLI: validated v2 assets can be merged
+// without pretending they came from an upload job.
+const importedId = newAssetId();
+await runtime.call('import-v2', {
+  assets: [
+    {
+      id: importedId,
+      v2: true,
+      filename: 'imported.jpg',
+      folder: 'photos',
+      generation: 1,
+      status: 'ready',
+      source: { key: `originals/assets/${importedId}/imported.jpg`, etag: 'imported', available: true },
+      published: { generation: 1, variants: { '480p': `processed/assets/${importedId}/1/480p.jpg` } },
+      lifecycle: { state: 'ready', health: { level: 'ok', reasons: [] } },
+    },
+  ],
+});
+const imported = await runtime.call('assets-list', {});
+assert.ok(imported.assets.some((asset) => asset.id === importedId));
+await assert.rejects(() => runtime.call('import-v2', { assets: [{ id: 'not-an-asset', v2: true }] }), /Invalid v2 asset/);
+
+console.log('Media assets: migration import path passed');

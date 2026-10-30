@@ -7,6 +7,7 @@ import {
   PutObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
+  CopyObjectCommand,
 } from '@aws-sdk/client-s3';
 import { CONTENT_TYPES } from '../../shared/media-manifest.mjs';
 export function createStorage(config, env = process.env) {
@@ -59,6 +60,19 @@ export function createStorage(config, env = process.env) {
       const object = await this.head(Key);
       if (!object || object.size !== fs.statSync(file).size) throw new Error(`Upload verification failed: ${Key}`);
       return Key;
+    },
+    async copy(From, To) {
+      await client.send(
+        new CopyObjectCommand({
+          Bucket,
+          CopySource: `${Bucket}/${From.split('/').map(encodeURIComponent).join('/')}`,
+          Key: To,
+          MetadataDirective: 'COPY',
+        }),
+      );
+      const object = await this.head(To);
+      if (!object) throw new Error(`Copy verification failed: ${To}`);
+      return To;
     },
     async putJSON(Key, value) {
       await client.send(

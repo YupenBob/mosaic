@@ -11,6 +11,7 @@
  * - `reconcile.mjs`       durable configuration reconciliation batches
  */
 import { emptyManifest, validateManifest } from '../../shared/media-manifest.mjs';
+import { ASSET_ID_RE, validateAssetManifest } from '../../shared/media-v2.mjs';
 import { DEFAULTS } from '../../shared/config.mjs';
 import { dispatchWorkflow, getWorkflowRun, findActiveWorkflowRun } from './services/workflows.js';
 import { hasRunningJobs, hasUnfinishedBuilds, expireLeases, isJobDue, nextTaskWakeAt } from './jobs/job-state.mjs';
@@ -275,6 +276,23 @@ export class JobsDurableObject {
       state.config = data.config;
       state.reconcile = { after: '', force: data.force || state.reconcile?.force || false };
       return { pending: true, queued: 0 };
+    }
+    if (operation === 'import-v2') {
+      const assets = Array.isArray(data.assets) ? data.assets : [];
+      for (const asset of assets) {
+        if (!asset || !ASSET_ID_RE.test(asset.id) || asset.v2 !== true)
+          throw Object.assign(new Error('Invalid v2 asset'), { status: 400 });
+      }
+      const probe = {
+        schemaVersion: 2,
+        revision: 0,
+        assets: Object.fromEntries(assets.map((asset) => [asset.id, asset])),
+      };
+      validateAssetManifest(probe);
+      for (const asset of assets) state.manifest.assets[asset.id] = asset;
+      state.manifest.schemaVersion = 2;
+      await this.saveManifest(state);
+      return { ok: true, imported: assets.length };
     }
     if (operation === 'assets-list') return this.assetsList(state, data);
     if (operation === 'asset-preview') return this.assetPreview(state, data);
