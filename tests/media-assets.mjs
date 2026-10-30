@@ -21,6 +21,8 @@ assert.equal(listed.assets[0].id, id);
 assert.equal(listed.assets[0].v2, true);
 assert.equal(listed.assets[0].published, false);
 assert.equal(listed.assets[0].sourceAvailable, true);
+assert.equal(listed.assets[0].lifecycle.state, 'processing');
+assert.equal(listed.assets[0].lifecycle.health.level, 'ok');
 
 const state = await runtime.call('state');
 validateManifest(state.manifest);
@@ -51,14 +53,35 @@ await runtime.call('publish', {
 const publishedState = await runtime.call('state');
 assert.ok(publishedState.manifest.assets[id].published.variants['480p']);
 assert.equal(publishedState.manifest.assets[id].status, 'processing');
+assert.equal(publishedState.manifest.assets[id].lifecycle.lastPublishedAt !== null, true);
+await runtime.call('failed', {
+  id: claimed.job.id,
+  token: claimed.job.token,
+  runId: 'run-asset',
+  error: 'fixture encode failure',
+});
+const degraded = await runtime.call('assets-list', {});
+assert.equal(degraded.assets[0].lifecycle.state, 'degraded');
+assert.ok(degraded.assets[0].lifecycle.health.reasons.includes('latest-job-failed'));
 
 const deleted = await runtime.call('delete-assets', { ids: [id] });
 assert.equal(deleted.ok, true);
 const afterDelete = await runtime.call('assets-list', {});
-assert.equal(afterDelete.total, 0, 'deleted assets disappear from the default list');
+assert.equal(afterDelete.total, 0, 'soft-deleted assets disappear from the default list');
 const withDeleted = await runtime.call('assets-list', { includeDeleted: true });
 assert.equal(withDeleted.total, 1);
-assert.equal(withDeleted.assets[0].status, 'deleted');
+assert.equal(withDeleted.assets[0].lifecycle.state, 'deleting');
+assert.ok(withDeleted.assets[0].lifecycle.purgeAfter);
+
+const restoredAsset = await runtime.call('restore-assets', { ids: [id] });
+assert.equal(restoredAsset.ok, true);
+const afterRestore = await runtime.call('assets-list', {});
+assert.equal(afterRestore.total, 1, 'restore brings the asset back before purge');
+assert.equal(afterRestore.assets[0].lifecycle.state, 'degraded');
+
+await runtime.call('delete-assets', { ids: [id], soft: false });
+const hardDeleted = await runtime.call('assets-list', { includeDeleted: true });
+assert.equal(hardDeleted.assets[0].status, 'deleted');
 
 // Restarting the coordinator must preserve the mixed manifest.
 runtime.restart();

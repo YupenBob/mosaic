@@ -112,7 +112,19 @@ export function registerAssets(app) {
     const id = assetIdParam(c);
     if (!id) return c.json({ error: 'Invalid asset id', code: 'INVALID_PARAMS' }, 400);
     try {
+      // Soft delete first: objects stay for the grace period and can be restored.
       const result = await jobsRequest(c.env, 'delete-assets', { ids: [id] });
+      return c.json({ ...result, assetId: id });
+    } catch (error) {
+      return c.json({ error: error.message, code: 'JOBS_ERROR' }, 503);
+    }
+  });
+
+  app.post('/api/assets/:id/restore', async (c) => {
+    const id = assetIdParam(c);
+    if (!id) return c.json({ error: 'Invalid asset id', code: 'INVALID_PARAMS' }, 400);
+    try {
+      const result = await jobsRequest(c.env, 'restore-assets', { ids: [id] });
       return c.json({ ...result, assetId: id });
     } catch (error) {
       return c.json({ error: error.message, code: 'JOBS_ERROR' }, 503);

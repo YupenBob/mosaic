@@ -13,6 +13,7 @@ import { ASSET_ID_RE } from '../../../shared/media-v2.mjs';
 import { failJob, isJobDue } from './job-state.mjs';
 import { isProcessedMode, normalizeJobOptions } from './media-options.mjs';
 import { applySourceRetention } from './source-retention.mjs';
+import { markFailed, markPublished, markSourceMissing, newLifecycle } from './asset-lifecycle.mjs';
 
 /**
  * @typedef {object} TaskContext
@@ -88,7 +89,13 @@ export async function registerAsset({ state, data, config, saveManifest }) {
     status: 'pending',
     jobId: id,
     published: previous?.published || null,
-    ...(v2 ? { v2: true, createdAt: previous?.createdAt || new Date().toISOString() } : {}),
+    ...(v2
+      ? {
+          v2: true,
+          createdAt: previous?.createdAt || new Date().toISOString(),
+          lifecycle: newLifecycle(previous?.lifecycle),
+        }
+      : {}),
   };
   if (v2) state.manifest.schemaVersion = 2;
   await saveManifest(state);
@@ -107,17 +114,44 @@ export async function registerAsset({ state, data, config, saveManifest }) {
  */
 export async function removeAssets({ state, data, saveManifest }) {
   const ids = new Set(Array.isArray(data.assetIds) ? data.assetIds : []);
+  const now = Date.now();
   for (const asset of Object.values(state.manifest.assets)) {
     const matches = ids.size
       ? ids.has(asset.id)
       : asset.slug === data.slug && (!data.filename || asset.filename === data.filename);
     if (!matches) continue;
-    asset.status = 'deleted';
     const job = state.jobs[asset.jobId];
     if (job) {
       job.status = 'cancelled';
       job.lease = null;
     }
+    if (asset.v2 && data.soft !== false) {
+      const lifecycle = asset.lifecycle || newLifecycle(null, now);
+      asset.lifecycle = {
+        ...lifecycle,
+        previousState: lifecycle.state,
+        state: 'deleting',
+        purgeAfter: new Date(now + (data.graceDays || 7) * 86400000).toISOString(),
+      };
+      continue;
+    }
+    asset.status = 'deleted';
+  }
+  await saveManifest(state);
+  return { ok: true, soft: data.soft !== false };
+}
+
+/** Restore a soft-deleted v2 asset before its purge date. */
+export async function restoreAssets({ state, data, saveManifest }) {
+  const ids = new Set(Array.isArray(data.assetIds) ? data.assetIds : []);
+  for (const asset of Object.values(state.manifest.assets)) {
+    if (!asset.v2 || !ids.has(asset.id) || asset.lifecycle?.state !== 'deleting') continue;
+    asset.lifecycle = {
+      ...asset.lifecycle,
+      state: asset.lifecycle.previousState || (asset.published ? 'ready' : 'failed'),
+      previousState: null,
+      purgeAfter: null,
+    };
   }
   await saveManifest(state);
   return { ok: true };
@@ -349,12 +383,14 @@ export async function recordProgress({ state, data, env, operation, saveManifest
     const same = JSON.stringify(asset.published) === JSON.stringify(data.published);
     asset.published = data.published;
     asset.status = data.complete ? 'ready' : 'processing';
+    if (asset.v2) asset.lifecycle = markPublished(asset.lifecycle, { complete: data.complete === true });
     if (!same) await saveManifest(state);
     // Only the final, fully verified publish may release the original source.
     let sourceRetention = null;
     if (data.sourceRetained === false) {
       sourceRetention = await applySourceRetention({ env, job, asset, complete: data.complete === true });
       if (sourceRetention.error) state.lastSourceDeleteError = sourceRetention.error;
+      if (sourceRetention.deleted && asset.v2) asset.lifecycle = markSourceMissing(asset.lifecycle);
     }
     return {
       ok: true,
@@ -372,6 +408,7 @@ export async function recordProgress({ state, data, env, operation, saveManifest
   if (operation === 'failed') {
     failJob(job, data.error || 'Media processing failed', job.config.media);
     asset.status = job.status;
+    if (asset.v2) asset.lifecycle = markFailed(asset.lifecycle, { hasPublished: !!asset.published });
     await saveManifest(state);
   }
   return { ok: true, revision: state.manifest.revision };

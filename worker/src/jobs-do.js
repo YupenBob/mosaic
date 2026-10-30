@@ -28,6 +28,7 @@ import {
   recordProgress,
   registerAsset,
   removeAssets,
+  restoreAssets,
   settleTask,
 } from './jobs/media-task-ops.mjs';
 import { reconcileBatch } from './jobs/reconcile.mjs';
@@ -229,7 +230,9 @@ export class JobsDurableObject {
       .filter((asset) => !wanted.size || wanted.has(asset.id))
       .filter((asset) => !data.status || asset.status === data.status)
       .filter((asset) => !data.folder || asset.folder === data.folder)
-      .filter((asset) => (data.includeDeleted ? true : asset.status !== 'deleted'))
+      .filter((asset) =>
+        data.includeDeleted ? true : asset.status !== 'deleted' && asset.lifecycle?.state !== 'deleting',
+      )
       .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
       .map((asset) => publicAssetView(asset, state.jobs[asset.jobId]));
     return { assets, total: assets.length };
@@ -299,6 +302,7 @@ export class JobsDurableObject {
     if (operation === 'enqueue') return registerAsset(this.context(state, data));
     if (operation === 'delete') return removeAssets(this.context(state, data));
     if (operation === 'delete-assets') return removeAssets(this.context(state, { ...data, assetIds: data.ids }));
+    if (operation === 'restore-assets') return restoreAssets(this.context(state, { ...data, assetIds: data.ids }));
     if (operation === 'import') return importAssets(this.context(state, data));
     if (operation === 'interpolate') return interpolateAssets(this.context(state, data));
     if (operation === 'claim') return claimTask(this.context(state, data));

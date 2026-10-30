@@ -226,6 +226,7 @@ export const assets = {
     apiFetch(`/assets/${encodeURIComponent(id)}/multipart/abort`, { method: 'POST', body: JSON.stringify(data) }),
 
   delete: (id) => apiFetch(`/assets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  restore: (id) => apiFetch(`/assets/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
 };
 
 // ── Media ──────────────────────────────────

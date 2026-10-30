@@ -9,7 +9,7 @@
 | P0 安全热修 | 完成 | `validSegment`、`jsStr`、`baseSha`、XSS 回归 |
 | P1 框架/视觉/动效/预览图 | 进行中 | 壳层、状态胶囊、账户菜单、动效、概览、文章筛选、编辑器两栏、预览图 |
 | P2 Media v2 | 进行中 | 资产身份/manifest v2、v2 上传 API、Jobs 双读、v2 构建解析、素材库初版已落地；迁移脚本与编辑器中引用待接 |
-| P3 任务中心/生命周期 | 进行中 | 任务中心页已基于现有 `/api/media-jobs` 落地；资产生命周期待 Media v2 |
+| P3 任务中心/生命周期 | 进行中 | 任务中心页已落地；v2 资产生命周期（processing/ready/degraded/failed/deleting）、软删除/恢复、健康原因已落地 |
 | P4 草稿/预览 | 未开始 | |
 | P5 视频增强 | 未开始 | |
 | P6 主题系统 | 未开始 | |
@@ -77,3 +77,11 @@ npx prettier --check <changed files>   # passed
 - 构建 `resolveMedia` 支持 frontmatter `media` 数组，正文继续用 `photo:N` / `video:N`。
 - 后台新增 `#library` 素材库初版：列表/筛选/小文件预签名上传/轮询；`/api/assets/:id/preview` 公共缩略图。
 - 新增 `tests/media-assets.mjs`、`tests/assets-api.mjs`；`test:unit` 已接入。
+
+## P2 第三批（生命周期与软删除）
+
+- v2 资产增加 `lifecycle`：`processing / ready / degraded / failed / deleting / deleted`，含 `firstPublishedAt/lastPublishedAt/purgeAfter/previousState`。
+- 发布完成 → ready；发布中 → processing；任务失败但有旧产物 → degraded；无产物 → failed；源文件删除 → degraded。
+- `DELETE /api/assets/:id` 改为软删除（默认 7 天），默认列表隐藏，`POST /api/assets/:id/restore` 可恢复。
+- `assets-list` 暴露 `lifecycle`；`asset-preview` 公共缩略图。
+- 测试覆盖：v2 发布、失败降级、软删除/恢复、硬删除、重启恢复。

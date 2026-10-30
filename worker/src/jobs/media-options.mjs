@@ -5,6 +5,7 @@
  * `options` keep working (sourceMode defaults to `original`).
  */
 import { DEFAULTS, mergeInterpolation, validateInterpolation } from '../../../shared/config.mjs';
+import { lifecycleView } from './asset-lifecycle.mjs';
 
 /**
  * Parse a boolean-ish transport value (query string, header or JSON body).
@@ -109,6 +110,7 @@ export function publicAssetView(asset, job) {
     options: job?.options || {},
     v2: asset.v2 === true,
     createdAt: asset.createdAt || null,
+    lifecycle: asset.v2 === true ? lifecycleView(asset) : null,
   };
 }
 
