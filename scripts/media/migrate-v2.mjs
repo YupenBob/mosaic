@@ -17,6 +17,7 @@ import { loadContext } from '../lib/context.mjs';
 import { createPipelineClient } from '../lib/pipeline-client.mjs';
 import { createStorage } from './storage.mjs';
 import { planV2Migration } from './plan-v2.mjs';
+import { applyV2Migration, uniqueCopies } from './apply-v2.mjs';
 
 const args = new Set(process.argv.slice(2));
 const apply = args.has('--apply');
@@ -81,7 +82,7 @@ async function main() {
   const state = await request('media/state');
   const posts = readPosts();
   const plan = await planV2Migration({ manifest: state.manifest, posts });
-  const copies = [...new Map(plan.copies.filter((copy) => copy.from).map((copy) => [copy.to, copy])).values()];
+  const copies = uniqueCopies(plan);
   console.log(
     `Media v2 plan: ${plan.counts.assets} assets, ${copies.length} object copies, ${plan.counts.posts} posts, ${plan.counts.references} references`,
   );
@@ -98,30 +99,22 @@ async function main() {
   if (process.env.MIGRATION_CONFIRM !== 'media-v2')
     throw new Error('Set MIGRATION_CONFIRM=media-v2 to confirm the migration');
 
-  for (const copy of copies) await store.copy(copy.from, copy.to);
-  console.log(`Copied ${copies.length} objects`);
-
-  for (let offset = 0; offset < plan.assets.length; offset += 25) {
-    const assets = plan.assets.slice(offset, offset + 25);
-    await request('media/import-v2', { assets });
-  }
-  console.log(`Imported ${plan.assets.length} v2 assets`);
-
-  let rewritten = 0;
-  for (const post of plan.posts) {
-    await rewritePost(
-      posts.find((candidate) => candidate.slug === post.slug),
-      post.media,
-    );
-    rewritten++;
-  }
-  await store.putJSON('site-data/media-v2-migration.json', {
-    completedAt: new Date().toISOString(),
-    assets: plan.assets.length,
-    copies: copies.length,
-    posts: rewritten,
+  let copied = 0;
+  const result = await applyV2Migration({
+    plan,
+    copy: async (from, to) => {
+      await store.copy(from, to);
+      copied++;
+    },
+    importAssets: (assets) => request('media/import-v2', { assets }),
+    rewritePost: (post) =>
+      rewritePost(
+        posts.find((candidate) => candidate.slug === post.slug),
+        post.media,
+      ),
+    writeMarker: (value) => store.putJSON('site-data/media-v2-migration.json', value),
   });
-  console.log(`Rewrote ${rewritten} posts; migration marker written`);
+  console.log(`Copied ${copied} objects, imported ${result.assets} assets, rewrote ${result.posts} posts`);
 }
 
 main().catch((error) => {
