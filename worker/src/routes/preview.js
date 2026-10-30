@@ -1,5 +1,12 @@
 /** Private preview endpoints (see services/preview.js). */
-import { createPreview, finishPreview, getPreviewStatus, readPreviewDraft, servePreview } from '../services/preview.js';
+import {
+  cleanupPreviews,
+  createPreview,
+  finishPreview,
+  getPreviewStatus,
+  readPreviewDraft,
+  servePreview,
+} from '../services/preview.js';
 
 export function registerPreviewPublic(app) {
   // Short-lived, unguessable preview site served straight from R2.
@@ -37,6 +44,14 @@ export function registerPreviewProtected(app) {
       return c.json(await createPreview(c, draftId), 202);
     } catch (error) {
       return c.json({ error: error.message, code: error.code || 'PREVIEW_ERROR' }, error.status || 502);
+    }
+  });
+
+  app.delete('/api/previews', async (c) => {
+    try {
+      return c.json(await cleanupPreviews(c));
+    } catch (error) {
+      return c.json({ error: error.message, code: 'PREVIEW_ERROR' }, error.status || 502);
     }
   });
 

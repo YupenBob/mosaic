@@ -151,3 +151,18 @@ await assert.rejects(
 );
 
 console.log('Media assets: migration import path passed');
+
+// Purge removes due soft-deleted assets from the manifest (the route also
+// removes their R2 prefixes before calling this operation).
+const purgeId = newAssetId();
+await runtime.enqueueAsset('purge-me.jpg', Buffer.from('x'), { id: purgeId });
+await runtime.call('delete-assets', { ids: [purgeId], graceDays: 0 });
+const purged = await runtime.call('purge-assets', {});
+assert.ok(purged.ids.includes(purgeId));
+const afterPurge = await runtime.call('assets-list', { includeDeleted: true });
+assert.equal(
+  afterPurge.assets.some((asset) => asset.id === purgeId),
+  false,
+);
+
+console.log('Media assets: purge due soft-deleted asset passed');

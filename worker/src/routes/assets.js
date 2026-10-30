@@ -108,6 +108,38 @@ export function registerAssets(app) {
     }
   });
 
+  app.delete('/api/assets/purge', async (c) => {
+    try {
+      const listed = await jobsRequest(c.env, 'assets-list', { includeDeleted: true });
+      const now = Date.now();
+      const due = (listed.assets || []).filter(
+        (asset) =>
+          asset.lifecycle?.state === 'deleting' &&
+          asset.lifecycle.purgeAfter &&
+          Date.parse(asset.lifecycle.purgeAfter) <= now,
+      );
+      let deleted = 0;
+      for (const asset of due) {
+        for (const prefix of [`originals/assets/${asset.id}/`, `processed/assets/${asset.id}/`]) {
+          let cursor;
+          do {
+            const result = await c.env.MEDIA.list({ prefix, ...(cursor ? { cursor } : {}) });
+            const keys = (result.objects || []).map((object) => object.key);
+            if (keys.length) {
+              await c.env.MEDIA.delete(keys);
+              deleted += keys.length;
+            }
+            cursor = result.truncated ? result.cursor : null;
+          } while (cursor);
+        }
+      }
+      const result = await jobsRequest(c.env, 'purge-assets', {});
+      return c.json({ ...result, objects: deleted });
+    } catch (error) {
+      return c.json({ error: error.message, code: 'JOBS_ERROR' }, 503);
+    }
+  });
+
   app.delete('/api/assets/:id', async (c) => {
     const id = assetIdParam(c);
     if (!id) return c.json({ error: 'Invalid asset id', code: 'INVALID_PARAMS' }, 400);

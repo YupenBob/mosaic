@@ -227,6 +227,7 @@ export const assets = {
 
   delete: (id) => apiFetch(`/assets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   restore: (id) => apiFetch(`/assets/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
+  purge: () => apiFetch('/assets/purge', { method: 'DELETE' }),
 };
 
 // ── Media ──────────────────────────────────

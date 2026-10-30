@@ -210,3 +210,29 @@ export async function finishPreview(c, token, body = {}) {
   });
   return meta;
 }
+
+/**
+ * Delete expired preview sites from R2. Called by the cleanup page; preview
+ * tokens are already invalid after expiry, this reclaims storage.
+ */
+export async function cleanupPreviews(c) {
+  const listed = await c.env.MEDIA.list({ prefix: 'previews/', limit: 1000 });
+  const ids = new Set();
+  for (const object of listed.objects || []) {
+    const id = object.key.split('/')[1];
+    if (/^prv_[a-z0-9]{26}$/.test(id)) ids.add(id);
+  }
+  const deleted = [];
+  const now = Date.now();
+  for (const id of ids) {
+    const metaObject = await c.env.MEDIA.get(`previews/${id}/meta.json`);
+    if (!metaObject) continue;
+    const meta = JSON.parse(await metaObject.text());
+    if (!meta.expiresAt || Date.parse(meta.expiresAt) > now) continue;
+    const objects = await c.env.MEDIA.list({ prefix: `previews/${id}/`, limit: 1000 });
+    const keys = (objects.objects || []).map((object) => object.key);
+    if (keys.length) await c.env.MEDIA.delete(keys);
+    deleted.push(id);
+  }
+  return { deleted: deleted.length, ids: deleted };
+}

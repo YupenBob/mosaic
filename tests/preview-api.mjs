@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createRuntime } from './helpers/runtime.mjs';
 import { createDraft } from '../worker/src/services/drafts.js';
 import {
+  cleanupPreviews,
   createPreview,
   finishPreview,
   getPreviewStatus,
@@ -58,6 +59,12 @@ try {
 
   await finishPreview(context, buildToken, { ok: true });
   assert.equal((await getPreviewStatus(context, preview.previewId)).status, 'ready');
+  assert.equal((await cleanupPreviews(context)).deleted, 0, 'unexpired preview is kept');
+  const meta = JSON.parse(await (await runtime.bucket.get(`previews/${preview.previewId}/meta.json`)).text());
+  meta.expiresAt = new Date(Date.now() - 1000).toISOString();
+  await runtime.bucket.put(`previews/${preview.previewId}/meta.json`, JSON.stringify(meta));
+  assert.equal((await cleanupPreviews(context)).deleted, 1);
+  assert.equal(await runtime.bucket.get(`previews/${preview.previewId}/index.html`), null);
 
   console.log('Preview API: token, draft read, R2 serving and status passed');
 } finally {

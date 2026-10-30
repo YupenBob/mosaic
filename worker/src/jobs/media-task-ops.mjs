@@ -131,7 +131,7 @@ export async function removeAssets({ state, data, saveManifest }) {
         ...lifecycle,
         previousState: lifecycle.state,
         state: 'deleting',
-        purgeAfter: new Date(now + (data.graceDays || 7) * 86400000).toISOString(),
+        purgeAfter: new Date(now + (data.graceDays ?? 7) * 86400000).toISOString(),
       };
       continue;
     }

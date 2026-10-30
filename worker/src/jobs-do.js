@@ -321,6 +321,19 @@ export class JobsDurableObject {
     if (operation === 'delete') return removeAssets(this.context(state, data));
     if (operation === 'delete-assets') return removeAssets(this.context(state, { ...data, assetIds: data.ids }));
     if (operation === 'restore-assets') return restoreAssets(this.context(state, { ...data, assetIds: data.ids }));
+    if (operation === 'purge-assets') {
+      const now = Date.now();
+      const ids = [];
+      for (const asset of Object.values(state.manifest.assets)) {
+        if (asset.v2 !== true || asset.lifecycle?.state !== 'deleting' || !asset.lifecycle.purgeAfter) continue;
+        if (Date.parse(asset.lifecycle.purgeAfter) > now) continue;
+        ids.push(asset.id);
+        delete state.manifest.assets[asset.id];
+        if (asset.jobId) delete state.jobs[asset.jobId];
+      }
+      if (ids.length) await this.saveManifest(state);
+      return { ok: true, purged: ids.length, ids };
+    }
     if (operation === 'import') return importAssets(this.context(state, data));
     if (operation === 'interpolate') return interpolateAssets(this.context(state, data));
     if (operation === 'claim') return claimTask(this.context(state, data));

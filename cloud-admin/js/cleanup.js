@@ -6,7 +6,7 @@ import { apiFetch } from '../src/api.js';
 import { state } from './state.js?v=1';
 import { pageTimeout } from './lifecycle.js';
 import { t } from './i18n.js?v=1';
-import { escHtml, modalConfirm, copyText, fmtSize } from './ui.js?v=1';
+import { escHtml, modalConfirm, copyText, fmtSize, toast } from './ui.js?v=1';
 import { jsStr } from './escape.js';
 
 export default async function renderCleanup() {
@@ -51,6 +51,15 @@ export default async function renderCleanup() {
           `
               : `<p class="text-success" style="padding:10px 0;font-size:13px"><i class="ri-check-line"></i> ${t('cleanup.noOrphans')}</p>`
           }
+        </div>
+
+        <div class="card card-pad mb-4">
+          <h2 style="margin:0 0 6px"><i class="ri-time-line" style="color:var(--color-warning)"></i> ${t('cleanup.lifecycleCleanup')}</h2>
+          <p class="muted mb-3">${t('cleanup.lifecycleDesc')}</p>
+          <div class="cleanup-actions">
+            <button class="btn btn-secondary" onclick="doPurgeAssets()"><i class="ri-hard-drive-3-line"></i> ${t('cleanup.purgeAssets')}</button>
+            <button class="btn btn-secondary" onclick="doCleanupPreviews()"><i class="ri-eye-off-line"></i> ${t('cleanup.cleanPreviews')}</button>
+          </div>
         </div>
 
         <div class="card card-pad">
@@ -162,3 +171,27 @@ export const cleanupSkeleton = () => `
     <div class="skeleton-card"><div class="skeleton skeleton-line w40" style="height:18px;margin-bottom:8px"></div><div class="skeleton skeleton-line"></div></div>
   </div>
 `;
+
+window.doPurgeAssets = () => {
+  modalConfirm(t('cleanup.confirmPurge'), t('cleanup.confirmPurgeDesc'), async () => {
+    try {
+      const result = await apiFetch('/assets/purge', { method: 'DELETE' });
+      toast('已清理 ' + (result.purged || 0) + ' 个到期资产', 'success');
+      location.reload();
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  });
+};
+
+window.doCleanupPreviews = () => {
+  modalConfirm(t('cleanup.confirmPreviews'), t('cleanup.confirmPreviewsDesc'), async () => {
+    try {
+      const result = await apiFetch('/previews', { method: 'DELETE' });
+      toast('已清理 ' + (result.deleted || 0) + ' 个过期预览', 'success');
+      location.reload();
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  });
+};
