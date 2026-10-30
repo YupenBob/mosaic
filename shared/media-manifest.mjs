@@ -20,12 +20,28 @@ export const CONTENT_TYPES = {
   json: 'application/json',
   ico: 'image/x-icon',
 };
+/**
+ * Characters that can break an HTML attribute, a JS string literal, a URL path
+ * or a filesystem path when a name is interpolated into generated markup.
+ * Quotes and angle brackets are rejected outright; such names are never valid
+ * Mosaic media/post identities.
+ */
+const UNSAFE_SEGMENT = /["'`<>\\\u2028\u2029]/;
+
+function hasControlCharacter(value) {
+  return [...value].some((character) => {
+    const code = character.codePointAt(0);
+    return code < 0x20 || (code >= 0x7f && code <= 0x9f);
+  });
+}
+
 export function validSegment(value) {
   return (
     typeof value === 'string' &&
     !!value &&
     !/[\/\\]/.test(value) &&
-    ![...value].some((character) => character.charCodeAt(0) < 32) &&
+    !UNSAFE_SEGMENT.test(value) &&
+    !hasControlCharacter(value) &&
     !['.', '..'].includes(value)
   );
 }

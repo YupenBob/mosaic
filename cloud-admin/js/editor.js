@@ -7,6 +7,7 @@ import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, loadLib, openModal, closeModal } from './ui.js?v=1';
 import { loadExistingMedia, setMediaPanelHooks } from './media-panel.js?v=1';
+import { jsStr } from './escape.js';
 
 const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';
@@ -382,6 +383,11 @@ export default async function renderEditor(signal) {
   }
   if (signal.aborted) return '';
 
+  // Optimistic-concurrency token for an existing post. `null` tells the Worker
+  // this is a create, so an existing slug is a conflict instead of an
+  // accidental overwrite.
+  state.editor.baseSha = slug ? post.sha || null : null;
+
   const fm = post.frontMatter || {};
   const draft = loadDraft(slug);
   const prefillCat = !slug ? state.params.cat || '' : '';
@@ -397,8 +403,8 @@ export default async function renderEditor(signal) {
       <div class="page-anim">
         <div class="page-header">
           <div>
-            <h1>${slug ? escHtml(fmv('title') || slug) : t('editor.newPost')}</h1>
-            <p class="page-subtitle">${slug ? escHtml(slug) : t('editor.slugHint')}</p>
+            <h1>${slug ? t('editor.editTitle') : t('editor.newPost')}</h1>
+            <p class="page-subtitle">${t('editor.draftHint')}</p>
           </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" onclick="doSavePost(true)"><i class="ri-arrow-left-line"></i> ${t('editor.saveAndBack')}</button>
@@ -422,16 +428,7 @@ export default async function renderEditor(signal) {
 
         <div class="editor-layout">
           <div class="editor-fields">
-            <div class="editor-section-title">${t('editor.sectionTitle')}</div>
-            <label class="field">
-              <span class="field-label">${t('editor.slug')}</span>
-              <input type="text" id="fm-slug" class="input" value="${escHtml(slug)}" ${slug ? 'readonly' : ''} placeholder="my-post" />
-              ${!slug ? `<span class="field-hint">${t('editor.slugHint')}</span>` : ''}
-            </label>
-            <label class="field">
-              <span class="field-label">${t('editor.title')}</span>
-              <input type="text" id="fm-title" class="input" value="${escHtml(fmv('title'))}" placeholder="${t('editor.title')}" />
-            </label>
+            <div class="editor-section-title">${t('editor.infoTitle')}</div>
             <label class="field">
               <span class="field-label">${t('editor.date')}</span>
               <input type="date" id="fm-date" class="input" value="${escHtml(fmv('date') || new Date().toISOString().split('T')[0])}" />
@@ -451,7 +448,7 @@ export default async function renderEditor(signal) {
             </label>
             <div class="editor-section-title">${t('editor.cover')}</div>
             <label class="field">
-              <input type="text" id="fm-cover" class="input" value="${escHtml(fmv('cover'))}" placeholder="cover.jpg or video:0 or photo:0" />
+              <input type="text" id="fm-cover" class="input" value="${escHtml(fmv('cover'))}" placeholder="${t('editor.coverPlaceholder')}" />
               <span class="field-hint">${t('editor.coverHint')}</span>
             </label>
             <div class="cover-preview" id="cover-preview"></div>
@@ -472,6 +469,29 @@ export default async function renderEditor(signal) {
           </div>
 
           <div class="editor-body">
+            <div class="editor-titlebar">
+              <input
+                type="text"
+                id="fm-title"
+                class="editor-title-input"
+                value="${escHtml(fmv('title'))}"
+                placeholder="${t('editor.titlePlaceholder')}"
+                aria-label="${t('editor.title')}"
+              />
+              <div class="editor-slug-row">
+                <span class="editor-slug-prefix">/posts/</span>
+                <input
+                  type="text"
+                  id="fm-slug"
+                  class="editor-slug-input"
+                  value="${escHtml(slug)}"
+                  ${slug ? 'readonly' : ''}
+                  placeholder="my-post"
+                  aria-label="${t('editor.slug')}"
+                />
+                ${!slug ? `<span class="editor-slug-hint">${t('editor.slugHint')}</span>` : ''}
+              </div>
+            </div>
             <div class="toolbar" role="toolbar" aria-label="Markdown">
               <button class="toolbar-btn" title="${t('editor.bold')}" aria-label="${t('editor.bold')}" onclick="editorToolbar('bold')"><i class="ri-bold"></i></button>
               <button class="toolbar-btn" title="${t('editor.italic')}" aria-label="${t('editor.italic')}" onclick="editorToolbar('italic')"><i class="ri-italic"></i></button>
@@ -687,12 +707,18 @@ window.doSavePost = async (goBack) => {
   const btn = document.getElementById('editor-save-btn');
   btn.disabled = true;
   try {
+    let result;
     if (state.params.slug) {
-      await postsApi.update(state.params.slug, { frontMatter, body });
+      result = await postsApi.update(state.params.slug, {
+        frontMatter,
+        body,
+        baseSha: state.editor.baseSha,
+      });
     } else {
-      await postsApi.create({ slug, frontMatter, body });
+      result = await postsApi.create({ slug, frontMatter, body, baseSha: null });
       location.hash = 'editor&slug=' + encodeURIComponent(slug);
     }
+    if (result?.sha) state.editor.baseSha = result.sha;
     try {
       localStorage.removeItem(draftKey(state.params.slug || '__new'));
       if (!state.params.slug) localStorage.removeItem(draftKey(slug));
@@ -702,7 +728,11 @@ window.doSavePost = async (goBack) => {
     toast(t('editor.saved'), 'success');
     if (goBack) location.hash = 'posts';
   } catch (err) {
-    toast(t('editor.saveFailed') + ': ' + err.message, 'error');
+    if (err.status === 409 || err.code === 'CONFLICT' || err.code === 'SLUG_CONFLICT') {
+      toast(t('editor.conflict'), 'error', 9000);
+    } else {
+      toast(t('editor.saveFailed') + ': ' + err.message, 'error');
+    }
   } finally {
     btn.disabled = false;
   }
@@ -915,7 +945,7 @@ window.openCoverPicker = async () => {
         photos
           .map(
             (f) => `
-          <div class="media-cell" onclick="pickCover('${escHtml(f.name)}')" title="${escHtml(f.name)}" style="cursor:pointer">
+          <div class="media-cell" onclick="pickCover(${jsStr(f.name)})" title="${escHtml(f.name)}" style="cursor:pointer">
             <img src="${escHtml(f.previewUrl || f.url || '')}" alt="${escHtml(f.name)}" loading="lazy" />
             <div class="media-cell-name">${escHtml(f.name)}</div>
           </div>`,

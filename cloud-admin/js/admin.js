@@ -15,10 +15,12 @@ import { onHashChange, navigateTo, parseHash } from './router.js';
 import { updateCoverPreview } from './editor.js?v=1';
 import { startPollers, stopPollers } from './pollers.js';
 import { setupGlobalSearch, setupKeyboard } from './command-palette.js';
+import { setupAccountMenu, closeAccountMenu } from './account-menu.js';
 
 // ── Auth ───────────────────────────────────
 /** Show the login screen and tear down the authenticated shell. */
 function showLogin() {
+  closeAccountMenu();
   state.pageScope?.dispose();
   setNavigationSignal(null);
   state.authStatus = 'expired';
@@ -135,6 +137,7 @@ function setupMobileNav() {
 
 // ── Topbar wiring ──────────────────────────
 function setupTopbar() {
+  setupAccountMenu();
   document.getElementById('topbar-theme-btn')?.addEventListener('click', cycleTheme);
   const langSelect = document.getElementById('topbar-lang');
   if (langSelect) {
@@ -144,6 +147,9 @@ function setupTopbar() {
   document.getElementById('topbar-build-btn')?.addEventListener('click', (event) => {
     event.stopPropagation();
     window.doTriggerBuild();
+  });
+  document.getElementById('app-status')?.addEventListener('click', () => {
+    if (state.page !== 'build') location.hash = 'build';
   });
 }
 

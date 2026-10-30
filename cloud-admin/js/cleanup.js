@@ -7,6 +7,7 @@ import { state } from './state.js?v=1';
 import { pageTimeout } from './lifecycle.js';
 import { t } from './i18n.js?v=1';
 import { escHtml, modalConfirm, copyText, fmtSize } from './ui.js?v=1';
+import { jsStr } from './escape.js';
 
 export default async function renderCleanup() {
   try {
@@ -41,7 +42,7 @@ export default async function renderCleanup() {
                   <i class="ri-file-line" style="color:var(--color-text-tertiary)"></i>
                   <code>${escHtml(o.key)}</code>
                   <span class="file-size">${fmtSize(o.size)}</span>
-                  <button class="btn btn-ghost btn-sm" onclick="copyCleanupPath('${escHtml(o.key)}')" title="${t('cleanup.copyPath')}" aria-label="${t('cleanup.copyPath')}"><i class="ri-file-copy-line"></i></button>
+                  <button class="btn btn-ghost btn-sm" onclick="copyCleanupPath(${jsStr(o.key)})" title="${t('cleanup.copyPath')}" aria-label="${t('cleanup.copyPath')}"><i class="ri-file-copy-line"></i></button>
                 </div>`,
                 )
                 .join('')}

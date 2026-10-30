@@ -89,6 +89,27 @@ try {
   await page.locator('#login-password').fill('fixture-password');
   await page.locator('#login-btn').click();
   await page.waitForFunction(() => document.querySelector('#app').style.display === 'flex');
+  await page.locator('#app-status').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#app-status').innerText(), /未上线/, 'status chip summarizes unbuilt changes');
+  await page.click('#account-btn');
+  await page.locator('#account-menu').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#account-theme-options button').count(), 3, 'account menu owns appearance');
+  await page.keyboard.press('Escape');
+  await page.locator('#account-menu').waitFor({ state: 'hidden' });
+
+  // Mobile posts are cards, never a squeezed table.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => {
+    location.hash = 'posts';
+  });
+  await page.locator('.admin-post-card').first().waitFor();
+  assert.equal(await page.locator('#posts-table-view').isVisible(), false, 'table hides on mobile');
+  assert.equal(await page.locator('#posts-cards-view').isVisible(), true, 'cards show on mobile');
+  assert.ok(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    'mobile posts do not scroll horizontally',
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.evaluate(() => {
     location.hash = 'build';
   });

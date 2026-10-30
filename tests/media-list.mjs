@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRuntime } from './helpers/runtime.mjs';
-import { listMedia } from '../worker/src/r2.js';
+import { listMedia, serveMediaObject } from '../worker/src/r2.js';
 import { emptyManifest } from '../shared/media-manifest.mjs';
 import { resolveMedia } from '../scripts/site/media.mjs';
 const runtime = createRuntime(),
@@ -48,6 +48,24 @@ assert.equal(result.covers.length, 1, 'orphan cover survives without changing ph
 assert.equal(result.covers[0].url, 'https://media.example/processed/post/cover.webp');
 assert.equal(result.videos[0].previewUrl, 'https://media.example/processed/post/poster.webp');
 assert.equal(result.photos[0].previewUrl, 'https://media.example/processed/post/z.webp');
+const proxied = await listMedia({ req: { param: () => 'post' }, env: runtime.env, json: (value) => value }, '');
+assert.equal(
+  proxied.videos[0].previewUrl,
+  '/api/media/object?key=' + encodeURIComponent('processed/post/poster.webp'),
+  'no public media domain falls back to the Worker object proxy',
+);
+const bad = await serveMediaObject({
+  req: { query: (name) => (name === 'key' ? '../site-data/media-manifest.json' : '') },
+  env: runtime.env,
+  json: (value, status = 200) => ({ value, status }),
+});
+assert.equal(bad.status, 400, 'object proxy rejects keys outside processed/originals');
+const good = await serveMediaObject({
+  req: { query: (name) => (name === 'key' ? 'processed/post/poster.webp' : '') },
+  env: runtime.env,
+  json: (value) => value,
+});
+assert.equal(good.status, 200, 'object proxy serves manifest objects');
 assert.deepEqual(
   resolveMedia(manifest, 'post', { mediaBase: 'https://media.example' }).photos.map((p) => p.file),
   result.photos.map((p) => p.name),

@@ -74,16 +74,6 @@
 
     <!-- Main App (hidden until login) -->
     <div id="app" style="display: none; flex-direction: column">
-      <!-- Dirty banner — full width above topbar -->
-      <div id="dirty-banner" class="dirty-banner" style="display: none" role="status">
-        <span id="dirty-banner-spinner" class="dirty-banner-spinner" hidden></span>
-        <i id="dirty-banner-icon" class="ri-error-warning-line dirty-banner-icon"></i>
-        <span id="dirty-banner-text"></span>
-        <button class="btn btn-secondary btn-sm dirty-banner-cta" onclick="location.hash = 'build'">
-          <i class="ri-tools-line"></i> <span data-i18n="dirty.goBuild">前往构建</span>
-        </button>
-      </div>
-
       <!-- Topbar -->
       <header class="topbar">
         <button
@@ -116,47 +106,81 @@
         </div>
 
         <div class="topbar-actions">
+          <button type="button" class="app-status" id="app-status" hidden>
+            <span class="app-status-dot" aria-hidden="true"></span>
+            <span class="app-status-text" id="app-status-text" role="status" aria-live="polite"></span>
+          </button>
           <span id="topbar-build-dot" class="status-dot" title=""></span>
           <button
             class="icon-btn"
             id="topbar-build-btn"
             data-i18n-title="build.title"
             data-i18n-aria="build.title"
-            title="构建并部署"
-            aria-label="构建并部署"
+            title="上线"
+            aria-label="上线"
           >
             <i class="ri-play-circle-line" aria-hidden="true"></i>
           </button>
-          <button
-            class="icon-btn"
-            id="topbar-theme-btn"
-            data-i18n-title="config.adminTheme"
-            data-i18n-aria="config.adminTheme"
-            title="切换主题"
-            aria-label="切换主题"
-          ></button>
-          <select
-            id="topbar-lang"
-            class="lang-select"
-            data-i18n-title="config.adminLang"
-            title="界面语言"
-            aria-label="界面语言"
-          >
-            <option value="zh-CN">中文</option>
-            <option value="en">EN</option>
-          </select>
-          <a
-            class="icon-btn"
-            id="topbar-site-btn"
-            target="_blank"
-            rel="noopener"
-            data-i18n-title="common.viewSite"
-            data-i18n-aria="common.viewSite"
-            title="访问网站"
-            aria-label="访问网站"
-          >
-            <i class="ri-external-link-line" aria-hidden="true"></i>
-          </a>
+          <button type="button" class="btn btn-primary btn-sm topbar-create" id="topbar-create">
+            <i class="ri-add-line" aria-hidden="true"></i>
+            <span data-i18n="common.newPost">写文章</span>
+          </button>
+          <div class="account-menu-wrap">
+            <button
+              type="button"
+              class="account-btn"
+              id="account-btn"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              data-i18n-aria="account.menu"
+              aria-label="账户菜单"
+            >
+              <span class="account-avatar" id="account-avatar">M</span>
+            </button>
+            <div class="account-menu" id="account-menu" role="menu" hidden>
+              <div class="account-menu-head">
+                <span class="account-menu-name">Mosaic</span>
+                <span class="account-menu-role" data-i18n="account.role">管理员</span>
+              </div>
+              <a
+                class="account-item"
+                id="account-site-link"
+                role="menuitem"
+                href="#"
+                target="_blank"
+                rel="noopener"
+                hidden
+              >
+                <i class="ri-external-link-line" aria-hidden="true"></i>
+                <span data-i18n="common.viewSite">访问网站</span>
+              </a>
+              <div class="account-section" role="group" aria-labelledby="account-theme-label">
+                <span class="account-section-label" id="account-theme-label" data-i18n="config.adminTheme">主题</span>
+                <div class="account-segmented" id="account-theme-options">
+                  <button type="button" role="menuitemradio" data-theme-pref="auto" data-i18n="account.themeAuto">
+                    自动
+                  </button>
+                  <button type="button" role="menuitemradio" data-theme-pref="light" data-i18n="config.themeLight">
+                    浅色
+                  </button>
+                  <button type="button" role="menuitemradio" data-theme-pref="dark" data-i18n="config.themeDark">
+                    深色
+                  </button>
+                </div>
+              </div>
+              <div class="account-section" role="group" aria-labelledby="account-lang-label">
+                <span class="account-section-label" id="account-lang-label" data-i18n="config.adminLang">语言</span>
+                <div class="account-segmented" id="account-lang-options">
+                  <button type="button" role="menuitemradio" data-lang="zh-CN">中文</button>
+                  <button type="button" role="menuitemradio" data-lang="en">English</button>
+                </div>
+              </div>
+              <button type="button" class="account-item account-signout" id="account-signout" role="menuitem">
+                <i class="ri-logout-box-line" aria-hidden="true"></i>
+                <span data-i18n="nav.signOut">退出登录</span>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -187,25 +211,15 @@
                 href="#dashboard"
                 class="nav-item"
                 data-page="dashboard"
-                aria-label="仪表盘"
+                aria-label="概览"
                 data-i18n-aria="nav.dashboard"
-                ><i class="ri-dashboard-line"></i> <span data-i18n="nav.dashboard">仪表盘</span></a
+                ><i class="ri-dashboard-line"></i> <span data-i18n="nav.dashboard">概览</span></a
               >
               <a href="#posts" class="nav-item" data-page="posts" aria-label="文章" data-i18n-aria="nav.posts"
                 ><i class="ri-article-line"></i> <span data-i18n="nav.posts">文章</span></a
               >
-              <a href="#editor" class="nav-item" data-page="editor" aria-label="编辑器" data-i18n-aria="nav.editor"
-                ><i class="ri-edit-line"></i> <span data-i18n="nav.editor">编辑器</span></a
-              >
-            </div>
-            <div class="nav-group">
-              <div class="nav-group-label" data-i18n="nav.groupSite">站点</div>
-              <a href="#build" class="nav-item" data-page="build" aria-label="构建与部署" data-i18n-aria="nav.build"
-                ><i class="ri-tools-line"></i> <span data-i18n="nav.build">构建与部署</span
-                ><span class="nav-badge" id="nav-build-badge" style="display: none"></span
-              ></a>
-              <a href="#config" class="nav-item" data-page="config" aria-label="站点设置" data-i18n-aria="nav.config"
-                ><i class="ri-settings-line"></i> <span data-i18n="nav.config">站点设置</span></a
+              <a href="#editor" class="nav-item" data-page="editor" aria-label="写文章" data-i18n-aria="nav.editor"
+                ><i class="ri-edit-line"></i> <span data-i18n="nav.editor">写文章</span></a
               >
               <a
                 href="#taxonomy"
@@ -217,10 +231,17 @@
               >
             </div>
             <div class="nav-group">
-              <div class="nav-group-label" data-i18n="nav.groupData">数据</div>
-              <a href="#trash" class="nav-item" data-page="trash" aria-label="回收站" data-i18n-aria="nav.trash"
-                ><i class="ri-delete-bin-6-line"></i> <span data-i18n="nav.trash">回收站</span></a
+              <div class="nav-group-label" data-i18n="nav.groupSite">站点</div>
+              <a href="#build" class="nav-item" data-page="build" aria-label="上线" data-i18n-aria="nav.build"
+                ><i class="ri-rocket-line"></i> <span data-i18n="nav.build">上线</span
+                ><span class="nav-badge" id="nav-build-badge" style="display: none"></span
+              ></a>
+              <a href="#config" class="nav-item" data-page="config" aria-label="设置" data-i18n-aria="nav.config"
+                ><i class="ri-settings-line"></i> <span data-i18n="nav.config">设置</span></a
               >
+            </div>
+            <div class="nav-group">
+              <div class="nav-group-label" data-i18n="nav.groupSystem">系统</div>
               <a href="#cleanup" class="nav-item" data-page="cleanup" aria-label="清理" data-i18n-aria="nav.cleanup"
                 ><i class="ri-broom-line"></i> <span data-i18n="nav.cleanup">清理</span></a
               >

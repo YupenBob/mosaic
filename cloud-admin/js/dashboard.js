@@ -86,7 +86,7 @@ export default function renderDashboard(signal) {
               update(key, model[key]);
             }
           });
-      for (const [key, request] of Object.entries({
+      const requests = {
         dashData: () => stats.dashboard(),
         healthData: () => health.check(),
         trafficData: () => stats.traffic(),
@@ -97,8 +97,19 @@ export default function renderDashboard(signal) {
         taxData: () => taxonomy.get(),
         postList: async () => (await postsApi.list()).posts || [],
         bs: () => build.status(),
-      }))
-        run(key, request);
+      };
+      for (const [key, request] of Object.entries(requests)) run(key, request);
+      const refresh = () => {
+        for (const [key, request] of Object.entries(requests)) run(key, request);
+      };
+      window.mosaicRefreshDashboard = refresh;
+      signal.addEventListener(
+        'abort',
+        () => {
+          if (window.mosaicRefreshDashboard === refresh) window.mosaicRefreshDashboard = null;
+        },
+        { once: true },
+      );
       document.querySelector('.dash-load-errors')?.addEventListener(
         'click',
         (event) => {
@@ -119,8 +130,12 @@ function renderSnapshot(
   if (cfg.mediaBase) state.mediaBase = cfg.mediaBase;
   state.siteUrl = cfg.url || state.siteUrl || '';
   const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const todayViews = (trafficData.byDay || []).find((d) => d.date === today)?.count || 0;
+  const yesterdayViews = (trafficData.byDay || []).find((d) => d.date === yesterday)?.count || 0;
   const weekViews = (trafficData.byDay || []).slice(-7).reduce((s, d) => s + d.count, 0);
+  const delta = yesterdayViews > 0 ? Math.round(((todayViews - yesterdayViews) / yesterdayViews) * 100) : null;
+  const num = (value) => (typeof value === 'number' ? new Intl.NumberFormat('zh-CN').format(value) : (value ?? '...'));
 
   // Recent activity
   const activities = [];
@@ -162,6 +177,9 @@ function renderSnapshot(
     },
   ];
   const allHealthy = healthItems.every((h) => h.status === 'ok');
+  const subtitle = healthItems.some((h) => h.status === 'pending')
+    ? t('common.loading')
+    : `${t('dashboard.todayViews')} ${num(todayViews)} · ${allHealthy ? t('dashboard.healthy') : t('dashboard.issues')}`;
 
   const quickstart = (loaded.has('postList') ? !postList.length : loaded.has('dashData') && dashData.posts === 0)
     ? `
@@ -191,13 +209,15 @@ function renderSnapshot(
         <div class="page-header">
           <div>
             <h1>${t('dashboard.title')}</h1>
-            <p class="page-subtitle">${healthItems.some((h) => h.status === 'pending') ? t('common.loading') : allHealthy ? t('dashboard.healthy') : t('dashboard.issues')}</p>
+            <p class="page-subtitle">${subtitle}</p>
           </div>
           <div class="page-header-actions">
-            <button class="btn btn-secondary btn-sm" onclick="location.reload()"><i class="ri-refresh-line"></i> ${t('dashboard.refresh')}</button>
+            <button class="btn btn-ghost btn-sm" onclick="window.mosaicRefreshDashboard?.()" title="${t('dashboard.refresh')}">
+              <i class="ri-refresh-line" aria-hidden="true"></i>
+              <span>${t('dashboard.refresh')}</span>
+            </button>
             <button class="btn btn-primary" onclick="location.hash='editor'"><i class="ri-add-line"></i> ${t('dashboard.newPost')}</button>
-            <button class="btn btn-secondary" data-build-trigger onclick="window.doTriggerBuild()"><i class="ri-play-fill"></i> ${t('dashboard.buildDeploy')}</button>
-            <span data-dashboard-site-link>${state.siteUrl ? `<a href="${escHtml(state.siteUrl)}" target="_blank" rel="noopener" class="btn btn-secondary"><i class="ri-external-link-line"></i> ${t('dashboard.viewSite')}</a>` : ''}</span>
+            <span data-dashboard-site-link>${state.siteUrl ? `<a href="${escHtml(state.siteUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm"><i class="ri-external-link-line" aria-hidden="true"></i> ${t('dashboard.viewSite')}</a>` : ''}</span>
           </div>
         </div>
 
@@ -214,15 +234,29 @@ function renderSnapshot(
             .join('')}
         </div>
 
-        <div class="dash-section-head"><h2>${t('dashboard.overview')}</h2></div>
-
         <div class="dash-cards">
-          <div class="dash-big-card"><span class="dash-big-num">${dashData.posts ?? '...'}</span><span class="dash-big-label">${t('dashboard.posts')}</span></div>
-          <div class="dash-big-card"><span class="dash-big-num">${dashData.categories ?? '...'}</span><span class="dash-big-label">${t('dashboard.categories')}</span></div>
-          <div class="dash-big-card"><span class="dash-big-num">${dashData.tags ?? '...'}</span><span class="dash-big-label">${t('dashboard.tags')}</span></div>
-          <div class="dash-big-card"><span class="dash-big-num">${trafficData.total ?? '...'}</span><span class="dash-big-label">${t('dashboard.totalViews')}</span></div>
-          <div class="dash-big-card"><span class="dash-big-num">${todayViews}</span><span class="dash-big-label">${t('dashboard.todayViews')} · ${weekViews}${t('dashboard.weekSuffix')}</span></div>
-          <div class="dash-big-card"><span class="dash-big-num">${diskData.sizeMB ?? '...'} MB</span><span class="dash-big-label">${t('dashboard.r2Usage')} · ${t('dashboard.r2Meta', { objects: diskData.objects ?? '...', cost: diskData.cost ?? '...' })}</span></div>
+          <div class="dash-big-card dash-kpi">
+            <span class="dash-big-label">${t('dashboard.posts')}</span>
+            <span class="dash-big-num">${num(dashData.posts)}</span>
+            <span class="dash-kpi-hint">${t('dashboard.postsHint')}</span>
+          </div>
+          <div class="dash-big-card dash-kpi">
+            <span class="dash-big-label">${t('dashboard.totalViews')}</span>
+            <span class="dash-big-num">${num(trafficData.total)}</span>
+            <span class="dash-kpi-hint">${t('dashboard.totalViewsHint')}</span>
+          </div>
+          <div class="dash-big-card dash-kpi">
+            <span class="dash-big-label">${t('dashboard.todayViews')}</span>
+            <span class="dash-big-num">${num(todayViews)}</span>
+            <span class="dash-kpi-hint">
+              ${delta == null ? `${num(weekViews)}${t('dashboard.weekSuffix')}` : `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}% ${t('dashboard.vsYesterday')}`}
+            </span>
+          </div>
+          <div class="dash-big-card dash-kpi">
+            <span class="dash-big-label">${t('dashboard.r2Usage')}</span>
+            <span class="dash-big-num">${diskData.sizeMB ?? '...'} MB</span>
+            <span class="dash-kpi-hint">${t('dashboard.r2Meta', { objects: diskData.objects ?? '...', cost: diskData.cost ?? '...' })}</span>
+          </div>
         </div>
 
         <div data-dashboard-quickstart>${quickstart}</div>
@@ -231,7 +265,7 @@ function renderSnapshot(
 
         <div class="dash-charts">
           <div class="dash-chart-card">
-            <h2><span>${t('dashboard.traffic')}</span><button class="btn btn-ghost btn-sm" aria-label="${t('dashboard.refresh')}" onclick="location.reload()"><i class="ri-refresh-line"></i></button></h2>
+            <h2><span>${t('dashboard.traffic')}</span><button class="btn btn-ghost btn-sm" aria-label="${t('dashboard.refresh')}" onclick="window.mosaicRefreshDashboard?.()"><i class="ri-refresh-line"></i></button></h2>
             <div class="dash-chart-wrap"><canvas id="chart-traffic"></canvas></div>
           </div>
           <div class="dash-chart-card">

@@ -10,14 +10,44 @@ import {
 } from './github-client.js';
 import { getConfig } from './site-config.js';
 import { isDirty } from './publication.js';
+import { validSegment } from '../../../shared/media-manifest.mjs';
+
+/** Reject unsafe or ambiguous post slugs before they reach GitHub/R2 paths. */
+export function assertPostSlug(slug) {
+  if (!validSegment(slug)) {
+    const error = new Error('Invalid post slug');
+    error.status = 400;
+    error.code = 'INVALID_PARAMS';
+    throw error;
+  }
+  return slug;
+}
 // ====== Contents API ======
+
+async function readPostsIndex(c) {
+  try {
+    const obj =
+      (await c.env.MEDIA.get('site-data/posts-index.json')) || (await c.env.MEDIA.get('site-data/posts.json'));
+    if (!obj) return null;
+    const posts = JSON.parse(await obj.text());
+    return Array.isArray(posts) ? posts : null;
+  } catch {
+    return null;
+  }
+}
 
 async function listPostsUncached(c) {
   const resp = await fetch(contentsUrl(c, `content/posts`), { headers: headers(c) });
   if (!resp.ok) throw new Error(`GitHub listPosts: ${resp.status}`);
   const dirs = (await resp.json()).filter((f) => f.type === 'dir');
+  // The build-time index carries resolved cover URLs, LQIP and aspect ratios.
+  // Use it as a fallback even while dirty so edited posts keep a thumbnail;
+  // frontmatter remains the source of truth for text fields.
+  const index = await readPostsIndex(c);
+  const indexBySlug = new Map((index || []).map((post) => [post.slug, post]));
   return Promise.all(
     dirs.map(async (d) => {
+      const cached = indexBySlug.get(d.name) || {};
       try {
         const mdResp = await fetch(contentsUrl(c, `content/posts/${d.name}/index.md`), { headers: headers(c) });
         if (!mdResp.ok) return { slug: d.name, title: d.name };
@@ -32,6 +62,10 @@ async function listPostsUncached(c) {
           date: fm.date,
           description: fm.description,
           cover: fm.cover || '',
+          ...(cached.cover ? { coverResolved: cached.cover } : {}),
+          ...(cached.coverLqip ? { coverLqip: cached.coverLqip } : {}),
+          ...(cached.coverAspect ? { coverAspect: cached.coverAspect } : {}),
+          ...(cached.coverSrcset ? { coverSrcset: cached.coverSrcset } : {}),
         };
       } catch {
         return { slug: d.name, title: d.name, cover: '' };
@@ -42,11 +76,8 @@ async function listPostsUncached(c) {
 
 async function listPostsFromR2(c) {
   try {
-    const obj =
-      (await c.env.MEDIA.get('site-data/posts-index.json')) || (await c.env.MEDIA.get('site-data/posts.json'));
-    if (!obj) return null;
-    const posts = JSON.parse(await obj.text());
-    if (!Array.isArray(posts)) return null;
+    const posts = await readPostsIndex(c);
+    if (!posts) return null;
     return posts.map((p) => ({
       slug: p.slug,
       title: p.title || p.slug,
@@ -55,6 +86,11 @@ async function listPostsFromR2(c) {
       date: p.date,
       description: p.description,
       cover: p.cover || '',
+      ...(p.coverLqip ? { coverLqip: p.coverLqip } : {}),
+      ...(p.coverAspect ? { coverAspect: p.coverAspect } : {}),
+      ...(p.coverSrcset ? { coverSrcset: p.coverSrcset } : {}),
+      ...(p.type ? { type: p.type } : {}),
+      ...(p.stats ? { stats: p.stats } : {}),
     }));
   } catch {
     return null;
@@ -90,8 +126,26 @@ export async function getPost(c, slug) {
   return { slug, frontMatter: fm, body, sha: md.sha };
 }
 
-export async function createOrUpdatePost(c, slug, frontMatter, body, message) {
+export async function createOrUpdatePost(c, slug, frontMatter, body, message, baseSha) {
+  assertPostSlug(slug);
   const existing = await getPost(c, slug);
+  // Optimistic concurrency: admin sends the blob SHA it loaded. `null` means
+  // "this is a new post", so an existing slug is a conflict instead of an
+  // accidental overwrite. Omitting the field keeps the legacy API behavior.
+  if (baseSha !== undefined) {
+    if (baseSha === null && existing) {
+      const error = new Error(`Post ${slug} already exists`);
+      error.status = 409;
+      error.code = 'SLUG_CONFLICT';
+      throw error;
+    }
+    if (baseSha !== null && (!existing || existing.sha !== baseSha)) {
+      const error = new Error(`Post ${slug} changed since it was loaded`);
+      error.status = 409;
+      error.code = 'CONFLICT';
+      throw error;
+    }
+  }
   const yaml = Object.entries(frontMatter)
     .map(([k, v]) => (Array.isArray(v) ? `${k}: [${v.join(', ')}]` : `${k}: ${v}`))
     .join('\n');

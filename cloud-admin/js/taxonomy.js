@@ -7,6 +7,7 @@ import { state } from './state.js?v=1';
 import { pageTimeout } from './lifecycle.js';
 import { t } from './i18n.js?v=1';
 import { escHtml, toast, modalConfirm, modalInput, emptyState } from './ui.js?v=1';
+import { jsStr } from './escape.js';
 
 let deleteSupported = null;
 
@@ -60,8 +61,8 @@ export default async function renderTaxonomy(signal) {
                     .map(
                       (tag) => `
                   <span class="chip">#${escHtml(tag.name)} <span class="chip-count">${tag.count}</span>
-                    <button class="icon-btn" style="width:20px;height:20px;font-size:12px" onclick="renameTag('${escHtml(tag.name)}')" title="${t('taxonomy.rename')}" aria-label="${t('taxonomy.rename')}"><i class="ri-edit-line"></i></button>
-                    ${deleteSupported ? `<button class="icon-btn" style="width:20px;height:20px;font-size:12px;color:var(--color-danger)" onclick="removeTag('${escHtml(tag.name)}', ${tag.count})" title="${t('taxonomy.delete')}" aria-label="${t('taxonomy.delete')}"><i class="ri-close-line"></i></button>` : ''}
+                    <button class="icon-btn" style="width:20px;height:20px;font-size:12px" onclick="renameTag(${jsStr(tag.name)})" title="${t('taxonomy.rename')}" aria-label="${t('taxonomy.rename')}"><i class="ri-edit-line"></i></button>
+                    ${deleteSupported ? `<button class="icon-btn" style="width:20px;height:20px;font-size:12px;color:var(--color-danger)" onclick="removeTag(${jsStr(tag.name)}, ${Number(tag.count) || 0})" title="${t('taxonomy.delete')}" aria-label="${t('taxonomy.delete')}"><i class="ri-close-line"></i></button>` : ''}
                   </span>`,
                     )
                     .join('')}</div>`
@@ -92,8 +93,8 @@ function buildCatTree(cats, prefix, depth = 0) {
             <span class="badge badge-neutral">${c.count}</span>
           </span>
           <span class="tax-row-actions">
-            <button class="icon-btn" onclick="renameCategory('${escHtml(fullName)}')" title="${t('taxonomy.rename')}" aria-label="${t('taxonomy.rename')}"><i class="ri-edit-line"></i></button>
-            ${deleteSupported ? `<button class="icon-btn" style="color:var(--color-danger)" onclick="removeCategory('${escHtml(fullName)}', ${c.count})" title="${t('taxonomy.delete')}" aria-label="${t('taxonomy.delete')}"><i class="ri-delete-bin-line"></i></button>` : ''}
+            <button class="icon-btn" onclick="renameCategory(${jsStr(fullName)})" title="${t('taxonomy.rename')}" aria-label="${t('taxonomy.rename')}"><i class="ri-edit-line"></i></button>
+            ${deleteSupported ? `<button class="icon-btn" style="color:var(--color-danger)" onclick="removeCategory(${jsStr(fullName)}, ${Number(c.count) || 0})" title="${t('taxonomy.delete')}" aria-label="${t('taxonomy.delete')}"><i class="ri-delete-bin-line"></i></button>` : ''}
           </span>
         </div>
         ${hasChildren ? `<div class="cat-children" data-cat="${escHtml(fullName)}">${buildCatTree(c.children, fullName, depth + 1)}</div>` : ''}

@@ -16,6 +16,7 @@ import {
   copyText,
   modalConfirm,
 } from './ui.js?v=1';
+import { jsStr } from './escape.js';
 
 // Chinese labels for the known pipeline steps (GitHub returns English names)
 const STEP_LABELS_ZH = {
@@ -86,15 +87,15 @@ export default async function renderBuild(signal) {
             <p class="page-subtitle">${runs.length ? t('build.runsCount', { n: runs.length }) : ''}</p>
           </div>
           <div class="page-header-actions">
-            <button class="btn btn-secondary" onclick="location.reload()"><i class="ri-refresh-line"></i> ${t('build.refresh')}</button>
+            <button class="btn btn-secondary" onclick="window.mosaicRefreshBuild?.()"><i class="ri-refresh-line"></i> ${t('build.refresh')}</button>
             <button class="btn btn-primary" data-build-trigger onclick="window.doTriggerBuild()"><i class="ri-play-fill"></i> ${t('build.trigger')}</button>
           </div>
         </div>
 
-        <div class="build-note">
-          <i class="ri-information-line" aria-hidden="true"></i>
-          <span>${t('build.streamingNote')} ${t('build.timeoutNote')}</span>
-        </div>
+        <details class="build-note">
+          <summary><i class="ri-information-line" aria-hidden="true"></i> ${t('build.howItWorks')}</summary>
+          <p>${t('build.streamingNote')} ${t('build.timeoutNote')}</p>
+        </details>
 
         <div id="build-status-card">${latest ? renderStatusCard(latest) : renderEmptyState()}</div>
 
@@ -256,6 +257,17 @@ export default async function renderBuild(signal) {
         hidePipelineTip();
         clearStepHighlight();
       };
+      const refresh = () => {
+        if (!stopped) poll();
+      };
+      window.mosaicRefreshBuild = refresh;
+      signal.addEventListener(
+        'abort',
+        () => {
+          if (window.mosaicRefreshBuild === refresh) window.mosaicRefreshBuild = null;
+        },
+        { once: true },
+      );
       signal.addEventListener('abort', cleanup, { once: true });
     },
   };
@@ -273,7 +285,7 @@ function buildSummary(runs, latest) {
   return {
     successRate,
     avgDur: avgSec ? fmtDuration(avgSec) : '—',
-    branch: latest?.headBranch || runs[0]?.headBranch || '',
+    branch: latest?.headBranch || latest?.branch || runs[0]?.headBranch || runs[0]?.branch || '',
   };
 }
 
@@ -311,14 +323,14 @@ function stepStatusInfo(s) {
 function renderPipeline(run) {
   const steps = run.steps || [];
   lastSteps = steps;
+  const running = run.status === 'in_progress' || run.status === 'queued';
   if (!steps.length) {
-    return `<div class="build-pipeline"><span class="muted">${t('build.noSteps')}</span></div>`;
+    return `<div class="build-pipeline"><span class="muted">${running ? t('build.noSteps') : t('build.noStepsDone')}</span></div>`;
   }
   const now = Date.now();
   const done = steps.filter((s) => s.status === 'completed' && s.conclusion === 'success').length;
   const failed = steps.find((s) => s.conclusion === 'failure');
   const runningStep = steps.find((s) => s.status === 'in_progress');
-  const running = run.status === 'in_progress' || run.status === 'queued';
 
   // Duration-weighted segments: real elapsed time per step, so the bar
   // reflects remaining work instead of equal-width steps.
@@ -555,7 +567,7 @@ function renderStatusCard(run) {
         <span class="build-duration" id="build-updated" style="margin-left:auto"></span>
         ${
           run.status === 'in_progress' || run.status === 'queued'
-            ? `<button class="btn btn-danger btn-sm" data-build-cancel onclick="window.doCancelBuild()" title="${t('build.cancel')}" aria-label="${t('build.cancel')}"><i class="ri-stop-line"></i> ${t('build.cancel')}</button>`
+            ? `<button class="btn btn-danger-outline btn-sm" data-build-cancel onclick="window.doCancelBuild()" title="${t('build.cancel')}" aria-label="${t('build.cancel')}"><i class="ri-stop-line"></i> ${t('build.cancel')}</button>`
             : ''
         }
       </div>
@@ -574,7 +586,7 @@ function renderStatusCard(run) {
       }
 
       <div class="build-meta">
-        <div><span class="build-meta-label">${t('build.branch')}</span><code>${escHtml(run.headBranch || 'main')}</code></div>
+        <div><span class="build-meta-label">${t('build.branch')}</span><code>${escHtml(run.headBranch || run.branch || 'main')}</code></div>
         <div>
           <span class="build-meta-label">${t('build.commit')}</span>
           <span style="display:inline-flex;gap:4px;align-items:center">
@@ -583,7 +595,7 @@ function renderStatusCard(run) {
                 ? `<a href="${escHtml(run.commitUrl)}" target="_blank" rel="noopener" class="mono" style="font-size:12px;color:var(--color-text-primary);text-decoration:none" title="${escHtml(run.headShaFull || run.headSha)}">${escHtml(run.headSha || '—')}</a>`
                 : `<code>${escHtml(run.headSha || '—')}</code>`
             }
-            ${run.headSha ? `<button class="btn btn-ghost btn-sm" onclick="window.copySha('${escHtml(run.headSha)}')" title="${t('build.copySha')}" aria-label="${t('build.copySha')}"><i class="ri-file-copy-line"></i></button>` : ''}
+            ${run.headSha ? `<button class="btn btn-ghost btn-sm" onclick="window.copySha(${jsStr(run.headSha)})" title="${t('build.copySha')}" aria-label="${t('build.copySha')}"><i class="ri-file-copy-line"></i></button>` : ''}
           </span>
         </div>
         <div><span class="build-meta-label">${t('build.event')}</span>${escHtml(run.event || 'push')}</div>
@@ -641,7 +653,7 @@ function buildDetailHtml(run, s, steps) {
   const dur = buildDuration(run);
   const failed = run.failedStep;
   const metaItems = [
-    [t('build.branch'), escHtml(run.headBranch || '—')],
+    [t('build.branch'), escHtml(run.headBranch || run.branch || '—')],
     [
       t('build.commit'),
       run.commitUrl

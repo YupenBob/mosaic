@@ -2,10 +2,16 @@
  * Posts CRUD + duplicate.
  */
 import { listPosts, getPost, createOrUpdatePost, deletePost, markDirty } from '../github.js';
+import { assertPostSlug } from '../services/content.js';
 import { invalidateUsageSnapshot } from '../usage.js';
 import { defer } from '../shared.js';
 import { invalidateMedia } from '../services/jobs.js';
 import { protectedMediaKeys } from '../services/media-references.js';
+
+/** Map service-level errors to HTTP without leaking them as generic 502s. */
+function postError(e) {
+  return { error: e.message, code: e.code || (e.status === 409 ? 'CONFLICT' : 'GITHUB_ERROR') };
+}
 
 export function registerPosts(app) {
   // Posts CRUD
@@ -27,32 +33,30 @@ export function registerPosts(app) {
 
   app.get('/api/posts/:slug', async (c) => {
     try {
-      const post = await getPost(c, c.req.param('slug'));
+      const slug = assertPostSlug(c.req.param('slug'));
+      const post = await getPost(c, slug);
       if (!post) return c.json({ error: 'Post not found', code: 'NOT_FOUND' }, 404);
       return c.json(post);
     } catch (e) {
-      return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502);
+      return c.json(postError(e), e.status || 502);
     }
   });
 
   app.post('/api/posts', async (c) => {
     try {
-      const { slug, frontMatter, body, message } = await c.req.json();
+      const { slug, frontMatter, body, message, baseSha } = await c.req.json();
       if (!slug) return c.json({ error: 'slug required', code: 'INVALID_PARAMS' }, 400);
-      const result = await createOrUpdatePost(c, slug, frontMatter, body, message);
+      const result = await createOrUpdatePost(c, slug, frontMatter, body, message, baseSha);
       await markDirty(c.env, result.commit?.sha || '');
       return c.json({ ok: true, slug, sha: result.content?.sha }, 201);
     } catch (e) {
-      return c.json(
-        { error: e.message, code: e.message.includes('exists') ? 'SLUG_CONFLICT' : 'GITHUB_ERROR' },
-        e.message.includes('exists') ? 409 : 502,
-      );
+      return c.json(postError(e), e.status || 502);
     }
   });
 
   app.delete('/api/posts/:slug', async (c) => {
     try {
-      const slug = c.req.param('slug');
+      const slug = assertPostSlug(c.req.param('slug'));
       const { message } = await c.req.json().catch(() => ({}));
 
       // Delete from GitHub
@@ -93,15 +97,17 @@ export function registerPosts(app) {
   // Duplicate post
   app.post('/api/posts/:slug/duplicate', async (c) => {
     try {
-      const post = await getPost(c, c.req.param('slug'));
+      const sourceSlug = assertPostSlug(c.req.param('slug'));
+      const post = await getPost(c, sourceSlug);
       if (!post) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404);
       const { newSlug } = await c.req.json().catch(() => ({}));
-      const slug = newSlug || `${c.req.param('slug')}-copy`;
-      await createOrUpdatePost(c, slug, post.frontMatter, post.body, `Duplicate ${c.req.param('slug')} → ${slug}`);
+      const slug = assertPostSlug(newSlug || `${sourceSlug}-copy`);
+      // `null` baseSha means "create only": never overwrite an existing post.
+      await createOrUpdatePost(c, slug, post.frontMatter, post.body, `Duplicate ${sourceSlug} → ${slug}`, null);
       defer(c, () => markDirty(c.env));
       return c.json({ ok: true, slug });
     } catch (e) {
-      return c.json({ error: e.message, code: 'GITHUB_ERROR' }, 502);
+      return c.json(postError(e), e.status || 502);
     }
   });
 }

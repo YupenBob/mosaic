@@ -12,6 +12,7 @@ import {
   abortMultipartUpload,
   listMedia,
   serveMediaFile,
+  serveMediaObject,
   uploadDirect,
   deleteMediaFile,
 } from '../r2.js';
@@ -26,6 +27,9 @@ export function registerMediaPublic(app) {
     } catch {}
     return serveMediaFile(c, cfg.mediaBase);
   });
+
+  // Object proxy for previews when no public media domain is configured.
+  app.get('/api/media/object', async (c) => serveMediaObject(c));
 
   // Upload — public (admin sends JWT in XHR)
   app.post('/api/upload/direct/:slug/:filename', async (c) => {

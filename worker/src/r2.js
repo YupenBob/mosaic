@@ -280,7 +280,11 @@ export async function listMedia(c, mediaBaseOverride) {
     if (seen.has(identity)) return;
     seen.add(identity);
     const sourceKey = task?.sourceKey || key;
-    const previewUrl = task?.previewKey ? mediaUrl(task.previewKey, r2Public) : '';
+    const previewUrl = task?.previewKey
+      ? r2Public
+        ? mediaUrl(task.previewKey, r2Public)
+        : `/api/media/object?key=${encodeURIComponent(task.previewKey)}`
+      : '';
     const url =
       r2Public && sourceKey
         ? mediaUrl(sourceKey, r2Public)
@@ -319,6 +323,29 @@ export async function listMedia(c, mediaBaseOverride) {
   for (const item of tasks) add(item.filename, 0, item.sourceKey, item);
   for (const list of Object.values(result)) list.sort(compareMediaOrder);
   return c.json(result);
+}
+
+// Serve an object by its manifest key when no public media domain is configured.
+// Only processed/originals namespaces are reachable; arbitrary keys are rejected.
+export async function serveMediaObject(c) {
+  const key = String(c.req.query('key') || '');
+  if (!/^(processed|originals)\//.test(key) || key.includes('..') || key.includes('\\')) {
+    return c.json({ error: 'Invalid media key', code: 'INVALID_PARAMS' }, 400);
+  }
+  try {
+    const obj = await c.env.MEDIA.get(key);
+    if (!obj) return c.json({ error: 'File not found', code: 'NOT_FOUND' }, 404);
+    return new Response(obj.body, {
+      headers: {
+        'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        ETag: obj.httpEtag || '',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (e) {
+    return c.json({ error: e.message, code: 'R2_ERROR' }, 502);
+  }
 }
 
 // Serve a media file from R2 (searches both originals/ and processed/)

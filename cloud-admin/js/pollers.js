@@ -1,36 +1,65 @@
 /**
  * App-level pollers and build/dirty chrome.
  *
- * Owns the dirty banner, the one-shot build status poller, the site URL in
- * the topbar and the global build trigger. Extracted from admin.js so the
+ * Owns the compact status chip, the one-shot build status poller, the site URL
+ * in the topbar and the global build trigger. Extracted from admin.js so the
  * entry point stays limited to auth, routing shell and i18n wiring.
  */
 import { getToken, build, config as configApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
-import { toast, formatTime } from './ui.js?v=1';
+import { toast } from './ui.js?v=1';
 
 let dirtyPollTimer = null;
 let buildPollTimer = null;
 let buildRunning = false;
 let currentBuildRun = null;
+let dirtyInfo = null;
+let lastBuildFailed = false;
 
 /** Whether a site build is currently queued/running. */
 export function isBuildRunning() {
   return buildRunning;
 }
 
-// ── Dirty banner ───────────────────────────
+// ── Status chip ────────────────────────────
+/**
+ * The old full-width banner was replaced by one topbar chip. Priority:
+ * running build > unbuilt changes > last build failed > hidden.
+ */
+function renderStatusChip() {
+  const chip = document.getElementById('app-status');
+  if (!chip) return;
+  let kind = '';
+  let text = '';
+  if (buildRunning) {
+    kind = 'building';
+    const runLabel = currentBuildRun?.runNumber ? ' #' + currentBuildRun.runNumber : '';
+    text = t('dirty.buildingChip') + runLabel;
+  } else if (dirtyInfo?.count > 0) {
+    kind = 'dirty';
+    text = t('dirty.chip', { count: dirtyInfo.count });
+  } else if (lastBuildFailed) {
+    kind = 'failed';
+    text = t('dirty.failedChip');
+  }
+  if (!kind) {
+    chip.hidden = true;
+    chip.removeAttribute('title');
+    chip.removeAttribute('aria-label');
+    return;
+  }
+  const label = document.getElementById('app-status-text');
+  chip.hidden = false;
+  chip.className = 'app-status app-status--' + kind;
+  chip.title = text;
+  chip.setAttribute('aria-label', text + ' — ' + t('nav.build'));
+  if (label) label.textContent = text;
+}
+
 export function showDirtyBanner(count, last) {
-  const banner = document.getElementById('dirty-banner');
-  if (!banner) return;
-  banner.classList.remove('is-building');
-  const spinner = document.getElementById('dirty-banner-spinner');
-  if (spinner) spinner.hidden = true;
-  const ago = last ? t('dirty.ago', { time: formatTime(last) }) : '';
-  const text = document.getElementById('dirty-banner-text');
-  if (text) text.textContent = t('dirty.text', { count, ago });
-  banner.style.display = 'flex';
+  dirtyInfo = { count, last };
+  renderStatusChip();
   const badge = document.getElementById('nav-build-badge');
   if (badge) {
     badge.textContent = count;
@@ -39,32 +68,32 @@ export function showDirtyBanner(count, last) {
 }
 
 export function hideDirtyBanner() {
-  const banner = document.getElementById('dirty-banner');
-  if (banner) {
-    banner.style.display = 'none';
-    banner.classList.remove('is-building');
-    const spinner = document.getElementById('dirty-banner-spinner');
-    if (spinner) spinner.hidden = true;
-  }
+  dirtyInfo = null;
+  renderStatusChip();
   const badge = document.getElementById('nav-build-badge');
   if (badge) badge.style.display = 'none';
 }
 
 function showBuildingBanner(run) {
-  const banner = document.getElementById('dirty-banner');
-  if (!banner) return;
-  banner.classList.add('is-building');
-  const spinner = document.getElementById('dirty-banner-spinner');
-  if (spinner) spinner.hidden = false;
-  const runLabel = run && run.runNumber ? ' #' + run.runNumber : '';
-  const text = document.getElementById('dirty-banner-text');
-  if (text) text.textContent = t('dirty.building') + runLabel;
-  banner.style.display = 'flex';
+  buildRunning = true;
+  currentBuildRun = run || null;
+  renderStatusChip();
   const badge = document.getElementById('nav-build-badge');
   if (badge) badge.style.display = 'none';
 }
 
-/** Refresh the dirty banner from `/api/dirty` (also used by save handlers). */
+/** Clear every piece of global chrome (logout / auth expiry). */
+export function resetStatusChrome() {
+  dirtyInfo = null;
+  lastBuildFailed = false;
+  buildRunning = false;
+  currentBuildRun = null;
+  renderStatusChip();
+  const badge = document.getElementById('nav-build-badge');
+  if (badge) badge.style.display = 'none';
+}
+
+/** Refresh the status chip from `/api/dirty` (also used by save handlers). */
 export async function checkDirty() {
   const token = getToken();
   if (!token || state.authStatus !== 'ok') return;
@@ -98,6 +127,7 @@ async function loadSiteUrl() {
   if (state.siteUrl) {
     const btn = document.getElementById('topbar-site-btn');
     if (btn) btn.href = state.siteUrl;
+    window.dispatchEvent(new CustomEvent('mosaic:site-url'));
     return;
   }
   try {
@@ -107,6 +137,7 @@ async function loadSiteUrl() {
       state.mediaBase = cfg.mediaBase || state.mediaBase;
       const btn = document.getElementById('topbar-site-btn');
       if (btn) btn.href = cfg.url;
+      window.dispatchEvent(new CustomEvent('mosaic:site-url'));
     }
   } catch {
     /* topbar link stays hidden on failure */
@@ -114,6 +145,7 @@ async function loadSiteUrl() {
 }
 
 export function stopPollers() {
+  resetStatusChrome();
   if (dirtyPollTimer) {
     clearInterval(dirtyPollTimer);
     dirtyPollTimer = null;
@@ -147,16 +179,19 @@ async function pollBuildStatus() {
     } else if (status.conclusion === 'success') {
       dot.className = 'status-dot ok';
       dot.title = t('build.success');
+      lastBuildFailed = false;
       window.setBuildTriggerStates && window.setBuildTriggerStates(false);
     } else if (status.conclusion === 'failure') {
       dot.className = 'status-dot down';
       dot.title = t('build.failed');
+      lastBuildFailed = true;
       window.setBuildTriggerStates && window.setBuildTriggerStates(false);
     } else {
       dot.className = 'status-dot';
       dot.title = '';
       window.setBuildTriggerStates && window.setBuildTriggerStates(false);
     }
+    renderStatusChip();
   } catch {
     /* transient */
   } finally {
@@ -223,6 +258,7 @@ window.doTriggerBuild = async () => {
   }
   try {
     const result = await build.trigger();
+    lastBuildFailed = false;
     hideDirtyBanner();
     toast(t('build.triggered', { method: result.method || 'push' }), 'success', 5000);
     if (result.wfError) toast(t('build.fallbackUsed', { error: result.wfError }), 'info', 6000);

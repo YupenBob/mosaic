@@ -2,6 +2,7 @@ import { setNavigationSignal } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { createPageScope } from './lifecycle.js';
+import { withViewTransition } from './motion.js';
 import { modalConfirm, escHtml } from './ui.js?v=1';
 import { isConfigDirty, clearConfigDirty } from './config/form.js?v=1';
 import renderDashboard, { dashboardSkeleton } from './dashboard.js?v=1';
@@ -24,7 +25,7 @@ export const pages = {
   editor: {
     render: renderEditor,
     skeleton: editorSkeleton,
-    label: () => (state.params.slug ? t('nav.editor') + ' · ' + state.params.slug : t('nav.editor')),
+    label: () => t('nav.editor'),
     icon: 'ri-edit-line',
   },
   build: { render: renderBuild, skeleton: buildSkeleton, label: () => t('nav.build'), icon: 'ri-tools-line' },
@@ -90,16 +91,20 @@ export function onHashChange() {
 }
 
 export function navigateTo(page, params) {
-  state.pageScope?.dispose();
-  state.pageScope = createPageScope();
-  state.abortController = state.pageScope;
-  setNavigationSignal(state.pageScope.signal);
-  state.page = page;
-  state.params = params || {};
-  _lastHash = location.hash || '#' + page;
-  updateNav(page);
-  updateChrome(page);
-  renderPage(page, state.abortController.signal);
+  withViewTransition(() => {
+    state.pageScope?.dispose();
+    state.pageScope = createPageScope();
+    state.abortController = state.pageScope;
+    setNavigationSignal(state.pageScope.signal);
+    state.page = page;
+    state.params = params || {};
+    _lastHash = location.hash || '#' + page;
+    updateNav(page);
+    updateChrome(page);
+    // renderPage paints its skeleton synchronously before awaiting data, so the
+    // transition captures the destination shell rather than the old page.
+    renderPage(page, state.abortController.signal);
+  });
 }
 
 function updateNav(page) {

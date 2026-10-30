@@ -6,8 +6,7 @@
  * Sections are pure `(cfg) => html` functions plus a descriptor so the config
  * page shell only needs to concatenate them.
  */
-import { t, setLang } from '../i18n.js?v=1';
-import { getThemePref, setTheme } from '../theme.js?v=1';
+import { t } from '../i18n.js?v=1';
 import {
   cfgGet,
   textField,
@@ -53,32 +52,6 @@ export function themeModeOptions() {
     { value: 'dark', label: t('config.themeDark') },
   ];
 }
-
-// ── Preferences ────────────────────────────
-function prefsSection() {
-  const themePref = getThemePref();
-  const lang = localStorage.getItem('mosaic_admin_lang') || 'zh-CN';
-  return `
-    <div class="config-field">
-      <label class="config-label"><span>${t('config.adminTheme')}</span><small>${t('config.adminThemeHint')}</small></label>
-      <select class="select" id="admin-theme-select" aria-label="${t('config.adminTheme')}" style="width:200px" onchange="window.setAdminTheme(this.value)">
-        <option value="auto" ${themePref === 'auto' ? 'selected' : ''}>${t('config.themeAuto')}</option>
-        <option value="light" ${themePref === 'light' ? 'selected' : ''}>${t('config.themeLight')}</option>
-        <option value="dark" ${themePref === 'dark' ? 'selected' : ''}>${t('config.themeDark')}</option>
-      </select>
-    </div>
-    <div class="config-field">
-      <label class="config-label"><span>${t('config.adminLang')}</span><small>${t('config.adminLangHint')}</small></label>
-      <select class="select" id="admin-lang-select" aria-label="${t('config.adminLang')}" style="width:200px" onchange="window.setAdminLang(this.value)">
-        <option value="zh-CN" ${lang === 'zh-CN' ? 'selected' : ''}>中文简体</option>
-        <option value="en" ${lang === 'en' ? 'selected' : ''}>English</option>
-      </select>
-    </div>
-  `;
-}
-
-window.setAdminTheme = (pref) => setTheme(pref);
-window.setAdminLang = (lang) => setLang(lang);
 
 // ── General ────────────────────────────────
 const LOGO_DATA_URI =
@@ -234,7 +207,6 @@ function mediaQualitySection(cfg) {
 
 /** Section descriptors consumed by the config page shell. */
 export const generalSections = [
-  { id: 'prefs', icon: 'ri-sliders-line', label: () => t('config.prefs'), body: prefsSection },
   { id: 'general', icon: 'ri-information-line', label: () => t('config.general'), body: generalSection },
   { id: 'author', icon: 'ri-user-line', label: () => t('config.author'), body: authorSection },
   { id: 'theme', icon: 'ri-contrast-2-line', label: () => t('config.themeModeSection'), body: themeSection },

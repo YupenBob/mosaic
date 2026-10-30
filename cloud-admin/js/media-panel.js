@@ -10,6 +10,7 @@ import { media as mediaApi, mediaJobs } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, modalConfirm } from './ui.js?v=1';
+import { jsStr } from './escape.js';
 import {
   canInterpolate,
   ensureInterpolationSupport,
@@ -65,16 +66,24 @@ function taskOptions(item) {
  * @param {number} index Index for `{{video:n}}` placeholders.
  * @param {string} slug Post slug.
  */
+function mediaThumb(type, file) {
+  const src = file.previewUrl || (type === 'photo' ? file.url : '');
+  const icon = type === 'video' ? 'ri-play-circle-fill' : type === 'music' ? 'ri-music-2-line' : 'ri-image-line';
+  if (!src)
+    return `<div class="media-cell-icon"><i class="ri-${type === 'video' ? 'video' : type === 'music' ? 'music' : 'image'}-line" aria-hidden="true"></i></div>`;
+  return `<div class="media-cell-thumb${type === 'photo' ? '' : ' media-cell-thumb--overlay'}">
+    <img src="${escHtml(src)}" alt="" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling?.removeAttribute('hidden')" />
+    ${icon ? `<span class="media-cell-thumb-icon" hidden><i class="${icon}" aria-hidden="true"></i></span>` : ''}
+  </div>`;
+}
+
 function mediaCell(type, file, index, slug) {
   const placeholder = placeholderFor(type, index);
-  const inner =
-    type === 'photo'
-      ? `<img src="${escHtml(file.previewUrl || file.url || '')}" alt="${escHtml(file.name)}" loading="lazy" />`
-      : `<div class="media-cell-icon"><i class="ri-${type === 'video' ? 'video' : 'music'}-line" aria-hidden="true"></i></div>`;
+  const inner = mediaThumb(type, file);
   const activate =
     type === 'photo'
-      ? `onclick="window.pickCover('${escHtml(file.name)}')"`
-      : `onclick="window.insertPlaceholder('${escHtml(placeholder)}')"`;
+      ? `onclick="window.pickCover(${jsStr(file.name)})"`
+      : `onclick="window.insertPlaceholder(${jsStr(placeholder)})"`;
   const tools = type === 'video' ? interpolationButton(file, slug) : '';
   return `
     <div class="media-cell" ${activate} draggable="true" data-ph="${escHtml(placeholder)}" title="${escHtml(file.name)} — ${t('editor.dragInsertHint')}">
@@ -84,9 +93,9 @@ function mediaCell(type, file, index, slug) {
       ${sourceBadge(file)}
       ${taskOptions(file)}
       ${tools ? `<div class="media-cell-tools">${tools}</div>` : ''}
-      ${file.taskId && ['failed', 'cancelled'].includes(file.status) ? `<button type="button" class="btn btn-ghost btn-sm media-cell-retry" onclick="event.stopPropagation();window.retryEditorMedia('${escHtml(file.taskId)}')"><i class="ri-refresh-line" aria-hidden="true"></i> ${t('jobs.retry')}</button>` : ''}
-      <button type="button" class="media-cell-insert" onclick="event.stopPropagation();window.insertPlaceholder('${escHtml(placeholder)}')" title="${t('editor.insert')}" aria-label="${t('editor.insert')} ${escHtml(file.name)}"><i class="ri-corner-down-left-line" aria-hidden="true"></i></button>
-      <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia('${escHtml(slug)}','${escHtml(file.name)}','${type}s')" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
+      ${file.taskId && ['failed', 'cancelled'].includes(file.status) ? `<button type="button" class="btn btn-ghost btn-sm media-cell-retry" onclick="event.stopPropagation();window.retryEditorMedia(${jsStr(file.taskId)})"><i class="ri-refresh-line" aria-hidden="true"></i> ${t('jobs.retry')}</button>` : ''}
+      <button type="button" class="media-cell-insert" onclick="event.stopPropagation();window.insertPlaceholder(${jsStr(placeholder)})" title="${t('editor.insert')}" aria-label="${t('editor.insert')} ${escHtml(file.name)}"><i class="ri-corner-down-left-line" aria-hidden="true"></i></button>
+      <button class="media-cell-del" onclick="event.stopPropagation();doDeleteMedia(${jsStr(slug)},${jsStr(file.name)},${jsStr(type + 's')})" title="${t('editor.deleteMedia')}" aria-label="${t('editor.deleteMedia')}"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
     </div>`;
 }
 
@@ -97,7 +106,7 @@ function mediaGroup(title, count, insertPlaceholder, cellsHtml, extraAction = ''
       <span class="editor-section-title" style="margin:0">${title} (${count})</span>
       <span class="media-group-actions">
         ${extraAction}
-        <button type="button" class="btn btn-ghost btn-sm" onclick="window.insertPlaceholder('${escHtml(insertPlaceholder)}')">${t('editor.insertAll')}</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="window.insertPlaceholder(${jsStr(insertPlaceholder)})">${t('editor.insertAll')}</button>
       </span>
     </div>
     ${cellsHtml}`;
@@ -179,7 +188,7 @@ export async function loadExistingMedia(slug) {
         );
       }
       if (covers.length)
-        html += `<div class="editor-section-title">${t('editor.cover')}</div><div class="media-grid">${covers.map((file) => `<button type="button" class="media-cell" onclick="window.pickCover('${escHtml(file.name)}')"><img src="${escHtml(file.previewUrl || file.url)}" alt="${escHtml(file.name)}" loading="lazy" /><span class="media-cell-name">${escHtml(file.name)}</span></button>`).join('')}</div>`;
+        html += `<div class="editor-section-title">${t('editor.cover')}</div><div class="media-grid">${covers.map((file) => `<button type="button" class="media-cell" onclick="window.pickCover(${jsStr(file.name)})"><img src="${escHtml(file.previewUrl || file.url)}" alt="${escHtml(file.name)}" loading="lazy" /><span class="media-cell-name">${escHtml(file.name)}</span></button>`).join('')}</div>`;
     }
     el.innerHTML = html;
     wireMediaActions(el, signal);

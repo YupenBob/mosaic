@@ -6,8 +6,10 @@ import { posts as postsApi, stats as statsApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, modalConfirm, modalInput, emptyState, debounce } from './ui.js?v=1';
+import { jsStr } from './escape.js';
+import { filterPostList } from './post-filter.js';
 
-const CHUNK = 100;
+const CHUNK = 50;
 let renderedCount = 0;
 
 export default async function renderPosts(signal) {
@@ -49,6 +51,12 @@ export default async function renderPosts(signal) {
             <option value="">${t('posts.allCats')}</option>
             ${catOptions}
           </select>
+          <select id="post-sort" class="select" style="width:auto" onchange="sortPosts(this.value)" aria-label="${t('posts.sortLabel')}">
+            <option value="newest">${t('posts.sortNewest')}</option>
+            <option value="oldest">${t('posts.sortOldest')}</option>
+            <option value="title">${t('posts.sortTitle')}</option>
+            <option value="views">${t('posts.sortViews')}</option>
+          </select>
           <span class="search-count" id="post-match-count"></span>
         </div>
 
@@ -79,11 +87,14 @@ export default async function renderPosts(signal) {
               ${postsData.slice(0, renderedCount).map(cardHtml).join('')}
             </div>
           </div>
-          ${
-            postsData.length > renderedCount
-              ? `<div class="load-more-wrap"><button class="btn btn-secondary" onclick="loadMorePosts()"><i class="ri-arrow-down-line"></i> ${t('common.loadMore')} (${postsData.length - renderedCount})</button></div>`
-              : ''
-          }
+          <div class="load-more-wrap" id="posts-load-more">
+            ${
+              postsData.length > renderedCount
+                ? `<button class="btn btn-secondary" onclick="loadMorePosts()"><i class="ri-arrow-down-line"></i> ${t('common.loadMore')} (${postsData.length - renderedCount})</button>`
+                : ''
+            }
+          </div>
+          <div id="posts-empty" hidden></div>
         `
         }
       </div>
@@ -94,14 +105,32 @@ export default async function renderPosts(signal) {
       statistics.then((result) => {
         if (signal.aborted) return;
         state.postStats = result.stats || {};
-        const table = document.querySelector('#posts-table tbody'),
-          grid = document.querySelector('.admin-card-grid');
-        if (table) table.innerHTML = postsData.slice(0, renderedCount).map(rowHtml).join('');
-        if (grid) grid.innerHTML = postsData.slice(0, renderedCount).map(cardHtml).join('');
-        window.switchPostsView(document.querySelector('.view-toggle-btn.active')?.dataset.view || savedView, true);
+        window.renderPostsList?.();
       });
     },
   };
+}
+
+function coverOf(p) {
+  const raw = String(p.cover || '');
+  const resolved = String(p.coverResolved || '');
+  const literal = raw && !/^(video|photo):/.test(raw) ? raw : '';
+  const url =
+    resolved ||
+    (literal
+      ? /^(https?:\/\/|\/)/.test(literal)
+        ? literal
+        : '/api/media/file/' + encodeURIComponent(p.slug) + '/' + encodeURIComponent(literal)
+      : '');
+  const srcset = p.coverSrcset?.['480'] || p.coverSrcset?.[480] || '';
+  return { src: srcset || url, lqip: p.coverLqip || '', has: !!(srcset || url) };
+}
+
+function thumbHtml(p) {
+  const cover = coverOf(p);
+  return cover.has
+    ? `<span class="cell-thumb"><i class="ri-article-line" aria-hidden="true"></i><img src="${escHtml(cover.src)}" alt="" loading="lazy" decoding="async" onerror="this.remove()" /></span>`
+    : `<span class="cell-thumb" aria-hidden="true"><i class="ri-article-line"></i></span>`;
 }
 
 function rowHtml(p) {
@@ -109,9 +138,12 @@ function rowHtml(p) {
   return `
     <tr data-search="${escHtml(((p.title || '') + ' ' + (p.category || '') + ' ' + (p.tags || []).join(' ')).toLowerCase())}" data-cat="${escHtml(p.category || '')}">
       <td>
-        <span class="cell-main">
-          <a href="#editor&slug=${encodeURIComponent(p.slug)}">${escHtml(p.title || p.slug)}</a>
-          <span class="cell-sub">${escHtml(p.slug)} · ${stats.views ? `<i class="ri-eye-line"></i> ${stats.views} · <i class="ri-heart-line"></i> ${stats.likes || 0}` : ''}</span>
+        <span class="cell-post">
+          ${thumbHtml(p)}
+          <span class="cell-main">
+            <a href="#editor&slug=${encodeURIComponent(p.slug)}">${escHtml(p.title || p.slug)}</a>
+            <span class="cell-sub">${escHtml(p.slug)} · ${stats.views ? `<i class="ri-eye-line"></i> ${stats.views} · <i class="ri-heart-line"></i> ${stats.likes || 0}` : ''}</span>
+          </span>
         </span>
       </td>
       <td>${escHtml(p.category || t('posts.uncategorized'))}</td>
@@ -120,9 +152,9 @@ function rowHtml(p) {
       <td>
         <div class="row-actions">
           ${state.siteUrl ? `<a class="icon-btn" href="${escHtml(state.siteUrl)}/posts/${encodeURIComponent(p.slug)}/" target="_blank" rel="noopener" title="${t('posts.openSite')}" aria-label="${t('posts.openSite')}"><i class="ri-external-link-line"></i></a>` : ''}
-          <button class="icon-btn" onclick="doDuplicatePost('${escHtml(p.slug)}')" title="${t('common.duplicate')}" aria-label="${t('common.duplicate')}"><i class="ri-file-copy-line"></i></button>
+          <button class="icon-btn" onclick="doDuplicatePost(${jsStr(p.slug)})" title="${t('common.duplicate')}" aria-label="${t('common.duplicate')}"><i class="ri-file-copy-line"></i></button>
           <a class="icon-btn" href="#editor&slug=${encodeURIComponent(p.slug)}" title="${t('common.edit')}" aria-label="${t('common.edit')}"><i class="ri-edit-line"></i></a>
-          <button class="icon-btn" style="color:var(--color-danger)" onclick="doDeletePost('${escHtml(p.slug)}')" title="${t('common.delete')}" aria-label="${t('common.delete')}"><i class="ri-delete-bin-line"></i></button>
+          <button class="icon-btn" style="color:var(--color-danger)" onclick="doDeletePost(${jsStr(p.slug)})" title="${t('common.delete')}" aria-label="${t('common.delete')}"><i class="ri-delete-bin-line"></i></button>
         </div>
       </td>
     </tr>
@@ -131,13 +163,13 @@ function rowHtml(p) {
 
 function cardHtml(p) {
   const stats = state.postStats[p.slug] || {};
-  const hasCover = p.cover && !String(p.cover).startsWith('video:') && !String(p.cover).startsWith('photo:');
+  const cover = coverOf(p);
   return `
     <a href="#editor&slug=${encodeURIComponent(p.slug)}" class="admin-post-card"
        data-search="${escHtml(((p.title || '') + ' ' + (p.category || '') + ' ' + (p.tags || []).join(' ')).toLowerCase())}" data-cat="${escHtml(p.category || '')}">
       ${
-        hasCover
-          ? `<div class="admin-card-cover"><img src="${escHtml(p.coverSrcset?.['480'] || (/^(https?:\/\/|\/)/.test(p.cover) ? p.cover : '/api/media/file/' + encodeURIComponent(p.slug) + '/' + encodeURIComponent(p.cover)))}" alt="${escHtml(p.title || p.slug)}" loading="lazy" onerror="this.closest('.admin-card-cover').classList.add('admin-card-cover-empty');this.style.display='none'" /></div>`
+        cover.has
+          ? `<div class="admin-card-cover"${cover.lqip ? ` style="background-image:url('${escHtml(cover.lqip)}')"` : ''}><i class="ri-article-line admin-card-cover-fallback" aria-hidden="true"></i><img src="${escHtml(cover.src)}" alt="${escHtml(p.title || p.slug)}" loading="lazy" decoding="async" onerror="this.remove()" /></div>`
           : '<div class="admin-card-cover admin-card-cover-empty"><i class="ri-article-line" style="font-size:30px;color:var(--color-text-tertiary)"></i></div>'
       }
       <div class="admin-card-body">
@@ -203,44 +235,78 @@ window.switchPostsView = (view, silent) => {
   if (c) window.filterPostsByCat(c);
 };
 
-window.filterPosts = (query) => {
-  const q = query.toLowerCase();
-  const cat = document.getElementById('post-cat-filter')?.value || '';
-  let count = 0;
-  document.querySelectorAll('#posts-table tbody tr, .admin-post-card').forEach((el) => {
-    const show =
-      (!q || (el.dataset.search || '').includes(q)) &&
-      (!cat || el.dataset.cat === cat || el.dataset.cat?.startsWith(cat + '/'));
-    el.style.display = show ? '' : 'none';
-    if (show) count++;
+function filteredPosts() {
+  return filterPostList(state.posts, {
+    query: document.getElementById('post-search')?.value || '',
+    category: document.getElementById('post-cat-filter')?.value || '',
+    sort: document.getElementById('post-sort')?.value || 'newest',
+    stats: state.postStats,
   });
-  const mc = document.getElementById('post-match-count');
-  if (mc) mc.textContent = q || cat ? t('posts.matchCount', { count: count / 2 }) : '';
-};
+}
 
-window.filterPostsByCat = () => {
-  window.filterPosts(document.getElementById('post-search')?.value || '');
-};
-
-window.debouncedFilterPosts = debounce((v) => window.filterPosts(v), 200);
-
-window.loadMorePosts = () => {
-  renderedCount = Math.min(state.posts.length, renderedCount + CHUNK);
+function renderPostsList({ reset = true } = {}) {
   const tableBody = document.querySelector('#posts-table tbody');
   const grid = document.querySelector('#posts-cards-view .admin-card-grid');
-  const more = state.posts.slice(renderedCount - CHUNK, renderedCount);
-  if (tableBody) tableBody.innerHTML += more.map(rowHtml).join('');
-  if (grid) grid.innerHTML += more.map(cardHtml).join('');
+  if (!tableBody || !grid) return;
+  const list = filteredPosts();
+  if (reset) renderedCount = Math.min(CHUNK, list.length);
+  const visible = list.slice(0, renderedCount);
+  tableBody.innerHTML = visible.map(rowHtml).join('');
+  grid.innerHTML = visible.map(cardHtml).join('');
+
   const q = document.getElementById('post-search')?.value || '';
-  if (q) window.filterPosts(q);
-  const wrap = document.querySelector('.load-more-wrap');
-  if (wrap) {
-    const remaining = state.posts.length - renderedCount;
-    wrap.innerHTML =
+  const cat = document.getElementById('post-cat-filter')?.value || '';
+  const count = document.getElementById('post-match-count');
+  if (count) count.textContent = q || cat ? t('posts.matchCount', { count: list.length }) : '';
+
+  const empty = document.getElementById('posts-empty');
+  const tableView = document.getElementById('posts-table-view');
+  const cardsView = document.getElementById('posts-cards-view');
+  const loadMore = document.getElementById('posts-load-more');
+  if (empty) {
+    if (!list.length) {
+      empty.hidden = false;
+      empty.innerHTML = emptyState(
+        'ri-search-line',
+        t('posts.noMatchTitle'),
+        t('posts.noMatchDesc'),
+        `<button class="btn btn-secondary" onclick="clearPostFilters()"><i class="ri-close-line"></i> ${t('posts.clearFilters')}</button>`,
+      );
+      if (tableView) tableView.hidden = true;
+      if (cardsView) cardsView.hidden = true;
+    } else {
+      empty.hidden = true;
+      empty.innerHTML = '';
+      if (tableView) tableView.hidden = false;
+      if (cardsView) cardsView.hidden = false;
+    }
+  }
+  if (loadMore) {
+    const remaining = list.length - renderedCount;
+    loadMore.innerHTML =
       remaining > 0
         ? `<button class="btn btn-secondary" onclick="loadMorePosts()"><i class="ri-arrow-down-line"></i> ${t('common.loadMore')} (${remaining})</button>`
         : '';
   }
+}
+
+window.renderPostsList = renderPostsList;
+window.filterPosts = () => renderPostsList();
+window.filterPostsByCat = () => renderPostsList();
+window.sortPosts = () => renderPostsList();
+window.clearPostFilters = () => {
+  const search = document.getElementById('post-search');
+  const cat = document.getElementById('post-cat-filter');
+  if (search) search.value = '';
+  if (cat) cat.value = '';
+  renderPostsList();
+};
+window.debouncedFilterPosts = debounce(() => renderPostsList(), 200);
+
+window.loadMorePosts = () => {
+  const list = filteredPosts();
+  renderedCount = Math.min(list.length, renderedCount + CHUNK);
+  renderPostsList({ reset: false });
 };
 
 window.doDeletePost = (slug) => {

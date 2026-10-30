@@ -5,6 +5,7 @@
 import { trash as trashApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { escHtml, toast, modalConfirm, emptyState } from './ui.js?v=1';
+import { jsStr } from './escape.js';
 
 export default async function renderTrash() {
   let items = [];
@@ -23,8 +24,8 @@ export default async function renderTrash() {
             <div style="padding:10px 16px;border-bottom:1px solid var(--color-border-light);display:flex;justify-content:space-between;align-items:center;gap:10px">
               <span style="font-size:var(--font-size-sm);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(item.title || item.dir || '')}</span>
               <div style="display:flex;gap:6px;flex-shrink:0">
-                <button class="btn btn-secondary btn-sm" onclick="doRestoreTrash('${escHtml(item.dir)}')"><i class="ri-arrow-go-back-line"></i> ${t('trash.restore')}</button>
-                <button class="btn btn-danger btn-sm" onclick="doPermanentDelete('${escHtml(item.dir)}')"><i class="ri-delete-bin-line"></i> ${t('trash.permDelete')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="doRestoreTrash(${jsStr(item.dir)})"><i class="ri-arrow-go-back-line"></i> ${t('trash.restore')}</button>
+                <button class="btn btn-danger btn-sm" onclick="doPermanentDelete(${jsStr(item.dir)})"><i class="ri-delete-bin-line"></i> ${t('trash.permDelete')}</button>
               </div>
             </div>`,
                 )
