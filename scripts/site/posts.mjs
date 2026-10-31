@@ -69,6 +69,7 @@ export function readPosts(context, manifest) {
             .slice(0, 200)
             .trim(),
         videoMode,
+        media: data.media || null,
         cover,
         coverLqip,
         coverAspect,

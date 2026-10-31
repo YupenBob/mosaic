@@ -7,6 +7,7 @@ import {
   readPreviewDraft,
   servePreview,
 } from '../services/preview.js';
+import { verifyPipelineSignature } from '../services/pipeline-signature.js';
 
 export function registerPreviewPublic(app) {
   // Short-lived, unguessable preview site served straight from R2.
@@ -17,20 +18,23 @@ export function registerPreviewPublic(app) {
     return servePreview(c, token, c.req.path.slice(prefix.length));
   });
 
-  // Workflow-only endpoints, authenticated by the build token.
+  // Workflow-only endpoints, authenticated by a pipeline HMAC signature. The
+  // workflow never receives a standalone build token.
   app.post('/api/preview-build/draft', async (c) => {
     try {
-      const body = await c.req.json().catch(() => ({}));
-      return c.json(await readPreviewDraft(c, body.token));
+      const raw = await c.req.text();
+      if (!(await verifyPipelineSignature(c, raw))) return c.json({ error: 'Invalid pipeline signature' }, 401);
+      return c.json(await readPreviewDraft(c, JSON.parse(raw)));
     } catch (error) {
       return c.json({ error: error.message }, error.status || 401);
     }
   });
 
   app.post('/api/preview-build/done', async (c) => {
-    const token = (c.req.header('Authorization') || '').replace(/^Bearer\s+/i, '');
     try {
-      return c.json(await finishPreview(c, token, await c.req.json().catch(() => ({}))));
+      const raw = await c.req.text();
+      if (!(await verifyPipelineSignature(c, raw))) return c.json({ error: 'Invalid pipeline signature' }, 401);
+      return c.json(await finishPreview(c, JSON.parse(raw)));
     } catch (error) {
       return c.json({ error: error.message }, error.status || 401);
     }

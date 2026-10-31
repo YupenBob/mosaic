@@ -167,6 +167,7 @@ npx prettier --check <changed files>   # passed
 - [视频增强](../video-enhance.md)
 - [主题包开发](../themes.md)
 - [版本历史](../history.md)
+- [Media v2 迁移 Workflow](../migrate-v2-workflow.md)
 
 ## 最终验证命令
 
@@ -208,3 +209,9 @@ SITE_THEME_PACKAGE=starter npm run build
 - 孤儿清理跳过 `assets/` 命名空间；保护 v2 `source.key` 与 `previousPublished`。
 - 迁移统一字符串 generation、重映射 processed key、补齐 legacy cover source 并先校验。
 - purge 清理 DO 旧行；回滚仅在跨 generation 时保存上一代；asset-id 封面；预览拉取 media manifest；modal 标题转义；草稿 CAS。
+
+## Round 8 补充
+
+- 预览 build token 移除：Actions 内用 `PIPELINE_SECRET` 签名；workflow 不再接收 token。
+- 新增 `migrate-v2.yml`：dry-run/apply 两段，R2 凭据只在 Actions。
+- 素材删除返回引用文章数；API 对在用素材返回 409，后台确认后 force 软删。

@@ -15,6 +15,8 @@ import {
   abortMultipartUpload,
 } from '../r2.js';
 import { jobsRequest } from '../services/jobs.js';
+import { listPosts } from '../services/content.js';
+import { buildAssetUsage } from '../../../shared/media-v2.mjs';
 
 function assetIdParam(c) {
   const id = c.req.param('id');
@@ -102,6 +104,13 @@ export function registerAssets(app) {
         folder: c.req.query('folder') || '',
         includeDeleted: c.req.query('includeDeleted') === '1',
       });
+      try {
+        const posts = await listPosts(c);
+        const usage = buildAssetUsage(posts.map((post) => ({ slug: post.slug, media: post.media }))).assets;
+        for (const asset of result.assets || []) asset.usage = usage[asset.id] || [];
+      } catch {
+        /* usage is advisory; listing still works if Git is temporarily unavailable */
+      }
       return c.json(result);
     } catch (error) {
       return c.json({ error: error.message, code: 'JOBS_ERROR' }, 503);
@@ -144,6 +153,15 @@ export function registerAssets(app) {
     const id = assetIdParam(c);
     if (!id) return c.json({ error: 'Invalid asset id', code: 'INVALID_PARAMS' }, 400);
     try {
+      if (c.req.query('force') !== '1') {
+        const posts = await listPosts(c).catch(() => []);
+        const usage = buildAssetUsage(posts.map((post) => ({ slug: post.slug, media: post.media }))).assets[id] || [];
+        if (usage.length)
+          return c.json(
+            { error: 'Asset is used by posts', code: 'IN_USE', usage: [...new Set(usage.map((entry) => entry.slug))] },
+            409,
+          );
+      }
       // Soft delete first: objects stay for the grace period and can be restored.
       const result = await jobsRequest(c.env, 'delete-assets', { ids: [id] });
       return c.json({ ...result, assetId: id });

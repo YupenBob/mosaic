@@ -4,8 +4,8 @@
  *
  * Two tokens exist:
  * - access token (`PREVIEW_SECRET`): readable by the browser, 24h by default.
- * - build token (`PIPELINE_SECRET`): passed to the workflow once so it can read
- *   the draft and report completion without an admin session.
+ * - pipeline HMAC (`PIPELINE_SECRET`): computed inside Actions to read the
+ *   draft and report completion; no standalone build token is passed around.
  */
 import { getConfig } from './site-config.js';
 import { dispatchWorkflow } from './workflows.js';
@@ -130,10 +130,6 @@ export async function createPreview(c, draftId) {
   await c.env.MEDIA.put(`previews/${previewId}/meta.json`, JSON.stringify(meta), {
     httpMetadata: { contentType: 'application/json', cacheControl: 'no-store' },
   });
-  const buildToken = await signPreviewToken(
-    { p: previewId, d: draftId, exp: now + 3600000 },
-    c.env.PIPELINE_SECRET || c.env.PREVIEW_SECRET,
-  );
   try {
     await dispatchWorkflow(
       c,
@@ -142,7 +138,6 @@ export async function createPreview(c, draftId) {
         preview_id: previewId,
         draft_id: draftId,
         api_base: new URL(c.req.url).origin,
-        build_token: buildToken,
       },
       config,
     );
@@ -188,22 +183,27 @@ export async function servePreview(c, token, requestPath) {
   });
 }
 
-export async function readPreviewDraft(c, token) {
-  const payload = await verifyPreviewToken(token, c.env.PIPELINE_SECRET || c.env.PREVIEW_SECRET);
-  if (!payload?.d || !payload?.p) throw Object.assign(new Error('Invalid build token'), { status: 401 });
-  const draft = await getDraft(c, payload.d);
-  return { draft, previewId: payload.p, expiresAt: payload.exp };
+export async function readPreviewDraft(c, { previewId, draftId } = {}) {
+  if (!/^prv_[a-z0-9]{26}$/.test(previewId || '') || !draftId)
+    throw Object.assign(new Error('Invalid preview build request'), { status: 400 });
+  const metaObject = await c.env.MEDIA.get(`previews/${previewId}/meta.json`);
+  if (!metaObject) throw Object.assign(new Error('Preview not found'), { status: 404 });
+  const meta = JSON.parse(await metaObject.text());
+  if (meta.draftId !== draftId)
+    throw Object.assign(new Error('Draft does not belong to this preview'), { status: 403 });
+  const draft = await getDraft(c, draftId);
+  return { draft, previewId, expiresAt: meta.expiresAt };
 }
 
-export async function finishPreview(c, token, body = {}) {
-  const payload = await verifyPreviewToken(token, c.env.PIPELINE_SECRET || c.env.PREVIEW_SECRET);
-  if (!payload?.p) throw Object.assign(new Error('Invalid build token'), { status: 401 });
-  const key = `previews/${payload.p}/meta.json`;
+export async function finishPreview(c, { previewId, ok = true, error = '' } = {}) {
+  if (!/^prv_[a-z0-9]{26}$/.test(previewId || ''))
+    throw Object.assign(new Error('Invalid preview id'), { status: 400 });
+  const key = `previews/${previewId}/meta.json`;
   const object = await c.env.MEDIA.get(key);
   if (!object) throw Object.assign(new Error('Preview not found'), { status: 404 });
   const meta = JSON.parse(await object.text());
-  meta.status = body.ok === false ? 'failed' : 'ready';
-  meta.error = body.ok === false ? String(body.error || 'Preview build failed') : '';
+  meta.status = ok === false ? 'failed' : 'ready';
+  meta.error = ok === false ? String(error || 'Preview build failed') : '';
   meta.completedAt = new Date().toISOString();
   await c.env.MEDIA.put(key, JSON.stringify(meta), {
     httpMetadata: { contentType: 'application/json', cacheControl: 'no-store' },

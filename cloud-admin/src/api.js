@@ -225,7 +225,8 @@ export const assets = {
   multipartAbort: (id, data) =>
     apiFetch(`/assets/${encodeURIComponent(id)}/multipart/abort`, { method: 'POST', body: JSON.stringify(data) }),
 
-  delete: (id) => apiFetch(`/assets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  delete: (id, force = false) =>
+    apiFetch(`/assets/${encodeURIComponent(id)}${force ? '?force=1' : ''}`, { method: 'DELETE' }),
   restore: (id) => apiFetch(`/assets/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
   rollback: (id) => apiFetch(`/assets/${encodeURIComponent(id)}/rollback`, { method: 'POST' }),
   purge: () => apiFetch('/assets/purge', { method: 'DELETE' }),

@@ -1,0 +1,64 @@
+name: Mosaic Media v2 Migration
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Plan only or apply
+        required: true
+        default: dry-run
+        type: choice
+        options: [dry-run, apply]
+      confirm:
+        description: Type media-v2 to apply
+        required: false
+        default: ''
+        type: string
+concurrency:
+  group: mosaic-media-v2-migration
+  cancel-in-progress: false
+jobs:
+  migrate:
+    runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      API_TARGET: ${{ vars.API_TARGET }}
+      PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPO: ${{ github.repository }}
+      SITE_BRANCH: ${{ vars.SITE_BRANCH || 'main' }}
+      R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+      R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version-file: '.nvmrc', cache: npm }
+      - name: Install dependencies
+        run: npm ci
+      - name: Read deployment configuration
+        run: node scripts/deployment-env.mjs
+      - name: Dry run plan
+        if: inputs.mode == 'dry-run'
+        run: node scripts/media/migrate-v2.mjs --write-plan
+      - name: Apply migration
+        if: inputs.mode == 'apply'
+        env:
+          MIGRATION_CONFIRM: media-v2
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "media-v2" ]; then
+            echo "::error::Set confirm=media-v2 to apply the migration"
+            exit 1
+          fi
+          node scripts/media/migrate-v2.mjs --apply
+      - name: Upload migration plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-v2-plan
+          path: .mosaic/media-v2-plan.json
+          if-no-files-found: ignore

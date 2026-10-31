@@ -14,10 +14,6 @@ on:
         description: Worker API origin
         required: true
         type: string
-      build_token:
-        description: Short-lived preview build token
-        required: true
-        type: string
       timeout_minutes:
         description: Preview job timeout
         default: '30'
@@ -32,7 +28,7 @@ jobs:
     permissions: { contents: read }
     env:
       API_BASE: ${{ inputs.api_base }}
-      BUILD_TOKEN: ${{ inputs.build_token }}
+      PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
       PREVIEW_ID: ${{ inputs.preview_id }}
       DRAFT_ID: ${{ inputs.draft_id }}
       R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
@@ -53,8 +49,7 @@ jobs:
         run: node scripts/preview/fetch-manifest.mjs
       - name: Fetch cloud draft
         run: |
-          curl --fail-with-body -sS -X POST -H "Accept: application/json" -H "Content-Type: application/json" \
-            -d "{\"token\":\"$BUILD_TOKEN\"}" "$API_BASE/api/preview-build/draft" -o "$RUNNER_TEMP/draft.json"
+          node scripts/preview/call.mjs draft
           node scripts/preview/write-draft.mjs "$RUNNER_TEMP/draft.json"
       - name: Generate preview
         run: npm run build
@@ -62,13 +57,7 @@ jobs:
         run: node scripts/preview/upload.mjs dist
       - name: Report success
         if: success()
-        run: |
-          curl --fail-with-body -sS -X POST "$API_BASE/api/preview-build/done" \
-            -H "Authorization: Bearer $BUILD_TOKEN" -H "Content-Type: application/json" \
-            -d '{"ok":true}'
+        run: PREVIEW_OK=true node scripts/preview/call.mjs done
       - name: Report failure
         if: failure()
-        run: |
-          curl -sS -X POST "$API_BASE/api/preview-build/done" \
-            -H "Authorization: Bearer $BUILD_TOKEN" -H "Content-Type: application/json" \
-            -d '{"ok":false,"error":"Preview workflow failed"}' || true
+        run: PREVIEW_OK=false PREVIEW_ERROR="Preview workflow failed" node scripts/preview/call.mjs done || true

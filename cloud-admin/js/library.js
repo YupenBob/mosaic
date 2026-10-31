@@ -105,8 +105,12 @@ function openAssetDetail(asset, onChanged) {
       closeOnClick: false,
       onClick: () => {
         closeModal();
-        modalConfirm(t('library.deleteTitle', { name: asset.filename }), t('library.deleteDesc'), async () => {
-          await assets.delete(asset.id);
+        const related = new Set((asset.usage || []).map((entry) => entry.slug)).size;
+        const desc = related
+          ? t('library.deleteInUse', { n: related }) + ' ' + t('library.deleteDesc')
+          : t('library.deleteDesc');
+        modalConfirm(t('library.deleteTitle', { name: asset.filename }), desc, async () => {
+          await assets.delete(asset.id, true);
           toast(t('library.deletedToast'), 'success');
           onChanged();
         });

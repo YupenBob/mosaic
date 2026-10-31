@@ -6,7 +6,7 @@
 
 1. 编辑器保存云草稿（R2 `drafts/<id>/current.json`）。
 2. `POST /api/previews`（管理员会话）创建 `prv_...`，写 `previews/<id>/meta.json`，派发 `preview.yml`。
-3. Actions 用一次性 build token 读取草稿，写入内容目录，执行 `npm run build`。
+3. Actions 用 `PIPELINE_SECRET` 对草稿读取请求签名，写入内容目录，执行 `npm run build`。
 4. Actions 把 `dist/` 上传到 `previews/<id>/`，回调 `/api/preview-build/done`。
 5. 编辑器轮询 `/api/previews/<id>`，完成后给出「打开预览」。
 6. 浏览器访问 `/api/preview/<access-token>/`；token 默认 24 小时过期。
@@ -14,7 +14,7 @@
 ## 密钥
 
 - `PREVIEW_SECRET`：签名预览访问 token，Worker secret。
-- `PIPELINE_SECRET`：签名一次性 build token，Worker 与 Actions 共享。
+- `PIPELINE_SECRET`：Actions 内签名草稿读取/完成回调；不作为 workflow 输入暴露。
 - `R2_ACCESS_KEY` / `R2_SECRET_KEY` / `R2_ENDPOINT` / `R2_BUCKET`：Actions 上传预览产物。
 - `API_TARGET` / `vars.API_TARGET`：Worker 公网地址，用于 Actions 回调。
 
@@ -22,8 +22,9 @@
 
 - 预览 token 只存在 URL，`X-Robots-Tag: noindex, nofollow`，`Cache-Control: no-store`。
 - 预览对象在 R2 `previews/<id>/`，不会进入生产构建路径。
-- build token 1 小时有效，只能读取指定草稿、更新指定预览状态。
+- 草稿读取/回调只接受当前时间窗口内的 HMAC 签名，不能脱离 `PIPELINE_SECRET` 重放。
 - 预览构建不写回 Git，不触发生产部署。
+- 工作流输入不再包含任何 build token。
 
 ## 限制
 

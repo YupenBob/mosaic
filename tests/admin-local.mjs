@@ -208,6 +208,7 @@ try {
             folder: 'photos',
             status: 'ready',
             published: true,
+            usage: [{ slug: 'fixture', kind: 'published', role: 'gallery', order: 0 }],
           },
           {
             id: 'ast_0123456789abcdefghjkmnpr',
@@ -263,7 +264,13 @@ try {
   await page.locator('.asset-card').first().click();
   await page.locator('.asset-detail').waitFor();
   assert.ok((await page.locator('.asset-detail').innerText()).includes('library-photo.jpg'), 'asset detail opens');
-  await page.locator('.modal-overlay .btn-secondary').first().click();
+  await page.locator('.modal-overlay .btn-danger').click();
+  await page.locator('#modal-confirm-input, .modal-desc').first().waitFor();
+  assert.ok(
+    (await page.locator('.modal-overlay').last().innerText()).includes('正被 1 篇文章使用'),
+    'delete confirmation names the referencing post',
+  );
+  await page.locator('.modal-overlay .btn-secondary').last().click();
 
   await page.evaluate(() => {
     location.hash = 'history';

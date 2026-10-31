@@ -68,6 +68,7 @@ export const I18N = {
       delete: '删除素材',
       deleteTitle: '删除「{name}」？',
       deleteDesc: '素材会进入 7 天待删除区，期间可以恢复；到期后才会真正清理。',
+      deleteInUse: '这个素材正被 {n} 篇文章使用，删除后这些文章会缺图。',
       deletedToast: '已移入待删除区',
       lifecycle: {
         processing: '处理中',
@@ -915,6 +916,7 @@ export const I18N = {
       delete: 'Delete asset',
       deleteTitle: 'Delete "{name}"?',
       deleteDesc: 'The asset moves to a 7-day pending-delete area and can be restored; it is purged after that.',
+      deleteInUse: 'This asset is used by {n} posts; deleting it will leave missing images there.',
       deletedToast: 'Moved to pending delete',
       lifecycle: {
         processing: 'Processing',
