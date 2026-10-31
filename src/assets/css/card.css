@@ -97,9 +97,13 @@
     box-shadow 460ms ease;
 }
 
-.post-card:hover {
-  transform: translateY(-7px) scale(1.012);
-  box-shadow: var(--shadow-lg);
+/* Lift only on devices that can actually hover: on touch screens `:hover`
+   sticks after a tap and leaves the tapped card floating under the modal. */
+@media (hover: hover) and (pointer: fine) {
+  .post-card:hover {
+    transform: translateY(-7px) scale(1.012);
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 .post-card:focus-visible {
@@ -140,8 +144,10 @@
   filter: none;
 }
 
-.post-card:hover .post-card-img {
-  transform: scale(1.05);
+@media (hover: hover) and (pointer: fine) {
+  .post-card:hover .post-card-img {
+    transform: scale(1.05);
+  }
 }
 
 /* Bottom scrim: darkest where the text sits, light at the top for the chip. */
@@ -269,6 +275,9 @@
  * positioned media layer behind the text. */
 .post-card--text {
   min-height: 208px;
+  /* Solid fallback first: browsers without color-mix() keep a clean surface
+     instead of dropping the whole declaration and going transparent. */
+  background: var(--color-surface);
   background:
     radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--color-accent) 22%, transparent) 0%, transparent 58%),
     linear-gradient(
@@ -285,6 +294,7 @@
   position: absolute;
   inset: 0;
   aspect-ratio: auto;
+  background: transparent;
   background:
     radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 70%),
     transparent;
@@ -302,6 +312,7 @@
 }
 
 .post-card--text .post-card-category {
+  background: var(--color-tag-bg);
   background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
   color: var(--color-accent-text);
   backdrop-filter: none;

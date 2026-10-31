@@ -46,6 +46,8 @@ const accentOptions = [
         root.setAttribute('data-theme', dark ? 'dark' : 'light');
         root.setAttribute('data-theme-mode', mode === 'light' || mode === 'dark' ? mode : 'auto');
         root.setAttribute('data-accent', accent || 'blue');
+        var themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) themeColor.setAttribute('content', dark ? '#1c1c1e' : '#f5f5f7');
       } catch (e) {}
     })();
   </script>

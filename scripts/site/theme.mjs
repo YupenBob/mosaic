@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_THEME,
   THEME_LAYOUTS,
@@ -17,7 +18,12 @@ export function resolveTheme(context) {
   const id = context.config.themePackage || DEFAULT_THEME;
   if (!THEME_ID_RE.test(id)) throw new Error('Invalid themePackage');
   const dir = path.join(context.root, 'themes', id);
-  const manifestPath = path.join(dir, 'theme.json');
+  const bundledDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../themes', id);
+  const manifestPath = fs.existsSync(path.join(dir, 'theme.json'))
+    ? path.join(dir, 'theme.json')
+    : id === DEFAULT_THEME && fs.existsSync(path.join(bundledDir, 'theme.json'))
+      ? path.join(bundledDir, 'theme.json')
+      : path.join(dir, 'theme.json');
   if (!fs.existsSync(manifestPath)) throw new Error(`Theme not found: ${id}`);
   const manifest = validateThemeManifest(JSON.parse(fs.readFileSync(manifestPath, 'utf8')), id);
   const options = validateThemeOptions(manifest, context.config.themeOptions || {});

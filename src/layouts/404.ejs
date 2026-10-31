@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="data-base" content="<%= rp %>data" />
+  <meta name="theme-color" content="#f5f5f7" />
   <title>404 - <%= site.title %></title>
   <script>
     /* Apply the pinned theme + accent before first paint (no flash of wrong theme).
@@ -21,6 +22,8 @@
         root.setAttribute('data-theme', dark ? 'dark' : 'light');
         root.setAttribute('data-theme-mode', mode === 'light' || mode === 'dark' ? mode : 'auto');
         root.setAttribute('data-accent', accent || 'blue');
+        var themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) themeColor.setAttribute('content', dark ? '#1c1c1e' : '#f5f5f7');
       } catch (e) {}
     })();
   </script>

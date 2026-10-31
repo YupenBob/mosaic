@@ -3,6 +3,7 @@
   "theme_light": { "zh-CN": "切换到亮色模式", "en": "Switch to light mode" },
   "theme_dark": { "zh-CN": "切换到暗色模式", "en": "Switch to dark mode" },
   "search_placeholder": { "zh-CN": "搜索...", "en": "Search..." },
+  "search_results_label": { "zh-CN": "搜索结果", "en": "Search results" },
   "categories_label": { "zh-CN": "分类", "en": "Categories" },
   "tags_label": { "zh-CN": "标签", "en": "Tags" },
   "no_posts": { "zh-CN": "还没有帖子。", "en": "No posts yet." },

@@ -372,6 +372,7 @@
 .video-container:fullscreen video {
   max-height: none;
   height: calc(100vh - 44px);
+  height: calc(100dvh - 44px);
 }
 
 /* === Page-level Playlist Panel === */
@@ -393,6 +394,7 @@
   box-shadow: var(--shadow-md);
   overflow: hidden;
   max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px);
   display: flex;
   flex-direction: column;
   margin-left: var(--space-3);

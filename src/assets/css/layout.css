@@ -12,6 +12,9 @@
   top: 0;
   z-index: var(--z-header);
   height: var(--header-height);
+  /* Solid fallback for engines without color-mix(); the translucent tint is
+     only a refinement on top of the blur. */
+  background: var(--color-surface);
   background: color-mix(in srgb, var(--color-surface) 80%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);

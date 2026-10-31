@@ -1,4 +1,4 @@
-﻿/* === Note modal (Xiaohongshu-style, no page navigation) ==================== */
+/* === Note modal (Xiaohongshu-style, no page navigation) ==================== */
 /* Owned by overlay-feed. Uses only existing design tokens + new overlay vars. */
 
 html.overlay-scroll-locked {
@@ -22,6 +22,8 @@ dialog.note-modal {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Stop wheel/touch momentum from chaining to the page behind the dialog. */
+  overscroll-behavior: contain;
 }
 
 dialog.note-modal:not([open]) {

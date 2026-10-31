@@ -101,6 +101,8 @@
   transition: opacity var(--transition-normal);
   user-select: none;
   -webkit-user-select: none;
+  /* Keep trackpad/wheel momentum from scrolling the page behind the viewer. */
+  overscroll-behavior: contain;
 }
 
 .gallery-overlay.open {
@@ -235,6 +237,7 @@
 .gallery-current-image {
   max-width: 90vw;
   max-height: calc(100vh - 48px - 90px);
+  max-height: calc(100dvh - 48px - 90px);
   object-fit: contain;
   transition: opacity var(--transition-fast);
   cursor: pointer;
@@ -376,5 +379,6 @@
   .gallery-current-image {
     max-width: 95vw;
     max-height: calc(100vh - 42px - 72px);
+    max-height: calc(100dvh - 42px - 72px);
   }
 }
