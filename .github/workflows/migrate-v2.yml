@@ -72,6 +72,7 @@ jobs:
         run: |
           mkdir -p docs
           cp .mosaic/media-v2-plan.json docs/media-v2-plan.json
+          npx prettier --write docs/media-v2-plan.json
           git config user.name "mosaic-migration[bot]"
           git config user.email "mosaic-migration@users.noreply.github.com"
           git add docs/media-v2-plan.json
