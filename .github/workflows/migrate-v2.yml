@@ -26,6 +26,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+      actions: write
     env:
       API_TARGET: ${{ vars.API_TARGET }}
       PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
@@ -88,6 +89,16 @@ jobs:
             exit 1
           fi
           node scripts/media/migrate-v2.mjs --apply
+      - name: Trigger site build
+        if: steps.mode.outputs.mode == 'apply'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPO/actions/workflows/pipeline.yml/dispatches" \
+            -d '{"ref":"main"}'
       - name: Upload migration plan
         if: always()
         uses: actions/upload-artifact@v4
