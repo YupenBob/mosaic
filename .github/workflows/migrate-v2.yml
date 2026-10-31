@@ -13,6 +13,10 @@ on:
         required: false
         default: ''
         type: string
+  push:
+    paths:
+      - .github/migrate-v2/plan
+      - .github/migrate-v2/apply
 concurrency:
   group: mosaic-media-v2-migration
   cancel-in-progress: false
@@ -41,14 +45,43 @@ jobs:
         run: npm ci
       - name: Read deployment configuration
         run: node scripts/deployment-env.mjs
+      - name: Resolve migration mode
+        id: mode
+        env:
+          DISPATCH_MODE: ${{ inputs.mode }}
+          DISPATCH_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="$DISPATCH_MODE"
+            CONFIRM="$DISPATCH_CONFIRM"
+          elif [ -f .github/migrate-v2/apply ]; then
+            MODE=apply
+            CONFIRM="$(tr -d '[:space:]' < .github/migrate-v2/apply)"
+          else
+            MODE=dry-run
+            CONFIRM=""
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "confirm=$CONFIRM" >> "$GITHUB_OUTPUT"
       - name: Dry run plan
-        if: inputs.mode == 'dry-run'
+        if: steps.mode.outputs.mode == 'dry-run'
         run: node scripts/media/migrate-v2.mjs --write-plan
+      - name: Commit dry-run plan
+        if: steps.mode.outputs.mode == 'dry-run' && github.event_name == 'push'
+        run: |
+          mkdir -p docs
+          cp .mosaic/media-v2-plan.json docs/media-v2-plan.json
+          git config user.name "mosaic-migration[bot]"
+          git config user.email "mosaic-migration@users.noreply.github.com"
+          git add docs/media-v2-plan.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore(migration): record Media v2 plan"
+          git push
       - name: Apply migration
-        if: inputs.mode == 'apply'
+        if: steps.mode.outputs.mode == 'apply'
         env:
           MIGRATION_CONFIRM: media-v2
-          CONFIRM: ${{ inputs.confirm }}
+          CONFIRM: ${{ steps.mode.outputs.confirm }}
         run: |
           if [ "$CONFIRM" != "media-v2" ]; then
             echo "::error::Set confirm=media-v2 to apply the migration"
