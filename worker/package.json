@@ -13,7 +13,7 @@
     "@aws-sdk/s3-request-presigner": "^3.500.0",
     "aws4fetch": "^1.0.20",
     "hono": "^4.0.0",
-    "jose": "^5.2.0"
+    "jose": "^6.2.13"
   },
   "devDependencies": {
     "wrangler": "3.114.17"
