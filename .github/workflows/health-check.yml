@@ -1,25 +1,53 @@
 name: Production Health Check
 
+# Daily browser regression against production. Cheap, zero-dependency surface
+# probes run far more often in probe.yml; this workflow keeps the expensive
+# end-to-end browser path (real page load, real media requests) at one run a day.
 on:
   schedule:
-    - cron: '0 */6 * * *' # every 6 hours
+    - cron: '0 2 * * *' # daily, 02:00 UTC
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mosaic-health-check
+  cancel-in-progress: true
 
 jobs:
   health:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-node@v5
-        with: { node-version: '22', cache: npm }
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       - name: Install deps
         run: npm ci
 
-      - name: Install Playwright chromium
-        run: npx playwright install --with-deps chromium
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
-      - name: Run production checks
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Install Playwright chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Run production browser regression
         run: node tests/check-site.mjs

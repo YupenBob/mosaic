@@ -1,4 +1,7 @@
 name: Mosaic Preview
+
+# Dispatched by the Worker when a private preview (or its rebuild) is requested.
+# One preview per id; a newer run cancels the previous one.
 on:
   workflow_dispatch:
     inputs:
@@ -18,46 +21,76 @@ on:
         description: Preview job timeout
         default: '30'
         type: string
+
+permissions:
+  contents: read
+
 concurrency:
   group: mosaic-preview-${{ inputs.preview_id }}
   cancel-in-progress: true
+
 jobs:
   preview:
     runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: ${{ fromJSON(inputs.timeout_minutes || '30') }}
-    permissions: { contents: read }
+    # Non-secret inputs only; credentials are scoped to the steps that call the
+    # Worker or R2, never to `npm ci` or the site build.
     env:
       API_BASE: ${{ inputs.api_base }}
-      PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
       PREVIEW_ID: ${{ inputs.preview_id }}
       DRAFT_ID: ${{ inputs.draft_id }}
-      R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-      R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       R2_BUCKET: ${{ vars.R2_BUCKET }}
       SITE_BRANCH: ${{ vars.SITE_BRANCH }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with: { node-version-file: '.nvmrc', cache: npm }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
       - name: Install dependencies
         run: npm ci
       - name: Read deployment configuration
         run: node scripts/deployment-env.mjs
       - name: Fetch published media manifest
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/preview/fetch-manifest.mjs
       - name: Fetch cloud draft
+        env:
+          PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
         run: |
           node scripts/preview/call.mjs draft
           node scripts/preview/write-draft.mjs "$RUNNER_TEMP/draft.json"
       - name: Generate preview
         run: npm run build
       - name: Upload preview to R2
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/preview/upload.mjs dist
-      - name: Report success
-        if: success()
-        run: PREVIEW_OK=true node scripts/preview/call.mjs done
-      - name: Report failure
-        if: failure()
-        run: PREVIEW_OK=false PREVIEW_ERROR="Preview workflow failed" node scripts/preview/call.mjs done || true
+      # One terminal report for every outcome (success, failure, cancel).
+      - name: Report preview result
+        if: always()
+        env:
+          PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+          PREVIEW_OK: ${{ job.status == 'success' && 'true' || 'false' }}
+          PREVIEW_ERROR: ${{ job.status != 'success' && format('Preview workflow {0}', job.status) || '' }}
+        run: node scripts/preview/call.mjs done || true
+      # Failed/cancelled previews must not leave partially uploaded objects
+      # behind: remove previews/<id>/ before the next attempt rebuilds it.
+      - name: Clean up unfinished preview
+        if: cancelled() || failure()
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/preview/cleanup.mjs || true

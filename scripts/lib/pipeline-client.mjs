@@ -11,6 +11,9 @@ export function createPipelineClient({
     let error;
     for (let attempt = 0; attempt <= retries; attempt++) {
       const timestamp = String(Date.now());
+      // Fresh nonce per attempt: the Worker records it in the Jobs DO so a
+      // captured callback cannot be replayed inside the 5-minute window.
+      const nonce = crypto.randomBytes(16).toString('hex');
       try {
         const response = await fetch(`${target.replace(/\/+$/, '')}/api/internal/${operation}`, {
           method: 'POST',
@@ -18,7 +21,11 @@ export function createPipelineClient({
           headers: {
             'Content-Type': 'application/json',
             'X-Mosaic-Time': timestamp,
-            'X-Mosaic-Signature': crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex'),
+            'X-Mosaic-Nonce': nonce,
+            'X-Mosaic-Signature': crypto
+              .createHmac('sha256', secret)
+              .update(`${timestamp}.${nonce}.${raw}`)
+              .digest('hex'),
           },
           signal: AbortSignal.timeout(30000),
         });

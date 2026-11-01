@@ -1,5 +1,6 @@
 # Mosaic Cloud Admin — deployed to Cloudflare Pages
 name = "mosaic-admin"
+# Keep in sync with shared/deployment.mjs (verified by scripts/check-wrangler-config.mjs).
 compatibility_date = "2025-06-01"
 
 # Build output is just the static files in this directory

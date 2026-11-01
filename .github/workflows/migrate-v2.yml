@@ -1,4 +1,8 @@
 name: Mosaic Media v2 Migration
+
+# Dry-run planning and the one-shot apply. The apply path runs in the
+# `production` environment, re-runs the offline suite before touching data and
+# rewrites every post frontmatter in ONE commit (never a commit per post).
 on:
   workflow_dispatch:
     inputs:
@@ -17,31 +21,37 @@ on:
     paths:
       - .github/migrate-v2/plan
       - .github/migrate-v2/apply
+
+permissions:
+  contents: write
+  actions: write
+
 concurrency:
   group: mosaic-media-v2-migration
   cancel-in-progress: false
+
 jobs:
-  migrate:
+  plan:
     runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 60
-    permissions:
-      contents: write
-      actions: write
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
+      confirm: ${{ steps.mode.outputs.confirm }}
+    # Non-secret configuration only; the Worker signature secret is scoped to
+    # the planning step that reads the live media state.
     env:
       API_TARGET: ${{ vars.API_TARGET }}
-      PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_REPO: ${{ github.repository }}
       SITE_BRANCH: ${{ vars.SITE_BRANCH || 'main' }}
-      R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-      R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       R2_BUCKET: ${{ vars.R2_BUCKET }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with: { node-version-file: '.nvmrc', cache: npm }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
       - name: Install dependencies
         run: npm ci
       - name: Read deployment configuration
@@ -66,6 +76,12 @@ jobs:
           echo "confirm=$CONFIRM" >> "$GITHUB_OUTPUT"
       - name: Dry run plan
         if: steps.mode.outputs.mode == 'dry-run'
+        env:
+          PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/media/migrate-v2.mjs --write-plan
       - name: Commit dry-run plan
         if: steps.mode.outputs.mode == 'dry-run' && github.event_name == 'push'
@@ -79,11 +95,52 @@ jobs:
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore(migration): record Media v2 plan"
           git push
+      - name: Upload migration plan
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: media-v2-plan
+          path: .mosaic/media-v2-plan.json
+          if-no-files-found: ignore
+
+  apply:
+    needs: plan
+    if: needs.plan.outputs.mode == 'apply'
+    runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    environment: production
+    env:
+      API_TARGET: ${{ vars.API_TARGET }}
+      GITHUB_REPO: ${{ github.repository }}
+      SITE_BRANCH: ${{ vars.SITE_BRANCH || 'main' }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+      - name: Install dependencies
+        run: npm ci && npm ci --prefix worker
+      - name: Read deployment configuration
+        run: node scripts/deployment-env.mjs
+      # Never migrate on top of a broken build: the same offline suite the
+      # pipeline uses must pass before any R2 object or commit is written.
+      - name: Offline checks
+        run: npm run check
       - name: Apply migration
-        if: steps.mode.outputs.mode == 'apply'
         env:
           MIGRATION_CONFIRM: media-v2
-          CONFIRM: ${{ steps.mode.outputs.confirm }}
+          CONFIRM: ${{ needs.plan.outputs.confirm }}
+          PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ "$CONFIRM" != "media-v2" ]; then
             echo "::error::Set confirm=media-v2 to apply the migration"
@@ -91,7 +148,6 @@ jobs:
           fi
           node scripts/media/migrate-v2.mjs --apply
       - name: Trigger site build
-        if: steps.mode.outputs.mode == 'apply'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -99,11 +155,4 @@ jobs:
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$GITHUB_REPO/actions/workflows/pipeline.yml/dispatches" \
-            -d '{"ref":"main"}'
-      - name: Upload migration plan
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: media-v2-plan
-          path: .mosaic/media-v2-plan.json
-          if-no-files-found: ignore
+            -d "{\"ref\":\"$SITE_BRANCH\"}"

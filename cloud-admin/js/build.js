@@ -18,42 +18,42 @@ import {
 } from './ui.js?v=1';
 import { jsStr } from './escape.js';
 
-// Chinese labels for the known pipeline steps (GitHub returns English names)
+// Chinese labels for the real steps of the current workflows (GitHub returns
+// English step names). Pinned action references are normalized first, so a SHA
+// bump or a `v5` → `v6` update never invalidates the labels. Keep in sync with
+// .github/workflows/*.yml; tests/admin-build-labels.mjs enforces coverage and
+// rejects stale entries.
+function normalizeStepName(name) {
+  const pinned = /^(Post )?Run ([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@\S+$/.exec(name);
+  return pinned ? `${pinned[1] || ''}Run ${pinned[2]}` : name;
+}
+
 const STEP_LABELS_ZH = {
   'Set up job': '准备任务',
   'Complete job': '完成任务',
-  'Run actions/checkout@v4': '检出代码',
-  'Run actions/setup-node@v4': '安装 Node.js',
-  'Post Run actions/checkout@v4': '清理检出缓存',
-  'Post Run actions/setup-node@v4': '清理 Node 环境',
-  'Post Restore media checksums cache': '清理媒体校验缓存',
-  'Start build progress reporter': '启动构建进度上报',
-  'Progress — generate site': '阶段：生成站点',
-  'Progress — tests': '阶段：运行测试',
-  'Progress — upload': '阶段：上传媒体',
-  'Progress — deploy': '阶段：部署',
-  'Finish build progress': '结束构建进度上报',
-  Checkout: '检出代码',
-  'Setup Node': '安装 Node.js',
-  'Install tools': '安装工具（ffmpeg / rclone / exiftool）',
-  'Install deps': '安装依赖',
-  'Restore media checksums cache': '恢复媒体校验缓存',
-  'Sync media from R2': '同步 R2 原始媒体',
-  'Strip EXIF from originals': '剥离原图 EXIF（隐私）',
-  'Compress media': '压缩媒体（图片 / 视频 / 音频）',
-  'Save media checksums cache': '保存媒体校验缓存',
+  'Run actions/checkout': '检出代码',
+  'Post Run actions/checkout': '完成检出清理',
+  'Run actions/setup-node': '安装 Node.js',
+  'Post Run actions/setup-node': '清理 Node.js 环境',
+  'Post Run actions/cache': '保存依赖/浏览器缓存',
+  'Install dependencies': '安装依赖',
+  'Read deployment configuration': '读取部署配置',
+  'Acquire published media snapshot': '获取已发布媒体清单快照',
   'Generate site': '生成站点',
-  'Run tests': '运行测试',
-  'Upload to R2': '上传处理产物到 R2',
-  'Upload video media': '上传视频 HLS 流',
-  'Sync stripped originals back': '回传剥离 EXIF 的原图',
-  'Strip media from dist': '从构建产物移除媒体',
-  'Copy Functions to dist': '复制代理函数到产物',
+  'Offline checks': '离线检查（校验 / 单元测试）',
+  'Restore Playwright browsers': '恢复浏览器内核缓存',
+  'Install Playwright system dependencies': '安装浏览器系统依赖',
+  'Install Playwright browsers': '安装浏览器内核',
+  'Browser regression': '浏览器回归测试',
+  'Deploy progress': '上报部署进度',
   'Deploy to Cloudflare Pages': '部署到 Cloudflare Pages',
+  'Publish site data cache': '发布站点数据缓存',
+  'Acknowledge deployment': '确认部署结果',
 };
 
 function stepLabel(name) {
-  return localStorage.getItem('mosaic_admin_lang') === 'en' ? name : STEP_LABELS_ZH[name] || name;
+  if (localStorage.getItem('mosaic_admin_lang') === 'en') return name;
+  return STEP_LABELS_ZH[normalizeStepName(name)] || name;
 }
 
 let stepsDetailOpen = false;

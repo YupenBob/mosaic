@@ -1,0 +1,42 @@
+version: 2
+
+# Keep the CI runtime surface current: pinned action SHAs, the root generator
+# toolchain and the Worker runtime all get one grouped weekly PR each.
+updates:
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ['*']
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+    labels:
+      - dependencies
+      - node
+
+  - package-ecosystem: npm
+    directory: '/worker'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      worker-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+    labels:
+      - dependencies
+      - worker

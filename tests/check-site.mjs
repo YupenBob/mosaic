@@ -117,17 +117,45 @@ async function main() {
         let bad = 0;
         const badUrls = [];
         let mediaBaseUrls = 0;
+        const absoluteImages = [];
         for (let i = 0; i < imgCount; i++) {
           const src = await imgs.nth(i).getAttribute('src');
           if (!src || src.startsWith('data:')) continue;
           if (src.includes('/media/')) {
             bad++;
             badUrls.push(src.slice(0, 100));
-          } else if (src.startsWith(MEDIA) || src.startsWith('http')) mediaBaseUrls++;
+          } else if (src.startsWith(MEDIA) || src.startsWith('http')) {
+            mediaBaseUrls++;
+            if (/^https:/.test(src)) absoluteImages.push(src);
+          }
         }
         check('No local media/ paths', bad === 0, bad > 0 ? badUrls.join(', ') : `${imgCount} images`);
         if (!LOCAL) {
           check('Media served from R2/media domain', mediaBaseUrls > 0, `${mediaBaseUrls}/${imgCount} absolute URLs`);
+          // Real request assertion: the asset itself must load and carry CORS,
+          // not merely be referenced by the HTML.
+          const sample = [...new Set(absoluteImages)].slice(0, 3);
+          if (sample.length) {
+            for (const url of sample) {
+              try {
+                const response = await fetch(url, {
+                  headers: { Origin: SITE, 'User-Agent': 'Mosaic-Check-Site/1.0' },
+                  signal: AbortSignal.timeout(20000),
+                });
+                check(`Image 200 ${url.replace(MEDIA, '')}`, response.ok, `status=${response.status}`);
+                const cors = response.headers.get('access-control-allow-origin') || '';
+                check(
+                  `Image CORS ${url.replace(MEDIA, '')}`,
+                  cors === '*' || cors.includes(new URL(SITE).origin),
+                  cors || 'missing access-control-allow-origin',
+                );
+              } catch (e) {
+                check(`Image 200 ${url.replace(MEDIA, '')}`, false, e.message);
+              }
+            }
+          } else {
+            console.log('  (no absolute image URLs on the first post, skipping real request checks)');
+          }
         }
       } else {
         console.log('  (no posts, skipping media check)');
