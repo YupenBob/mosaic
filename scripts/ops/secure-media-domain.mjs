@@ -10,6 +10,11 @@
  * Usage:
  *   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ZONE_ID=... node scripts/ops/secure-media-domain.mjs --dry-run
  *   node scripts/ops/secure-media-domain.mjs --apply
+ *
+ * Rollout mode: by default a missing zone id / token, or a token without WAF
+ * permission, only reports DEGRADED and exits 0 so an automated release is not
+ * blocked by a Cloudflare-side prerequisite. Pass `--strict` (or
+ * WAF_STRICT=1) once the credentials exist so a WAF regression fails the job.
  */
 import { cloudflareJson, fatal, isApply, loadConfig, log, modeLabel, parseArgs } from './common.mjs';
 
@@ -19,6 +24,15 @@ const ALLOWED_PREFIXES = ['/processed/', '/originals/', '/site-data/favicon.'];
 
 const args = parseArgs();
 const apply = isApply(args);
+// Rollout switch: until the zone id and a WAF-capable token exist, the release
+// runs in degraded mode instead of failing after the Worker already shipped.
+const strict = args.flags.has('strict') || process.env.WAF_STRICT === '1';
+function degraded(reason) {
+  if (strict) fatal(reason, 1);
+  log(mode, `DEGRADED: ${reason}`);
+  log(mode, 'private prefixes (drafts/, previews/, site-data/ except favicon) stay public until this rule lands');
+  process.exit(0);
+}
 const mode = modeLabel(apply);
 const config = loadConfig().config;
 
@@ -52,10 +66,7 @@ const token = process.env.CLOUDFLARE_API_TOKEN;
 async function plan() {
   // Local dry-runs stay meaningful without credentials: show the desired rule.
   if (!zone || !token) {
-    if (apply)
-      fatal(
-        `${!zone ? 'CLOUDFLARE_ZONE_ID' : 'CLOUDFLARE_API_TOKEN'} is required to apply the WAF rule (set both for --apply)`,
-      );
+    if (apply) degraded(`${!zone ? 'CLOUDFLARE_ZONE_ID' : 'CLOUDFLARE_API_TOKEN'} is missing`);
     log(
       mode,
       `no ${!zone ? 'CLOUDFLARE_ZONE_ID' : 'CLOUDFLARE_API_TOKEN'}: showing the desired rule only, existing ruleset not merged`,
@@ -81,7 +92,7 @@ let planResult;
 try {
   planResult = await plan();
 } catch (error) {
-  fatal(`cannot read the zone WAF ruleset: ${error.message}`, 1);
+  degraded(`cannot read the zone WAF ruleset: ${error.message}`);
 }
 const { ruleset, merged, changed, unverified } = planResult;
 if (!changed) {
@@ -129,6 +140,6 @@ try {
     console.log(`Created zone WAF ruleset ${data?.result?.id} with ${merged.length} rule(s)`);
   }
 } catch (error) {
-  fatal(`WAF ruleset update failed: ${error.message}`, 1);
+  degraded(`WAF ruleset update failed: ${error.message}`);
 }
 log(mode, `media domain locked down; purging cached site-data URLs is handled by scripts/ops/purge-site-data.mjs`);

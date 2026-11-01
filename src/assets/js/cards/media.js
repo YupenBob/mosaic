@@ -67,6 +67,12 @@ export async function upgradeCardImage(img) {
   img.dataset.upgraded = 'true';
   img.removeAttribute('data-src');
   img.removeAttribute('data-srcset');
+  // The HD swap can change a card's intrinsic height a few px after the first
+  // masonry pass (WebKit reflows text/icons differently once the real image is
+  // decoded). Tell the layout to re-pack so the vertical gutter stays equal to
+  // the CSS gap instead of drifting by the height delta.
+  if (typeof window !== 'undefined')
+    window.dispatchEvent(new CustomEvent('mosaic:card-media-upgraded', { detail: { img } }));
   return true;
 }
 

@@ -100,6 +100,20 @@ node scripts/ops/purge-site-data.mjs --apply    # 清缓存（按 URL，每批 �
 
 全部脚本默认 dry-run（`--apply` 或 `MOSAIC_APPLY=true` 才写），且先列清单再删除。
 
+## 渐进上线（降级模式）
+
+首次发布时仓库可能还没有 `CLOUDFLARE_ZONE_ID` 变量，或 `CLOUDFLARE_API_TOKEN` 不含
+Zone WAF Edit 权限。`secure-media-domain.mjs --apply` 在这种情况下的行为是**可选的降级**：
+
+- 默认（非 strict）：打印 `DEGRADED: ...` 并以 0 退出，release 不会被 Cloudflare 侧前置条件卡住；
+  `drafts/`、`previews/`、`site-data/` 在此阶段仍然可被直连读取（代码侧已关闭 Worker 读取面）。
+- 传 `--strict` 或 `WAF_STRICT=1`：缺 zone/权限或下发失败直接以 1 退出，用于 WAF 落地后防回归。
+
+建议节奏：① 先按降级模式完成首次发布；② 在仓库 Variables 增加 `CLOUDFLARE_ZONE_ID`
+（必要时补 `MEDIA_ORIGIN`）；③ 手动 dispatch `infrastructure.yml` 一次并确认日志显示规则写入；
+④ 用 `node scripts/ops/probe.mjs`（先 `PROBE_STRICT_PRIVATE` 注释状态）确认私有前缀 403/404；
+⑤ 打开 probe 的严格开关，并把 `infrastructure.yml` 的 WAF step 改为 `--strict`。
+
 ## 回滚
 
 - **站点**：`rollback.yml` → `scripts/ops/rollback.mjs`，默认打印当前/目标 Pages deployment，`--apply`（workflow 里 `confirm=rollback`）才调用

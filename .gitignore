@@ -11,6 +11,7 @@ Thumbs.db
 *.log
 .env
 .secrets/
+.pw/
 worker/.dev.vars
 worker/.wrangler/
 content/.media-checksums.json
