@@ -30,20 +30,20 @@
     "test:online": "node tests/check-site.mjs && node tests/admin-smoke.mjs && node tests/a11y-admin.mjs"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1068.0",
+    "@aws-sdk/client-s3": "^3.1159.0",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.60.0",
-    "axe-core": "^4.13.0",
+    "@playwright/test": "^1.64.1",
+    "axe-core": "^4.14.0",
     "ejs": "^3.1.10",
-    "esbuild": "^0.28.1",
-    "eslint": "^10.8.0",
-    "globals": "^17.9.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
     "gray-matter": "^4.0.3",
     "marked": "^15.0.7",
     "morphicons": "^2.0.2",
     "playwright": "^1.60.0",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.10",
     "serve": "^14.2.6",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.5"
   }
 }
