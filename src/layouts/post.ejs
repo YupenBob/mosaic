@@ -1,6 +1,11 @@
 <%
 /* Post detail page */
 const pageDataTitle = post.title + ' - ' + site.title;
+// Code blocks are rare; only those pages link the highlighter stylesheet and
+// trigger the lazy vendor-script load (app.js does the latter client-side).
+const hasCodeBlocks = (post.blocks || []).some(
+  (block) => block.type === 'text' && /<pre[\s>][\s\S]*?<code[\s>]/i.test(block.html || ''),
+);
 function playbackUrl(url) {
   if (!url || !site.player?.requestVersion) return url;
   return url + (url.includes('?') ? '&' : '?') + 'mosaic-cors=' + encodeURIComponent(site.player.requestVersion);
@@ -30,29 +35,29 @@ function videoElementHTML(vid) {
   if (vid.pending) return pendingHTML(vid);
   var multiSrc = !!(vid.sources);
   var hasHLS = !!(vid.hls);
-  var videoStyle = ' style="aspect-ratio:' + (vid.aspect || site.player.defaultAspect) + '"';
+  var videoStyle = ' style="aspect-ratio:' + escAttr(vid.aspect || site.player.defaultAspect) + '"';
   var h = '<div class="video-player-overlay"><button class="video-big-play" aria-label="Play"><i class="ri-play-fill"></i></button></div>';
   if (hasHLS) {
-    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.hls) + '" poster="' + (vid.poster || '') + '" class="video-element" data-hls="true">';
-    h += '<source src="' + playbackUrl(vid.hls) + '" type="application/x-mpegURL" />';
+    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.hls) + '" poster="' + escAttr(vid.poster || '') + '" class="video-element" data-hls="true">';
+    h += '<source src="' + escAttr(playbackUrl(vid.hls)) + '" type="application/x-mpegURL" />';
     // MP4 tier fallbacks (only consumed if hls.js hits an unrecoverable fatal
     // error, so playback degrades to a file instead of dying).
     if (vid.sources) {
       var hlsResKeys = Object.keys(vid.sources).sort().reverse();
       for (var hr = 0; hr < hlsResKeys.length; hr++) {
-        h += '<source data-res="' + hlsResKeys[hr] + '" src="' + playbackUrl(vid.sources[hlsResKeys[hr]]) + '" type="video/mp4" />';
+        h += '<source data-res="' + escAttr(hlsResKeys[hr]) + '" src="' + escAttr(playbackUrl(vid.sources[hlsResKeys[hr]])) + '" type="video/mp4" />';
       }
     }
     h += '</video>';
   } else if (multiSrc) {
-    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.file) + '" poster="' + (vid.poster || '') + '" class="video-element">';
+    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.file) + '" poster="' + escAttr(vid.poster || '') + '" class="video-element">';
     var resKeys = Object.keys(vid.sources).sort().reverse();
     for (var r = 0; r < resKeys.length; r++) {
-      h += '<source data-res="' + resKeys[r] + '" src="' + playbackUrl(vid.sources[resKeys[r]]) + '" type="video/mp4" />';
+      h += '<source data-res="' + escAttr(resKeys[r]) + '" src="' + escAttr(playbackUrl(vid.sources[resKeys[r]])) + '" type="video/mp4" />';
     }
     h += '</video>';
   } else if (vid.src) {
-    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.src) + '" poster="' + (vid.poster || '') + '" src="' + playbackUrl(vid.src) + '" class="video-element"></video>';
+    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.src) + '" poster="' + escAttr(vid.poster || '') + '" src="' + escAttr(playbackUrl(vid.src)) + '" class="video-element"></video>';
   }
   return h;
 }
@@ -98,15 +103,15 @@ function renderGallery(photos, threshold) {
     // Two-stage blur-up: src is the tiny LQIP placeholder, sharp image swaps
     // in via gallery.js after it decodes. No srcset here — srcset would make
     // the browser skip the placeholder entirely (loading it directly).
-    var attrs = 'data-src480="' + p.src480 + '" data-src720="' + p.src720 + '" data-src1080="' + p.src1080 + '" data-src-orig="' + p.srcOrig + '" ';
+    var attrs = 'data-src480="' + escAttr(p.src480) + '" data-src720="' + escAttr(p.src720) + '" data-src1080="' + escAttr(p.src1080) + '" data-src-orig="' + escAttr(p.srcOrig) + '" ';
     if (idx === 0) attrs += 'fetchpriority="high" ';
     if (single) {
       h += '<div class="gallery-single-item">';
-      h += '<img ' + attrs + 'src="' + p.src10p + '" alt="Photo" loading="lazy" />';
+      h += '<img ' + attrs + 'src="' + escAttr(p.src10p) + '" alt="Photo" loading="lazy" />';
       h += '</div>';
     } else {
       h += '<div class="gallery-item">';
-      h += '<img ' + attrs + 'src="' + p.src10p + '" alt="Photo" loading="lazy" />';
+      h += '<img ' + attrs + 'src="' + escAttr(p.src10p) + '" alt="Photo" loading="lazy" />';
       h += '</div>';
     }
   });
@@ -207,18 +212,10 @@ function renderBlock(block) {
   <link rel="icon" type="image/svg+xml" sizes="any" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
   <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/vendor/highlight-github.min.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/card.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/post.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/gallery.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/video.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/filter.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/motion.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/icons.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/responsive.css" />
+  <% if (hasCodeBlocks) { %><link rel="stylesheet" href="<%= rp %>assets/vendor/highlight-github.min.css" /><% } %>
+  <%# scripts/minify.mjs concatenates the site stylesheets (in cascade order)
+      into this single bundle; keep this the only assets/css link here. %>
+  <link rel="stylesheet" href="<%= rp %>assets/css/bundle.css" />
   <meta property="og:title" content="<%= pageDataTitle %>" />
   <meta property="og:description" content="<%= post.description %>" />
     <% var postUrl = (site.url || '') + '/posts/' + post.slug + '/'; %>
@@ -229,9 +226,7 @@ function renderBlock(block) {
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="<%= pageDataTitle %>" />
   <% if (post.cover) { %><meta name="twitter:image" content="<%= post.cover %>" /><% } %>
-  <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"BlogPosting","headline":"<%= post.title %>","description":"<%= post.description %>","datePublished":"<%= post.date %>","url":"<%= postUrl %>"}
-  </script>
+  <% const structuredData = { '@context': 'https://schema.org', '@type': 'BlogPosting', headline: post.title, description: post.description, url: postUrl }; if (post.date) structuredData.datePublished = post.date; %><script type="application/ld+json"><%- JSON.stringify(structuredData).replace(/</g, '\\u003c') %></script>
   <% if (site.enableBusuanzi) { %>
   <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
   <% } %>
@@ -256,7 +251,7 @@ document.addEventListener('click', function(event) {
       <a href="<%= rp %>index.html"><%= t('home') %></a>
       <% if (categories && categories.length) { %>
         <% categories.slice(0, 5).forEach(function(cat) { %>
-        <a href="<%= rp %>categories/<%= cat.slug %>/"><%= cat.name %></a>
+        <a href="<%= rp %>categories/<%= categoryRoute(cat.full) %>/"><%= cat.name %></a>
         <% }); %>
       <% } %>
     </nav>
@@ -273,24 +268,24 @@ document.addEventListener('click', function(event) {
   <nav class="post-breadcrumb" aria-label="Breadcrumb">
       <a href="<%= rp %>index.html"><%= t('home') %></a>
       <i class="ri-arrow-right-s-line"></i>
-      <a href="<%= rp %>categories/<%= post.category.toLowerCase().replace(/\s+/g, '-') %>/"><%= post.category %></a>
+      <a href="<%= rp %>categories/<%= categoryRoute(post.category) %>/"><%= post.category %></a>
       <i class="ri-arrow-right-s-line"></i>
       <span><%= post.title %></span>
     </nav>
     <!-- Header -->
     <header class="post-header">
-      <a href="<%= rp %>categories/<%= post.category.toLowerCase().replace(/\s+/g, '-') %>/" class="post-category"><%= post.category %></a>
+      <a href="<%= rp %>categories/<%= categoryRoute(post.category) %>/" class="post-category"><%= post.category %></a>
       <h1 class="post-title"><%= post.title %></h1>
       <div class="post-meta">
         <% if (post.date) { %>
         <span class="post-meta-item"><i class="ri-calendar-line"></i> <%= post.date.split('T')[0] %></span>
         <% } %>
-        <a href="<%= rp %>categories/<%= post.category.toLowerCase().replace(/\s+/g, '-') %>/" class="post-meta-item"><i class="ri-folder-line"></i> <%= post.category %></a>
+        <a href="<%= rp %>categories/<%= categoryRoute(post.category) %>/" class="post-meta-item"><i class="ri-folder-line"></i> <%= post.category %></a>
       </div>
       <% if (post.tags && post.tags.length > 0) { %>
       <div class="post-tags">
-        <% post.tags.forEach(function(t) { %>
-        <a href="<%= rp %>tags/<%= t.toLowerCase().replace(/\s+/g, '-') %>/" class="post-tag">#<%= t %></a>
+        <% post.tags.forEach(function(tag) { %>
+        <a href="<%= rp %>tags/<%= tagSlug(tag) %>/" class="post-tag">#<%= tag %></a>
         <% }); %>
       </div>
       <% } %>
@@ -397,9 +392,10 @@ document.addEventListener('click', function(event) {
   </div>
 </footer>
 
-<script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= lang || 'zh-CN' %>';</script>
-  <script src="<%= rp %>assets/vendor/highlight.min.js"></script>
-<script>hljs.highlightAll();</script>
+<script>window.__I18N=<%- JSON.stringify(i18n || {}).replace(/</g, '\\u003c') %>;window.__LANG='<%= lang || 'zh-CN' %>';</script>
+<%# The highlighter vendor script + stylesheet are only requested by pages
+    that render code: app.js lazily imports highlight.js when it finds
+    `pre code` in the DOM (see src/assets/js/highlight.js). %>
 <script type="module" src="<%= rp %>assets/js/app.js"></script>
 </body>
 </html>

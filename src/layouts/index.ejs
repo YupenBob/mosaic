@@ -54,19 +54,9 @@ const accentOptions = [
   <link rel="icon" type="image/svg+xml" sizes="any" href="<%= site.favicon ? (site.favicon.indexOf('http') === 0 || site.favicon.startsWith('/') ? site.favicon : rp + site.favicon) : rp + 'assets/logo.svg' %>" />
   <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/card.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/post.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/gallery.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/video.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/filter.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/motion.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/icons.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/note.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/feed.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/responsive.css" />
+  <%# scripts/minify.mjs concatenates the site stylesheets (in cascade order)
+      into this single bundle; keep this the only assets/css link here. %>
+  <link rel="stylesheet" href="<%= rp %>assets/css/bundle.css" />
   <meta property="og:title" content="<%= pageDataTitle %>" />
   <meta property="og:description" content="<%= pageDesc %>" />
   <meta property="og:type" content="website" />
@@ -110,7 +100,7 @@ const accentOptions = [
       <a href="<%= rp %>index.html" class="<% if (!activeCategory && !activeTag) { %>active<% } %>"><%= t('home') %></a>
       <% if (categories && categories.length) { %>
         <% categories.slice(0, 5).forEach(function(cat) { %>
-        <a href="<%= rp %>categories/<%= cat.slug %>/"><%= cat.name %></a>
+        <a href="<%= rp %>categories/<%= categoryRoute(cat.full) %>/"><%= cat.name %></a>
         <% }); %>
       <% } %>
     </nav>
@@ -233,7 +223,7 @@ const accentOptions = [
   </div>
 </footer>
 
-<script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
+<script>window.__I18N=<%- JSON.stringify(i18n || {}).replace(/</g, '\\u003c') %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
 <script type="module" src="<%= rp %>assets/js/app.js"></script>
 </body>
 </html>

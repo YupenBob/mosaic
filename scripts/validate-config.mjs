@@ -1,11 +1,18 @@
 /**
  * Validate mosaic.config.json and post frontmatter before building.
  *
+ * There is exactly one source of truth for each layer:
+ *   - config rules live in shared/config.mjs (`normalizeConfig`/`validateConfig`),
+ *     so the generator, the Worker and this script cannot drift apart;
+ *   - frontmatter rules live in shared/content-schema.mjs (frontmatter schema),
+ *     shared by the build and the Worker.
+ *
  * Hard failures (exit 1):
- *   - config missing required fields or wrong types
- *   - frontmatter date not parseable / category not a string / tags not an array
+ *   - config file unreadable, not an object, or rejected by validateConfig
+ *   - frontmatter schema errors (bad date/type, unsafe category/tag/name, …)
  * Soft warnings (printed, non-fatal):
  *   - cover references a file that doesn't exist in the post directory
+ *   - cosmetic frontmatter (unknown block names, duplicate tags)
  *
  * Run: node scripts/validate-config.mjs  (also wired into `npm run check`)
  */
@@ -14,6 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import matter from 'gray-matter';
 import { normalizeConfig, validateConfig } from '../shared/config.mjs';
+import { validateFrontmatter } from '../shared/content-schema.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -32,50 +40,30 @@ const warn = (msg) => {
   warnings++;
 };
 
-// ── config shape ──
-let cfg;
+// ── config: parse, normalize and validate through the shared implementation ──
+let raw;
 try {
-  cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+  raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 } catch (e) {
   fail(`mosaic.config.json unreadable: ${e.message}`);
   process.exit(1);
 }
+if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail('mosaic.config.json must be a JSON object');
 
-for (const key of ['title', 'url', 'apiBase', 'mediaBase', 'language']) {
-  if (typeof cfg[key] !== 'string' || !cfg[key]) fail(`config.${key} must be a non-empty string`);
+let config;
+try {
+  config = normalizeConfig(raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {});
+} catch (e) {
+  // __proto__/constructor injection is rejected by shared/config.deepMerge.
+  fail(`mosaic.config.json invalid: ${e.message}`);
+  process.exit(1);
 }
-if (cfg.pageSize !== undefined && (typeof cfg.pageSize !== 'number' || cfg.pageSize < 1)) {
-  fail('config.pageSize must be a positive number');
-}
-for (const q of ['imageQuality', 'videoQuality']) {
-  if (cfg[q] !== undefined && (typeof cfg[q] !== 'object' || cfg[q] === null)) {
-    fail(`config.${q} must be an object`);
-  }
-}
-if (cfg.build !== undefined && (typeof cfg.build !== 'object' || cfg.build === null)) {
-  fail('config.build must be an object');
-}
-if (cfg.build?.timeoutMinutes !== undefined) {
-  const t = cfg.build.timeoutMinutes;
-  if (!Number.isInteger(t) || t < 10 || t > 360) {
-    fail('config.build.timeoutMinutes must be an integer between 10 and 360');
-  }
-}
-if (cfg.videoQuality?.uploadAfterTiers !== undefined) {
-  const n = cfg.videoQuality.uploadAfterTiers;
-  if (!Number.isInteger(n) || n < 1 || n > 5) {
-    fail('config.videoQuality.uploadAfterTiers must be an integer between 1 and 5');
-  }
-}
-for (const group of ['plugins', 'components']) {
-  if (cfg[group] !== undefined && (typeof cfg[group] !== 'object' || cfg[group] === null)) {
-    fail(`config.${group} must be an object`);
-  }
-}
+// `requireSiteFields` asks shared/config for the site-identity checks
+// (title/url/apiBase/mediaBase/language) that only the real config file must
+// satisfy; normalized defaults remain valid for tests and Worker patches.
+for (const message of validateConfig(config, { requireSiteFields: true })) fail(message);
 
-for (const message of validateConfig(normalizeConfig(cfg))) fail(message);
-
-// ── post frontmatter ──
+// ── post frontmatter: shared schema (hard) + build-specific media hints (soft) ──
 if (fs.existsSync(CONTENT)) {
   for (const dir of fs.readdirSync(CONTENT)) {
     const postPath = path.join(CONTENT, dir);
@@ -91,25 +79,15 @@ if (fs.existsSync(CONTENT)) {
       fail(`${dir}/index.md frontmatter parse error: ${e.message}`);
       continue;
     }
-    if (data.date !== undefined && Number.isNaN(new Date(data.date).getTime())) {
-      fail(`${dir}: date "${data.date}" is not parseable`);
-    }
-    if (data.category && typeof data.category !== 'string') {
-      fail(`${dir}: category must be a string`);
-    }
-    if (data.tags !== undefined && (!Array.isArray(data.tags) || data.tags.some((t) => typeof t !== 'string'))) {
-      fail(`${dir}: tags must be an array of strings`);
-    }
+
+    const schema = validateFrontmatter(data, { slug: dir });
+    for (const error of schema.errors) fail(`${dir}: ${error}`);
+    for (const warning of schema.warnings) warn(`${dir}: ${warning}`);
+
     if (typeof data.cover === 'string' && data.cover && !/^video:\d+$|^photo:\d+$/.test(data.cover)) {
       const coverPath = path.join(postPath, data.cover);
       if (!fs.existsSync(coverPath)) {
         warn(`${dir}: cover "${data.cover}" not found under ${dir}/ (will be resolved by the pipeline)`);
-      }
-    }
-    if (data.blocks !== undefined) {
-      const allowed = ['text', 'gallery', 'videos', 'music', 'photo', 'video'];
-      if (!Array.isArray(data.blocks) || data.blocks.some((b) => typeof b !== 'string' || !allowed.includes(b))) {
-        warn(`${dir}: blocks must be an array of ${allowed.join('/')} (ignored)`);
       }
     }
     // Content-block placeholders (valid positions only: alone on a line,

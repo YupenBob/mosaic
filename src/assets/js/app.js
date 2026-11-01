@@ -119,6 +119,18 @@ register({
 });
 
 register({
+  name: 'highlight',
+  enabled: true,
+  page: 'post',
+  async init() {
+    // The vendor highlighter and its stylesheet are only pulled in when the
+    // post actually renders a code block (see src/assets/js/highlight.js).
+    const { hasCodeBlock, highlightCode } = await import('./highlight.js');
+    if (hasCodeBlock()) await highlightCode();
+  },
+});
+
+register({
   name: 'filter',
   enabled: true,
   page: 'list',

@@ -53,7 +53,10 @@ export async function processTask(
     const prefix = processedPrefixFor(job);
     const publish = async (payload, complete, sanitized = false, extra = {}) => {
       if (heartbeatError) throw heartbeatError;
-      controller.signal.throwIfAborted();
+      // A budget abort must still allow a safe-point partial publish (the
+      // processor verifies every referenced object before handing it over).
+      if (controller.signal.aborted && controller.signal.reason?.code !== 'MEDIA_BUDGET')
+        controller.signal.throwIfAborted();
       await request('media/publish', {
         ...identity,
         published: { ...payload, sourceHash: hash },
@@ -92,30 +95,104 @@ export async function processTask(
     fs.rmSync(directory, { recursive: true, force: true });
   }
 }
-export async function runMedia() {
-  const context = loadContext();
-  const request = createPipelineClient();
-  const store = createStorage(context.config);
+/**
+ * Claim and process media tasks until the queue drains or the run budget ends.
+ *
+ * Claims are bounded by `upload.concurrency`; images and audio run in parallel
+ * while video jobs pass through a single serial lane (one ffmpeg transcode at
+ * a time) and heartbeat their lease while queued.
+ *
+ * @param {{context?: object, request?: Function, store?: object, runId?: string}} [deps]
+ *   Dependency seam used by tests; production calls it with no arguments.
+ */
+export async function runMedia(deps = {}) {
+  const context = deps.context || loadContext();
+  const request = deps.request || createPipelineClient();
+  const store = deps.store || createStorage(context.config);
   const workRoot = path.resolve(process.env.MEDIA_WORK_DIR || path.join(os.tmpdir(), 'mosaic-media'));
   fs.mkdirSync(workRoot, { recursive: true });
-  const runId = process.env.GITHUB_RUN_ID;
+  const runId = deps.runId || process.env.GITHUB_RUN_ID;
   if (!runId) throw new Error('GITHUB_RUN_ID is required; production media runs only in Actions');
   const deadline = Date.now() + context.config.media.timeoutMinutes * 60000 * context.config.media.budgetRatio;
+  // Images and audio run side by side; ffmpeg-heavy video jobs stay serial so
+  // two transcodes never contend for the same CPU inside one runner.
+  const concurrency = Math.max(1, Number(context.config.upload?.concurrency) || 1);
   let failures = 0;
-  while (Date.now() < deadline) {
-    const { job, published, more } = await request('media/claim', { runId });
+  let stopping = false;
+  const active = new Set();
+  let videoChain = Promise.resolve();
+  const runVideoSerially = (work) => {
+    const next = videoChain.then(work, work);
+    videoChain = next.catch(() => {});
+    return next;
+  };
+  const dispatch = (job, published) => {
+    const work = async () => {
+      try {
+        const complete = await processTask(job, { request, store, workRoot, deadline, published });
+        // A budget stop requeues the remaining work; stop claiming new jobs.
+        if (!complete) stopping = true;
+      } catch (error) {
+        console.error(`${job.filename}: ${error.message}`);
+        failures++;
+      }
+    };
+    let task;
+    if (job.folder === 'videos') {
+      // The video lane is serial, so a claimed video may wait for the previous
+      // transcode (up to the timeout). Keep its 120s lease alive while queued;
+      // processTask starts its own heartbeat once the lane reaches this job.
+      let queued = true;
+      const leaseTimer = setInterval(
+        () => {
+          if (!queued) return;
+          request('media/heartbeat', {
+            id: job.id,
+            token: job.token,
+            runId: job.runId,
+            current: job.filename,
+          }).catch((error) => {
+            // The lease was revoked/superseded; the task itself will observe 409.
+            if (error.status === 409) queued = false;
+          });
+        },
+        Math.max(1000, Math.floor(job.config.media.leaseMs / 3)),
+      );
+      task = runVideoSerially(async () => {
+        queued = false;
+        clearInterval(leaseTimer);
+        return work();
+      }).finally(() => {
+        queued = false;
+        clearInterval(leaseTimer);
+      });
+    } else {
+      task = work();
+    }
+    const tracked = Promise.resolve(task).finally(() => active.delete(tracked));
+    active.add(tracked);
+  };
+  while (!stopping && Date.now() < deadline) {
+    if (active.size >= concurrency) {
+      await Promise.race(active);
+      continue;
+    }
+    let claim;
+    try {
+      claim = await request('media/claim', { runId });
+    } catch (error) {
+      console.error(`media/claim: ${error.message}`);
+      failures++;
+      break;
+    }
+    const { job, published, more } = claim;
     if (!job) {
       if (more) continue;
       break;
     }
-    try {
-      const complete = await processTask(job, { request, store, workRoot, deadline, published });
-      if (!complete) break;
-    } catch (error) {
-      console.error(`${job.filename}: ${error.message}`);
-      failures++;
-    }
+    dispatch(job, published);
   }
+  await Promise.allSettled([...active]);
   if (failures) process.exitCode = 1;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))

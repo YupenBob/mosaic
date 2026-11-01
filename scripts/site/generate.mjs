@@ -27,8 +27,7 @@ export function generateSite(context) {
     children: node.children.map(publicCategory),
   });
   const publicTags = indexes.tags.map(({ posts: _posts, ...tag }) => tag);
-  for (const [name, value] of Object.entries({
-    'posts.json': posts,
+  const dataFiles = {
     'posts-index.json': indexes.listing,
     'categories.json': indexes.categories.map(publicCategory),
     'tags.json': publicTags,
@@ -39,7 +38,12 @@ export function generateSite(context) {
       category,
       tags: tags.join(' '),
     })),
-  }))
+  };
+  // Full article records (body + resolved media) are a debugging artifact only;
+  // production builds ship the thin posts-index.json. Opt in with
+  // MOSAIC_DEBUG_DATA=1.
+  if (process.env.MOSAIC_DEBUG_DATA === '1') dataFiles['posts.json'] = posts;
+  for (const [name, value] of Object.entries(dataFiles))
     fs.writeFileSync(path.join(dataDir, name), JSON.stringify(value));
   // Experience v2 artifacts (feed + lazy note details); additive only.
   const experience = writeExperienceData({ dist, config: context.config, posts });

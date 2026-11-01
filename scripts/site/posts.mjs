@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { buildBlocks, deriveType } from '../blocks.mjs';
+import { ContentSchemaError, validateFrontmatter } from '../../shared/content-schema.mjs';
+import { validSegment } from '../../shared/media-manifest.mjs';
 import { resolveMedia } from './media.mjs';
 export function readPosts(context, manifest) {
   const site = context.config;
@@ -10,9 +12,15 @@ export function readPosts(context, manifest) {
     .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(context.content, entry.name, 'index.md')))
     .map((entry) => {
       const slug = entry.name;
+      // The directory name becomes a public URL path and a dist directory:
+      // reject anything that could escape it before reading the document.
+      if (!validSegment(slug)) throw new ContentSchemaError([`invalid post directory name "${slug}"`]);
       const { data, content } = matter(
         fs.readFileSync(path.join(context.content, slug, 'index.md'), 'utf8').replace(/\r\n/g, '\n'),
       );
+      const schema = validateFrontmatter(data, { slug });
+      for (const warning of schema.warnings) console.warn(`WARN ${slug}: ${warning}`);
+      if (schema.errors.length) throw new ContentSchemaError(schema.errors.map((error) => `${slug}: ${error}`));
       const { photos, videos, music, covers } = resolveMedia(manifest, { slug, media: data.media }, site);
       const coverRef = String(data.cover || '');
       const indexed = /^(video|photo):(\d+)$/.exec(coverRef);
