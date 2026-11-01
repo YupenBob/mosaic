@@ -90,6 +90,15 @@ export const DEFAULTS = {
     manifestKey: 'site-data/media-manifest.json',
     /** Keep originals/ after decoding. Never part of the processing fingerprint. */
     keepSourceFiles: true,
+    /**
+     * Server-side (media runner) upload tuning. Objects at or above
+     * `multipartThreshold` bytes use S3 multipart with `partSize` chunks and
+     * `uploadRetries` retries per request; smaller objects use a single PUT.
+     * Distinct from `upload.*`, which tunes the browser uploader.
+     */
+    multipartThreshold: 104857600,
+    partSize: 8388608,
+    uploadRetries: 3,
     image: { placeholderWidth: 150, placeholderQuality: 30 },
     audio: { bitrates: ['128k', '320k'], waveformBuckets: 400, sampleRate: 8000 },
   },
@@ -226,7 +235,15 @@ export function mergeInterpolation(base = {}, override) {
   return merged;
 }
 
-export function validateConfig(config) {
+/**
+ * Validate a merged configuration. Defaults are sufficient for processors and
+ * the Worker (partial `/api/config` patches rely on them), so site-identity
+ * fields are only checked when the caller opts in.
+ * @param {object} config - normalized config
+ * @param {{requireSiteFields?: boolean}} [options]
+ * @returns {string[]} human-readable errors (empty when valid)
+ */
+export function validateConfig(config, options = {}) {
   const errors = [];
   if (!/^[a-z][a-z0-9-]{1,40}$/.test(String(config.themePackage || '')))
     errors.push('themePackage must be a lowercase theme id');
@@ -256,6 +273,9 @@ export function validateConfig(config) {
     ['media.maxRetries', config.media?.maxRetries, 0, 20],
     ['media.deploymentHistory', config.media?.deploymentHistory, 1, 100],
     ['media.reconcileBatchSize', config.media?.reconcileBatchSize, 1, 100],
+    ['media.multipartThreshold', config.media?.multipartThreshold, 5242880, 5368709120],
+    ['media.partSize', config.media?.partSize, 5242880, 104857600],
+    ['media.uploadRetries', config.media?.uploadRetries, 0, 20],
     ['videoQuality.crf', config.videoQuality?.crf, 0, 51],
     ['videoQuality.maxHeight', config.videoQuality?.maxHeight, 1, 4320],
     ['videoQuality.uploadAfterTiers', config.videoQuality?.uploadAfterTiers, 1, 6],
@@ -280,6 +300,12 @@ export function validateConfig(config) {
   }
   if (!(config.media?.budgetRatio > 0 && config.media.budgetRatio < 1))
     errors.push('media.budgetRatio must be between 0 and 1');
+  if (
+    Number.isInteger(config.media?.multipartThreshold) &&
+    Number.isInteger(config.media?.partSize) &&
+    config.media.multipartThreshold < config.media.partSize
+  )
+    errors.push('media.multipartThreshold must be greater than or equal to media.partSize');
   for (const key of ['debounceMs', 'retryMs', 'leaseMs', 'pollMs', 'retentionDays'])
     if (!Number.isFinite(config.media?.[key]) || config.media[key] < 0) errors.push(`Invalid media.${key}`);
   if (
@@ -304,6 +330,13 @@ export function validateConfig(config) {
     errors.push('player.hls.startLevel must be an integer of -1 or greater');
   if (!config.deployment?.branch || !config.mediaSource?.bucket || !config.media?.manifestKey)
     errors.push('Deployment branch, bucket and manifest key are required');
+  // Opt-in site-identity checks. normalizeConfig() fills defaults for
+  // apiBase/language, so these only make sense for a real site config
+  // (scripts/validate-config.mjs opts in; tests and the Worker keep
+  // defaults-only validation for partial config patches).
+  if (options.requireSiteFields)
+    for (const key of ['title', 'url', 'apiBase', 'mediaBase', 'language'])
+      if (typeof config[key] !== 'string' || !config[key]) errors.push(`config.${key} must be a non-empty string`);
   return errors;
 }
 

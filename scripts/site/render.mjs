@@ -2,7 +2,37 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ejs from 'ejs';
 import { renderCard, renderCards, renderEmptyState } from '../../src/assets/js/cards/render.js';
+import { categoryRoute, tagSlug } from '../../shared/taxonomy.mjs';
 import { resolveTheme } from './theme.mjs';
+import { bundleSiteCss } from '../lib/site-css.mjs';
+
+/** Escape a value for XML text/attribute content. */
+function escapeXml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Wrap a value in CDATA. A literal `]]>` inside the value is split across two
+ * CDATA sections (`]]]]><![CDATA[>`), which is the only way to keep the
+ * document well-formed.
+ */
+function cdata(value) {
+  return `<![CDATA[${String(value == null ? '' : value).replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+}
+
+/** Percent-encode one generated route path (each segment separately). */
+function encodeRoutePath(pathname) {
+  return String(pathname)
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
 export function renderSite(context, posts, indexes) {
   ejs.clearCache();
   const { src: SRC, dist: DIST } = context;
@@ -29,28 +59,32 @@ export function renderSite(context, posts, indexes) {
         const pubDate = p.date ? new Date(p.date).toUTCString() : new Date().toUTCString();
         return [
           '  <item>',
-          `    <title><![CDATA[${p.title || p.slug}]]></title>`,
-          `    <link>${link}</link>`,
-          `    <guid isPermaLink="true">${link}</guid>`,
-          `    <description><![CDATA[${p.description || ''}]]></description>`,
+          `    <title>${cdata(p.title || p.slug)}</title>`,
+          `    <link>${escapeXml(link)}</link>`,
+          `    <guid isPermaLink="true">${escapeXml(link)}</guid>`,
+          `    <description>${cdata(p.description || '')}</description>`,
           `    <pubDate>${pubDate}</pubDate>`,
-          authorName ? `    <dc:creator><![CDATA[${authorName}]]></dc:creator>` : '',
+          authorName ? `    <dc:creator>${cdata(authorName)}</dc:creator>` : '',
           '  </item>',
         ]
           .filter(Boolean)
           .join('\n');
       })
       .join('\n');
-    const self = base ? `<atom:link href="${base}/feed.xml" rel="self" type="application/rss+xml"/>` : '';
+    const self = base
+      ? `<atom:link href="${escapeXml(`${base}/feed.xml`)}" rel="self" type="application/rss+xml"/>`
+      : '';
     return (
       `<?xml version="1.0" encoding="UTF-8"?>\n` +
       `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">\n` +
       `<channel>\n` +
-      `  <title><![CDATA[${siteTitle}]]></title>\n` +
-      `  <link>${base || '/'}</link>\n` +
-      `  <description><![CDATA[${siteDesc}]]></description>\n` +
+      `  <title>${cdata(siteTitle)}</title>\n` +
+      `  <link>${escapeXml(base || '/')}</link>\n` +
+      `  <description>${cdata(siteDesc)}</description>\n` +
       (self ? `  ${self}\n` : '') +
-      (authorEmail && authorName ? `  <managingEditor>${authorEmail} (${authorName})</managingEditor>\n` : '') +
+      (authorEmail && authorName
+        ? `  <managingEditor>${escapeXml(`${authorEmail} (${authorName})`)}</managingEditor>\n`
+        : '') +
       `${items}\n` +
       `</channel>\n</rss>\n`
     );
@@ -65,18 +99,12 @@ export function renderSite(context, posts, indexes) {
     const locs = [
       `${base}/`,
       `${base}/404.html`,
-      ...categoryPages.map(
-        (c) =>
-          `${base}/categories/${c.full
-            .split('/')
-            .map((p) => p.toLowerCase().replace(/\s+/g, '-'))
-            .join('/')}/`,
-      ),
-      ...tags.map((t) => `${base}/tags/${t.slug}/`),
+      ...categoryPages.map((c) => `${base}/categories/${encodeRoutePath(categoryRoute(c.full))}/`),
+      ...tags.map((t) => `${base}/tags/${encodeURIComponent(tagSlug(t.name))}/`),
       ...posts.map((p) => `${base}/posts/${encodeURIComponent(p.slug)}/`),
     ];
     const urls = locs
-      .map((loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`)
+      .map((loc) => `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`)
       .join('\n');
     return (
       `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -143,6 +171,8 @@ export function renderSite(context, posts, indexes) {
       renderCard,
       renderCards,
       renderEmptyState,
+      categoryRoute,
+      tagSlug,
       theme: { id: theme.id, name: theme.manifest.name, version: theme.manifest.version, options: theme.options },
       lang: SITE.language || 'zh-CN',
       activeCategory: data.activeCategory || '',
@@ -213,11 +243,7 @@ export function renderSite(context, posts, indexes) {
 
   // Category pages (all nesting depths, indexed once).
   for (const cat of categoryPages) {
-    const route = cat.full
-      .split('/')
-      .map((part) => part.toLowerCase().replace(/\s+/g, '-'))
-      .join('/');
-    renderFile('index.ejs', path.join(DIST, 'categories', route, 'index.html'), {
+    renderFile('index.ejs', path.join(DIST, 'categories', categoryRoute(cat.full), 'index.html'), {
       posts: cat.posts,
       categories,
       tags,
@@ -229,7 +255,7 @@ export function renderSite(context, posts, indexes) {
   // Tag pages
   for (const tag of tags) {
     const tagPosts = tag.posts;
-    renderFile('index.ejs', path.join(DIST, 'tags', tag.slug, 'index.html'), {
+    renderFile('index.ejs', path.join(DIST, 'tags', tagSlug(tag.name), 'index.html'), {
       posts: tagPosts,
       categories,
       tags,
@@ -242,9 +268,38 @@ export function renderSite(context, posts, indexes) {
   renderFile('404.ejs', path.join(DIST, '404.html'), { posts: [], categories: [], tags: [] });
 
   // Copy assets
+  // Publish only framework asset trees plus referenced top-level files;
+  // development artifacts (screenshot.png, design sources, docs) never ship.
+  // scripts/minify.mjs then bundles css/js and drops the per-file copies.
   const assetsDir = path.join(SRC, 'assets');
   if (fs.existsSync(assetsDir)) {
-    fs.cpSync(assetsDir, path.join(DIST, 'assets'), { recursive: true });
+    const targetAssets = path.join(DIST, 'assets');
+    const ASSET_TREES = ['css', 'js', 'remixicon', 'vendor'];
+    const DEV_ARTIFACT = /^(screenshot\.(?:png|jpe?g|webp)|.+\.(?:psd|xcf|ai|sketch|fig|md|zip))$/i;
+    fs.mkdirSync(targetAssets, { recursive: true });
+    for (const name of ASSET_TREES) {
+      const from = path.join(assetsDir, name);
+      if (fs.existsSync(from)) fs.cpSync(from, path.join(targetAssets, name), { recursive: true });
+    }
+    for (const entry of fs.readdirSync(assetsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || entry.name.startsWith('.') || DEV_ARTIFACT.test(entry.name)) continue;
+      fs.copyFileSync(path.join(assetsDir, entry.name), path.join(targetAssets, entry.name));
+    }
+    // A configured favicon may live in a nested folder outside the trees above.
+    const favicon = typeof SITE.favicon === 'string' ? SITE.favicon : '';
+    if (favicon.startsWith('/assets/')) {
+      const relative = favicon.slice('/assets/'.length).replace(/^\/+/, '');
+      const from = path.join(assetsDir, relative);
+      const to = path.join(targetAssets, relative);
+      if (!relative.startsWith('..') && fs.existsSync(from) && !fs.existsSync(to)) {
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        fs.copyFileSync(from, to);
+      }
+    }
+    // The layouts link a single stylesheet, so every generation path (build,
+    // preview, browser tests calling generateSite directly) must emit it.
+    const bundled = bundleSiteCss(targetAssets);
+    if (bundled) console.log(`CSS bundle: ${bundled.files} files -> assets/css/bundle.css (${bundled.bytes} B)`);
   }
 
   console.log(`Generated: ${posts.length} posts, ${categories.length} categories, ${tags.length} tags`);

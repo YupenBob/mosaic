@@ -36,7 +36,7 @@ async function loadJson(route) {
   }
 }
 
-const posts = (await loadJson('/data/posts.json')) || [];
+const posts = (await loadJson('/data/posts-index.json')) || [];
 const categories = (await loadJson('/data/categories.json')) || [];
 const tags = (await loadJson('/data/tags.json')) || [];
 
@@ -49,29 +49,31 @@ function pushPost(post, label) {
   pages.push({
     url: `${SITE}/posts/${post.slug}/`,
     label,
-    wait: post.photos?.length
+    wait: post.media?.gallery?.length
       ? '.gallery-item'
-      : post.videos?.length
+      : post.media?.videos?.length
         ? '.video-element'
-        : post.music?.length
+        : post.media?.music?.length
           ? '.music-track'
           : 'article',
   });
 }
 pushPost(
-  posts.find((p) => (p.photos || []).length > 0),
+  posts.find((p) => (p.media?.gallery || []).length > 0),
   'photo',
 );
 pushPost(
-  posts.find((p) => (p.videos || []).length > 0),
+  posts.find((p) => (p.media?.videos || []).length > 0),
   'video',
 );
 pushPost(
-  posts.find((p) => (p.music || []).length > 0),
+  posts.find((p) => (p.media?.music || []).length > 0),
   'music',
 );
 pushPost(
-  posts.find((p) => !(p.photos || []).length && !(p.videos || []).length && !(p.music || []).length) || posts[0],
+  posts.find(
+    (p) => !(p.media?.gallery || []).length && !(p.media?.videos || []).length && !(p.media?.music || []).length,
+  ) || posts[0],
   'post',
 );
 if (categories[0]) {

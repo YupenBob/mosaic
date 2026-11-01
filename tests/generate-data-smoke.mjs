@@ -32,6 +32,9 @@ const g = spawnSync(process.execPath, ['scripts/generate.js'], {
   cwd: ROOT,
   encoding: 'utf8',
   timeout: 10 * 60 * 1000,
+  // Full article records (data/posts.json) are a debug artifact gated behind
+  // MOSAIC_DEBUG_DATA; this test validates their structure.
+  env: { ...process.env, MOSAIC_DEBUG_DATA: '1' },
 });
 check('generate exits 0', g.status === 0, `status=${g.status}`);
 if (g.status !== 0) console.error(g.stderr.slice(0, 2000));

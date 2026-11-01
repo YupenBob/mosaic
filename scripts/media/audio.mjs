@@ -20,13 +20,21 @@ export async function waveformFromFile(file, buckets) {
   }
   return peaks;
 }
-export async function processAudio({ source, directory, job, store, prefix, publish, signal }) {
+export async function processAudio({ source, directory, job, store, prefix, publish, budgetExceeded, signal }) {
   const sources = {};
+  // A budget stop before any output is a clean requeue (no partial publish).
+  if (budgetExceeded?.()) return false;
   const meta = await extractMusicMeta(source);
   const metadataArgs = ['title', 'artist', 'album']
     .filter((key) => meta[key])
     .flatMap((key) => ['-metadata', `${key}=${meta[key]}`]);
   for (const bitrate of job.config.media.audio.bitrates) {
+    // Safe point between tier encodes: publish the verified MP3s so the audio
+    // is already playable when the budget is exhausted.
+    if (budgetExceeded?.()) {
+      if (Object.keys(sources).length) await publish({ ...meta, cover: '', coverPreview: '', sources }, false);
+      return false;
+    }
     const file = path.join(directory, `${bitrate}.mp3`);
     await runProcess(
       'ffmpeg',
@@ -34,6 +42,12 @@ export async function processAudio({ source, directory, job, store, prefix, publ
       { signal },
     );
     sources[bitrate] = await store.upload(`${prefix}/${bitrate}.mp3`, file);
+  }
+  // Waveform, cover art and the final publish are the remaining work: stop at
+  // this safe point and keep the encoded tiers instead of restarting from zero.
+  if (budgetExceeded?.()) {
+    if (Object.keys(sources).length) await publish({ ...meta, cover: '', coverPreview: '', sources }, false);
+    return false;
   }
   const pcmFile = path.join(directory, 'waveform.pcm');
   await runProcess(

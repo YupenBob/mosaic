@@ -30,11 +30,9 @@
   <link rel="icon" type="image/svg+xml" sizes="any" href="<%= rp %>assets/logo.svg" />
   <link rel="apple-touch-icon" href="<%= rp %>assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="<%= rp %>assets/remixicon/remixicon.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/tokens.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/reset.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/layout.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/motion.css" />
-  <link rel="stylesheet" href="<%= rp %>assets/css/icons.css" />
+  <%# Keep this the only assets/css link: scripts/minify.mjs bundles the site
+      stylesheets into assets/css/bundle.css (as index.ejs/post.ejs do). %>
+  <link rel="stylesheet" href="<%= rp %>assets/css/bundle.css" />
 <script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality, themeMode: site.themeMode, experience: site.experience }).replace(/</g, '\\u003c') %>;</script>
 </head>
 <body data-page="404">
@@ -61,7 +59,7 @@
       <p class="footer-feed"><a href="<%= rp %>feed.xml" title="RSS" aria-label="RSS"><i class="ri-rss-line"></i> RSS</a></p>
     </div>
   </footer>
-  <script>window.__I18N=<%- JSON.stringify(i18n || {}) %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
+  <script>window.__I18N=<%- JSON.stringify(i18n || {}).replace(/</g, '\\u003c') %>;window.__LANG='<%= site.language || 'zh-CN' %>';</script>
   <script type="module" src="<%= rp %>assets/js/app.js"></script>
 </body>
 </html>

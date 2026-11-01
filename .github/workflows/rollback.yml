@@ -1,0 +1,50 @@
+name: Mosaic Rollback
+
+# Restore a previous Cloudflare Pages deployment. Dry-run by default: pass
+# confirm=rollback (and optionally deployment_id) to actually switch production.
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: Pages deployment id to restore (empty = previous successful)
+        required: false
+        default: ''
+        type: string
+      confirm:
+        description: Type rollback to apply
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mosaic-rollback
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    environment: production
+    env:
+      SITE_BRANCH: ${{ vars.SITE_BRANCH }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      # rollback.mjs only needs Node's built-in fetch, so no npm ci here.
+      - name: Read deployment configuration
+        run: node scripts/deployment-env.mjs
+      - name: Rollback Pages deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "rollback" ]; then
+            echo "Dry run (type rollback to apply)"
+            node scripts/ops/rollback.mjs ${DEPLOYMENT_ID:+--deployment "$DEPLOYMENT_ID"}
+            exit 0
+          fi
+          node scripts/ops/rollback.mjs --apply ${DEPLOYMENT_ID:+--deployment "$DEPLOYMENT_ID"}

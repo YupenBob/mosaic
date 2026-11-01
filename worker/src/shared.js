@@ -11,9 +11,13 @@ export const HEALTH_TIMEOUT_MS = 5000;
 
 // ── CORS ──
 export const PUBLIC_CORS_PREFIXES = ['/api/health', '/api/stats/', '/api/track/', '/api/media/'];
+// Admin-only reports under the public /api/stats/ prefix: they must use the
+// configured origin allowlist, not the wildcard used by public read endpoints.
+export const ADMIN_STATS_PATHS = ['/api/stats/posts', '/api/stats/traffic'];
 export const DEFAULT_ALLOWED_ORIGINS = '';
 
 export function isPublicPath(path) {
+  if (ADMIN_STATS_PATHS.includes(path)) return false;
   return PUBLIC_CORS_PREFIXES.some((p) => path.startsWith(p));
 }
 

@@ -136,9 +136,9 @@ try {
   // insert buttons/insert-all (placeholder composition UX).
   let mediaSlug = '';
   try {
-    const front = await fetch('https://mosaic.xsanye.cn/data/posts.json').then((r) => r.json());
+    const front = await fetch('https://mosaic.xsanye.cn/data/posts-index.json').then((r) => r.json());
     mediaSlug = (front || []).find(
-      (p) => (p.photos || []).length || (p.videos || []).length || (p.music || []).length,
+      (p) => (p.media?.gallery || []).length || (p.media?.videos || []).length || (p.media?.music || []).length,
     )?.slug;
   } catch {}
   if (mediaSlug) {

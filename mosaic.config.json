@@ -74,7 +74,10 @@
   },
 
   "media": {
-    "keepSourceFiles": true
+    "keepSourceFiles": true,
+    "multipartThreshold": 104857600,
+    "partSize": 8388608,
+    "uploadRetries": 3
   },
 
   "cardShowTags": true,

@@ -4,6 +4,8 @@
  */
 import { GITHUB_API, branchPayload, headers } from './github-client.js';
 import { markDirty } from './publication.js';
+import { snapshotPostForOverlay } from './content.js';
+import { markContentOverlayRefresh, removeFromContentOverlay, upsertContentOverlay } from './content-overlay.mjs';
 
 const SHA_RE = /^[a-f0-9]{7,40}$/;
 const MAX_RESTORE_FILES = 20;
@@ -149,5 +151,41 @@ export async function restoreHistory(c, sha, path = '') {
     }
   }
   await markDirty(c.env, '');
+  await recordRestoreOverlay(c, results);
   return { ok: results.every((file) => file.status !== 'failed'), commit: detail.shortSha, files: results };
+}
+
+const POST_INDEX_PATH = /^content\/posts\/([^/]+)\/index\.md$/;
+
+/**
+ * A restore rewrites Git directly, bypassing the posts CRUD hooks. Reflect the
+ * restored post files in the content overlay; anything we cannot express as a
+ * post upsert/removal (config, theme, media files, partial failures) marks the
+ * overlay `refresh` so listPosts reads the authoritative Git state once.
+ */
+async function recordRestoreOverlay(c, results) {
+  const upserts = [];
+  const removals = [];
+  let refresh = results.some((file) => file.status === 'failed');
+  for (const result of results) {
+    const match = POST_INDEX_PATH.exec(result.path);
+    if (!match || !result.path.startsWith('content/posts/')) {
+      if (result.status !== 'skipped') refresh = true;
+      continue;
+    }
+    const slug = match[1];
+    if (result.status === 'deleted') removals.push(slug);
+    else if (result.status === 'restored') {
+      const snapshot = await snapshotPostForOverlay(c, slug).catch(() => null);
+      if (snapshot) upserts.push(snapshot);
+      else removals.push(slug);
+    }
+  }
+  try {
+    if (upserts.length) await upsertContentOverlay(c, upserts);
+    if (removals.length) await removeFromContentOverlay(c, removals);
+    if (refresh) await markContentOverlayRefresh(c);
+  } catch (error) {
+    console.error('history overlay update failed (falling back to GitHub reads):', error?.message || error);
+  }
 }

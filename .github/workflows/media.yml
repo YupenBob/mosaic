@@ -1,4 +1,8 @@
 name: Mosaic Media
+
+# Triggered by the Worker's Jobs DO (workflow_dispatch) or manually. Media
+# processing never runs from a plain push: it needs R2/Worker credentials and a
+# paid runner window.
 on:
   workflow_dispatch:
     inputs:
@@ -6,27 +10,33 @@ on:
         description: Media job timeout (10-360 minutes)
         default: '90'
         type: string
+
+permissions:
+  contents: read
+
 concurrency:
   group: mosaic-media-${{ github.ref }}
   cancel-in-progress: false
+
 jobs:
   media:
     runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: ${{ fromJSON(inputs.timeout_minutes || vars.MEDIA_TIMEOUT_MINUTES || '90') }}
-    permissions: { contents: read }
+    # Non-secret configuration only; credentials are scoped to the processing
+    # steps below so `npm ci` / ffmpeg never see production secrets.
     env:
       API_TARGET: ${{ vars.API_TARGET }}
-      PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
-      R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-      R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       R2_BUCKET: ${{ vars.R2_BUCKET }}
       MIGRATION_GIT_SHA: ${{ vars.MIGRATION_GIT_SHA }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with: { node-version-file: '.nvmrc', cache: npm }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
       - name: Install dependencies and media tools
         run: |
           npm ci
@@ -35,9 +45,27 @@ jobs:
       - name: Read deployment configuration
         run: node scripts/deployment-env.mjs
       - name: Migrate legacy manifests
+        env:
+          PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/media/migrate.mjs
       - name: Process queued media
+        env:
+          PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npm run media:process
       - name: Clean unreferenced media versions
         if: success()
+        env:
+          PIPELINE_SECRET: ${{ secrets.PIPELINE_SECRET }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/media/cleanup.mjs

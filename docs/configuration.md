@@ -30,6 +30,7 @@
 | `videoQuality.fps` / `segmentSeconds` / `audioBitrate` | 30 / 6 / 128k | 视频帧率、HLS 分片、AAC 码率 |
 | `videoQuality.interpolation` | enabled:false, fps:60, mode:mci, mcMode:aobmc, meMode:bidir, vsbmc:true | ffmpeg 光流补帧（minterpolate）；仅 enabled 时进入处理指纹 |
 | `media.keepSourceFiles` | true | 解码成功并全部档位发布后是否保留 `originals/` 源文件；不进入处理指纹 |
+| `media.multipartThreshold` / `partSize` / `uploadRetries` | 100 MiB / 8 MiB / 3 | 服务端媒体 runner 上传：达到阈值走 S3 分片并使用 `partSize` 片大小，每次请求最多 `uploadRetries` 次重试；小对象单次 PUT。须满足 `multipartThreshold >= partSize`；与浏览器侧 `upload.*` 独立 |
 | `theme` / `themeMode.default` | auto / auto | 主题模式：auto / light / dark（`themeMode` 优先，旧 `theme` 自动映射） |
 | `themeMode.accent` / `allowVisitorToggle` / `showMenu` | blue / true / true | 主题色板与访客切换入口 |
 | `experience.card` | size:large, image:full, layout:masonry | 列表卡片尺寸、封面展示方式与布局（`masonry` 瀑布流 / `grid` 等高网格） |

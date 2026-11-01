@@ -1,0 +1,39 @@
+name: Mosaic Probe
+
+# Frequent, zero-dependency production probes: run every 3 hours, finish in
+# well under a minute and never install npm packages. Browser-level regression
+# is a daily concern (health-check.yml); this workflow answers "is the edge
+# serving and locked down right now?".
+on:
+  schedule:
+    - cron: '0 */3 * * *' # every 3 hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: mosaic-probe
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ${{ vars.MOSAIC_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    env:
+      SITE_URL: ${{ vars.SITE_URL || 'https://mosaic.xsanye.cn' }}
+      API_URL: ${{ vars.API_URL || 'https://mosaic-api.xsanye.cn' }}
+      MEDIA_URL: ${{ vars.MEDIA_URL || 'https://mosaic-media.xsanye.cn' }}
+      ADMIN_URL: ${{ vars.ADMIN_URL || 'https://mosaic-admin.xsanye.cn' }}
+      GITHUB_REPO: ${{ github.repository }}
+      # Rollout switch — first production run is WARN-ONLY: a public private
+      # prefix is reported but does not fail. Once the run is clean, uncomment
+      # the next line so a WAF regression fails the probe (and opens ops-alert).
+      # PROBE_STRICT_PRIVATE: '1'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Probe production surfaces
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/ops/probe.mjs --json

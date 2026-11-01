@@ -1,5 +1,6 @@
 name = "mosaic-api"
 main = "src/index.js"
+# Keep in sync with shared/deployment.mjs (verified by scripts/check-wrangler-config.mjs).
 compatibility_date = "2024-04-01"
 
 # R2 Bucket binding

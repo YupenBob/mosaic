@@ -33,7 +33,9 @@ export function registerHealth(app) {
   app.get('/api/health/r2', async (c) => {
     const started = Date.now();
     try {
-      await c.env.MEDIA.head('site-data/health-probe');
+      // A real read (HEAD only proves the binding exists, not that the bucket
+      // is readable). The probe key is tiny/absent; we only care about throws.
+      await c.env.MEDIA.get('site-data/health-probe');
       return c.json({ status: 'ok', ok: true, latency: Date.now() - started });
     } catch (e) {
       return c.json({ status: 'error', ok: false, latency: Date.now() - started, error: e.message });

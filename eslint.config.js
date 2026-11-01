@@ -11,6 +11,8 @@ export default [
       '**/vendor/**',
       'test-results/**',
       '.playwright-cli/**',
+      '.pw/**',
+      '.secrets/**',
       '__pycache__/**',
       'video/**',
     ],

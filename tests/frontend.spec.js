@@ -78,10 +78,10 @@ test('category page stylesheet loads (relative path regression)', async ({ page 
 });
 
 test('gallery: open post gallery and switch quality', async ({ page }) => {
-  const posts = await fetch(`${SITE}/data/posts.json`)
+  const posts = await fetch(`${SITE}/data/posts-index.json`)
     .then((r) => r.json())
     .catch(() => []);
-  const galleryPost = (posts || []).find((p) => (p.photos || []).length > 0);
+  const galleryPost = (posts || []).find((p) => (p.media?.gallery || []).length > 0);
   test.skip(!galleryPost, 'no gallery post in this build');
   const resp = await page.goto(`${SITE}/posts/${galleryPost.slug}/`, {
     timeout: 60000,
@@ -102,10 +102,10 @@ test('gallery: open post gallery and switch quality', async ({ page }) => {
 });
 
 test('gallery: wheel zoom keeps the cursor-fixed content point', async ({ page }) => {
-  const posts = await fetch(`${SITE}/data/posts.json`)
+  const posts = await fetch(`${SITE}/data/posts-index.json`)
     .then((r) => r.json())
     .catch(() => []);
-  const galleryPost = (posts || []).find((p) => (p.photos || []).length > 0);
+  const galleryPost = (posts || []).find((p) => (p.media?.gallery || []).length > 0);
   test.skip(!galleryPost, 'no gallery post in this build');
   await page.goto(`${SITE}/posts/${galleryPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
   const firstItem = page.locator('.gallery-item img, .gallery-single-item img').first();
@@ -148,10 +148,10 @@ test('gallery: wheel zoom keeps the cursor-fixed content point', async ({ page }
 });
 
 test('gallery: blur-up loads LQIP first, then swaps to the sharp source', async ({ page }) => {
-  const posts = await fetch(`${SITE}/data/posts.json`)
+  const posts = await fetch(`${SITE}/data/posts-index.json`)
     .then((r) => r.json())
     .catch(() => []);
-  const galleryPost = (posts || []).find((p) => (p.photos || []).length > 0);
+  const galleryPost = (posts || []).find((p) => (p.media?.gallery || []).length > 0);
   test.skip(!galleryPost, 'no gallery post in this build');
   await page.goto(`${SITE}/posts/${galleryPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
   const img = page.locator('.gallery-item img, .gallery-single-item img').first();
@@ -172,10 +172,10 @@ test('gallery: blur-up loads LQIP first, then swaps to the sharp source', async 
 });
 
 test('gallery: masonry grid keeps natural aspect when a post has many photos', async ({ page }) => {
-  const posts = await fetch(`${SITE}/data/posts.json`)
+  const posts = await fetch(`${SITE}/data/posts-index.json`)
     .then((r) => r.json())
     .catch(() => []);
-  const gridPost = (posts || []).find((p) => (p.photos || []).length > 5);
+  const gridPost = (posts || []).find((p) => (p.media?.gallery || []).length > 5);
   test.skip(!gridPost, 'no multi-photo (grid) post in this build');
   await page.goto(`${SITE}/posts/${gridPost.slug}/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
   const grid = page.locator('.gallery-grid');
@@ -197,10 +197,10 @@ test('gallery: masonry grid keeps natural aspect when a post has many photos', a
 });
 
 test('video player: custom controls render and quality menu opens', async ({ page }) => {
-  const posts = await fetch(`${SITE}/data/posts.json`)
+  const posts = await fetch(`${SITE}/data/posts-index.json`)
     .then((r) => r.json())
     .catch(() => []);
-  const videoPost = (posts || []).find((p) => (p.videos || []).length > 0);
+  const videoPost = (posts || []).find((p) => (p.media?.videos || []).length > 0);
   test.skip(!videoPost, 'no video post in this build');
   const resp = await page.goto(`${SITE}/posts/${videoPost.slug}/`, {
     timeout: 60000,
@@ -228,7 +228,7 @@ test('search filters posts (query -> dropdown + grid)', async ({ page }) => {
   await page.goto(SITE, { waitUntil: 'domcontentloaded' });
   // Discover a query that uniquely matches one post across title/description/
   // tags (posts may be renamed/removed; skip when no unique term exists).
-  const posts = await fetch(`${SITE}/data/posts.json`)
+  const posts = await fetch(`${SITE}/data/posts-index.json`)
     .then((r) => r.json())
     .catch(() => []);
   const searchable = (posts || []).map((p) =>
@@ -248,7 +248,7 @@ test('search filters posts (query -> dropdown + grid)', async ({ page }) => {
   test.skip(!query, 'no uniquely-searchable post in this build');
   const input = page.locator('.search-input');
   await input.waitFor({ state: 'visible', timeout: 10000 });
-  // initSearch wires the input listener only after posts.json loads + dynamic
+  // initSearch wires the input listener only after posts-index.json loads + dynamic
   // imports; wait for the grid to render (initFilter done), then fill — and
   // re-fill if we still raced ahead of the listener.
   await page.locator('.post-card').first().waitFor({ state: 'visible', timeout: 15000 });
@@ -290,10 +290,10 @@ async function assertMobileHls(page) {
   await page.route(/(busuanzi\.ibruce\.info|static\.cloudflareinsights\.com|giscus\.app)/, (route) => route.abort());
   // Discover a video post from the generated data instead of hardcoding a slug
   // (posts may be renamed/removed; only skip when this build has no video).
-  const posts = await fetch(`${SITE}/data/posts.json`)
+  const posts = await fetch(`${SITE}/data/posts-index.json`)
     .then((r) => (r.ok ? r.json() : []))
     .catch(() => []);
-  const videoPost = Array.isArray(posts) ? posts.find((p) => (p.videos || []).length > 0) : undefined;
+  const videoPost = Array.isArray(posts) ? posts.find((p) => (p.media?.videos || []).length > 0) : undefined;
   test.skip(!videoPost, 'no video post found in this build');
   const postUrl = `${SITE}/posts/${videoPost.slug}/`;
   const resp = await page.goto(postUrl, { timeout: 60000, waitUntil: 'domcontentloaded' });

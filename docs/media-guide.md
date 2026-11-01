@@ -17,10 +17,13 @@
 - 视频：生成海报时额外输出 `poster-preview.webp`，写入清单 `published.posterPreview`。
 - 音乐：提取封面时额外输出 `cover-preview.webp`，写入 `published.coverPreview`。
 
-构建把预览地址写入 `posts-index.json` / `posts.json` 的 `coverLqip`（以及 `feed.json` /
-`notes/{slug}.json`）。前台先渲染预览（模糊占位），`cards/media.js` 在图片接近视口或首屏优先时
+构建把预览地址写入 `posts-index.json` 的 `coverLqip`（以及 `feed.json` / `notes/{slug}.json`）。前台先渲染预览（模糊占位），`cards/media.js` 在图片接近视口或首屏优先时
 解码高清图并原位替换；极端/旧媒体没有预览时直接加载原图，不阻塞页面。删除/重建媒体后新产物
 自动带上预览，无需人工干预。
+
+`data/posts.json` 是**调试产物**：只有 `MOSAIC_DEBUG_DATA=1` 时才生成完整文章列表（含正文与媒体数组），
+生产构建只输出精简的 `data/posts-index.json`、`feed.json` 与 `notes/{slug}.json`。列表、搜索、后台
+与 RSS 都只读取精简索引，不要在生产里依赖 `posts.json`。
 
 ## 对象与身份
 

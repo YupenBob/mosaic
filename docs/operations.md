@@ -4,13 +4,20 @@
 
 | 工作流 | 触发 | 处理范围 |
 | --- | --- | --- |
-| Mosaic Site / pipeline.yml | 内容 push、手动、DO 调度 | 取清单快照、生成、离线检查、浏览器回归、Pages 部署、缓存与确认 |
+| Mosaic Site / pipeline.yml | **仅 main push**、手动/DO 调度 | 取清单快照、生成、离线检查、浏览器回归、Pages 部署（3 次退避）、缓存与确认；`environment: production` |
 | Mosaic Media / media.yml | DO 调度、手动 | 迁移一次、处理队列、验证并发布、清理未引用旧版本 |
-| Mosaic Infrastructure | Worker/后台 push、手动 | 共享校验、Worker dry-run、任务绑定、后台与代理环境配置 |
-| Mosaic Verify | push/PR/手动 | 无生产 Secrets 的完整离线检查、FFmpeg 合成媒体、浏览器测试 |
-| Health Check | 原有定时巡检 | 现有生产健康检查 |
+| Mosaic Infrastructure | **仅 main push**、手动 | 共享校验、Worker dry-run、Worker/后台部署、媒体域 WAF 白名单；`environment: production` |
+| Mosaic Media v2 Migration / migrate-v2.yml | 手动/marker push | 计划（dry-run）或应用；apply 在 `production` 环境、先 `npm run check`、单 commit 重写全部文章 |
+| Mosaic Verify | **PR 与非 main 分支 push** | 无生产 Secrets 的完整离线检查、FFmpeg 合成媒体、Playwright 缓存 + 浏览器测试（cancel-in-progress） |
+| Mosaic Preview | Worker 调度 | 单篇草稿的私密预览；`if: always()` 上报结果，失败/取消时清理 `previews/<id>/` |
+| Mosaic Probe | 每 3 小时 | 零依赖线上探测：health、媒体 CORS、HLS Range、私有前缀、越权路由、后台首页；失败自动开 `ops-alert` issue |
+| Production Health Check | 每日 | Playwright 浏览器回归 + 真实请求断言图片 200/CORS |
+| Mosaic Maintenance | 每周一 + 手动 | R2 lifecycle、manifest GC、previews/drafts 清理（手动默认 dry-run） |
+| Mosaic Rollback | 手动 | Pages 回退（默认 dry-run，`confirm=rollback` 才执行） |
 
-生产上传只在媒体 Actions 中执行。站点工作流没有 rclone、EXIF 工具、FFmpeg、checksum cache、原文件同步或媒体上传步骤。部署后仅上传小型 site-data 列表缓存。`API_TARGET`、桶、分支、超时与项目由配置/Variables 输出，密钥由 Secrets 提供。
+CI 去重：`pipeline.yml`、`infrastructure.yml` 只在 main push 与手动/调度触发；`verify.yml` 只在 PR 与非 main 分支 push 触发。所有 `uses` 固定 40 位 SHA，job 级 `env` 不含 Secrets（Secrets 只出现在调用外部 API 的 step）。`scripts/check-workflows.mjs` 在 `npm run check` 中强制以上规则。
+
+生产上传只在媒体 Actions 中执行。站点工作流没有 rclone、EXIF 工具、FFmpeg、checksum cache、原文件同步或媒体上传步骤。部署后仅上传小型 site-data 列表缓存。`API_TARGET`、桶、分支、超时与项目由配置/Variables 输出，密钥由 Secrets 提供。媒体域白名单规则、上线预检与残余风险见 [security-media.md](security-media.md)。
 
 ## 排查
 

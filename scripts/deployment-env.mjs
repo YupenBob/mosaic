@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadContext } from './lib/context.mjs';
+import { COMPATIBILITY_DATE } from '../shared/deployment.mjs';
 const { config } = loadContext();
 const values = {
   SITE_BRANCH: config.deployment.branch,
@@ -24,7 +25,7 @@ if (process.argv.includes('--worker-config')) {
       {
         name: config.deployment.workerName,
         main: path.join(root, 'worker/src/index.js'),
-        compatibility_date: '2024-04-01',
+        compatibility_date: COMPATIBILITY_DATE,
         r2_buckets: [{ binding: 'MEDIA', bucket_name: config.mediaSource.bucket }],
         durable_objects: {
           bindings: [

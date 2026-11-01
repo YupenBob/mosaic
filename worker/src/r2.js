@@ -149,12 +149,42 @@ function uploadKeepSource(c, body = {}) {
   );
 }
 
+// Namespaces under the R2 root that the upload/media API must never write into
+// on behalf of a caller: they are owned by the pipeline (previews), the cloud
+// drafts store (drafts), the media v2 asset lifecycle (assets) and the site
+// data writer (site-data). A post slug may not shadow any of them.
+export const RESERVED_MEDIA_SEGMENTS = ['assets', 'previews', 'drafts', 'site-data'];
+const RESERVED_MEDIA = new Set(RESERVED_MEDIA_SEGMENTS);
+
+// site-data is deliberately minimal: only the favicon family is uploaded
+// through the public upload API. Everything else in site-data is written by the
+// Worker/pipeline itself and must stay unreachable from user uploads.
+export const SITE_DATA_FILES = ['favicon.svg', 'favicon.png', 'favicon.ico', 'favicon.webp'];
+const SITE_DATA = new Set(SITE_DATA_FILES);
+
+function invalidMediaName() {
+  return Object.assign(new Error('Invalid media name'), { status: 400, code: 'INVALID_PARAMS' });
+}
+
+function assertSiteDataFile(filename) {
+  if (!SITE_DATA.has(String(filename).toLowerCase())) throw invalidMediaName();
+}
+
+function assertMediaSlug(slug) {
+  if (!validSegment(slug) || RESERVED_MEDIA.has(slug)) throw invalidMediaName();
+}
+
 // site-data is a reserved namespace (favicon etc.): not a post slug, so it is
 // never picked up by the pipeline sync and never swept as an orphan.
 export function mediaKey(slug, filename) {
-  if (!validSegment(slug) || !validSegment(filename)) throw new Error('Invalid media name');
+  if (!validSegment(filename)) throw invalidMediaName();
+  if (slug === 'site-data') {
+    assertSiteDataFile(filename);
+    return `site-data/${filename}`;
+  }
+  assertMediaSlug(slug);
   const ext = filename.split('.').pop()?.toLowerCase() || '';
-  return slug === 'site-data' ? `site-data/${filename}` : `originals/${slug}/${folderForExt(ext)}/${filename}`;
+  return `originals/${slug}/${folderForExt(ext)}/${filename}`;
 }
 
 /** Media v2 keys are independent of any post slug. */
@@ -177,7 +207,8 @@ function uploadTarget(body = {}) {
     };
   }
   const slug = body.slug;
-  if (!validSegment(slug) || !validSegment(filename)) throw new Error('Invalid media name');
+  if (!validSegment(filename)) throw invalidMediaName();
+  assertMediaSlug(slug);
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   return { slug, filename, folder: folderForExt(ext), key: mediaKey(slug, filename) };
 }
@@ -219,7 +250,12 @@ export async function uploadDirect(c) {
   const folder = folderForExt(ext);
   const contentType = EXT_CONTENT_TYPE[ext] || 'application/octet-stream';
   const isSiteData = slug === 'site-data';
-  const key = mediaKey(slug, filename);
+  let key;
+  try {
+    key = mediaKey(slug, filename);
+  } catch (error) {
+    return c.json({ error: error.message, code: 'INVALID_PARAMS' }, 400);
+  }
 
   await c.env.MEDIA.put(key, c.req.raw.body, { httpMetadata: { contentType } });
   const obj = await c.env.MEDIA.head(key).catch(() => null);
@@ -246,7 +282,12 @@ export async function uploadComplete(c) {
   const slug = c.req.param('slug');
   const filename = decodeURIComponent(c.req.param('filename'));
   if (!slug || !filename) return c.json({ error: 'slug and filename required', code: 'INVALID_PARAMS' }, 400);
-  const key = mediaKey(slug, filename);
+  let key;
+  try {
+    key = mediaKey(slug, filename);
+  } catch (error) {
+    return c.json({ error: error.message, code: 'INVALID_PARAMS' }, 400);
+  }
   try {
     const body = await c.req.json().catch(() => ({}));
     const obj = await c.env.MEDIA.head(key);
@@ -310,6 +351,10 @@ export async function deleteMediaFile(c) {
   const slug = c.req.param('slug');
   const filename = c.req.param('file');
   if (!slug || !filename) return c.json({ error: 'slug and file required', code: 'INVALID_PARAMS' }, 400);
+  // Only a real post slug can own uploads: never the reserved namespaces
+  // (site-data/drafts/previews/assets), and never a traversing segment.
+  if (!validSegment(slug) || RESERVED_MEDIA.has(slug) || !validSegment(filename))
+    return c.json({ error: 'Invalid media name', code: 'INVALID_PARAMS' }, 400);
   await invalidateMedia(c.env, slug, filename);
   const protectedKeys = await protectedMediaKeys(c.env);
   let deleted = 0;
@@ -397,6 +442,65 @@ export async function listMedia(c, mediaBaseOverride) {
   return c.json(result);
 }
 
+// ── Range-aware streaming for the Worker-mediated media fallback ──
+// When no public media domain is configured, media is streamed through the
+// Worker. Video players (and Safari in particular) probe with `Range:`; a 200
+// full-body response makes them download the whole file before playback. A
+// single byte range is enough (multipart ranges are not used by players).
+const RANGE_RE = /^bytes=(\d+)-(\d*)$/;
+
+function parseRange(header) {
+  const match = RANGE_RE.exec(String(header || '').trim());
+  if (!match) return null;
+  const offset = parseInt(match[1], 10);
+  const end = match[2] ? parseInt(match[2], 10) : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(offset) || offset < 0 || end < offset) return null;
+  return { offset, end };
+}
+
+function rangeOption(range) {
+  if (!range) return undefined;
+  return {
+    range: { offset: range.offset, ...(Number.isFinite(range.end) ? { length: range.end - range.offset + 1 } : {}) },
+  };
+}
+
+function requestRange(c) {
+  try {
+    return typeof c.req.header === 'function' ? parseRange(c.req.header('Range')) : null;
+  } catch {
+    return null;
+  }
+}
+
+function serveObject(obj, range, cacheControl) {
+  const total = typeof obj.size === 'number' ? obj.size : undefined;
+  const headers = {
+    'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+    'Cache-Control': cacheControl,
+    ETag: obj.httpEtag || '',
+    // Media fetched via hls.js (XHR/fetch) requires CORS; R2's own edge
+    // responses sometimes omit it on cached range responses.
+    'Access-Control-Allow-Origin': '*',
+    'Accept-Ranges': 'bytes',
+  };
+  if (range && total !== undefined) {
+    const offset = obj.range?.offset ?? range.offset;
+    if (offset >= total) {
+      return new Response(null, {
+        status: 416,
+        headers: { 'Content-Range': `bytes */${total}`, 'Accept-Ranges': 'bytes' },
+      });
+    }
+    const end = Number.isFinite(range.end) ? Math.min(range.end, total - 1) : total - 1;
+    return new Response(obj.body, {
+      status: 206,
+      headers: { ...headers, 'Content-Range': `bytes ${offset}-${end}/${total}` },
+    });
+  }
+  return new Response(obj.body, { status: 200, headers });
+}
+
 // Serve an object by its manifest key when no public media domain is configured.
 // Only processed/originals namespaces are reachable; arbitrary keys are rejected.
 export async function serveMediaObject(c) {
@@ -405,67 +509,47 @@ export async function serveMediaObject(c) {
     return c.json({ error: 'Invalid media key', code: 'INVALID_PARAMS' }, 400);
   }
   try {
-    const obj = await c.env.MEDIA.get(key);
+    const range = requestRange(c);
+    const obj = await c.env.MEDIA.get(key, rangeOption(range));
     if (!obj) return c.json({ error: 'File not found', code: 'NOT_FOUND' }, 404);
-    return new Response(obj.body, {
-      headers: {
-        'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        ETag: obj.httpEtag || '',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    return serveObject(obj, range, 'public, max-age=31536000, immutable');
   } catch (e) {
     return c.json({ error: e.message, code: 'R2_ERROR' }, 502);
   }
 }
 
-// Serve a media file from R2 (searches both originals/ and processed/)
+// Serve a media file from R2. The folder is derived from the file extension so
+// a miss costs at most two GETs (processed, then originals) instead of the old
+// 10-prefix sweep.
 export async function serveMediaFile(c) {
   const slug = c.req.param('slug');
   const filename = c.req.param('filename');
 
-  // site-data namespace (favicon etc.)
   if (slug === 'site-data') {
+    // Public site-data reads are restricted to the favicon whitelist.
+    if (!SITE_DATA.has(String(filename).toLowerCase()))
+      return c.json({ error: 'File not found', code: 'NOT_FOUND' }, 404);
     try {
-      const obj = await c.env.MEDIA.get(`site-data/${filename}`);
-      if (obj) {
-        return new Response(obj.body, {
-          headers: {
-            'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
-            'Cache-Control': 'public, max-age=86400',
-            ETag: obj.httpEtag || '',
-            // Media fetched via hls.js (XHR/fetch) requires CORS; R2's own
-            // edge responses sometimes omit it on cached range responses.
-            'Access-Control-Allow-Origin': '*',
-          },
-        });
-      }
+      const range = requestRange(c);
+      const obj = await c.env.MEDIA.get(`site-data/${filename}`, rangeOption(range));
+      if (obj) return serveObject(obj, range, 'public, max-age=86400');
     } catch {}
     return c.json({ error: 'File not found', code: 'NOT_FOUND' }, 404);
   }
 
-  // Search order: processed (compressed) first, then originals
-  const prefixes = ['processed', 'originals'];
-  const folders = ['photos', 'videos', 'music', 'covers', 'others'];
+  if (!validSegment(slug) || !validSegment(filename))
+    return c.json({ error: 'Invalid media name', code: 'INVALID_PARAMS' }, 400);
 
-  for (const prefix of prefixes) {
-    for (const folder of folders) {
-      const key = `${prefix}/${slug}/${folder}/${filename}`;
-      try {
-        const obj = await c.env.MEDIA.get(key);
-        if (obj) {
-          return new Response(obj.body, {
-            headers: {
-              'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
-              'Cache-Control': 'public, max-age=31536000',
-              ETag: obj.httpEtag || '',
-              'Access-Control-Allow-Origin': '*',
-            },
-          });
-        }
-      } catch {}
-    }
+  // Folder is derived from the extension: processed (compressed) first, then
+  // the original. Two GETs worst case.
+  const folder = folderForExt(filename.split('.').pop()?.toLowerCase() || '');
+  const range = requestRange(c);
+  for (const prefix of ['processed', 'originals']) {
+    const key = `${prefix}/${slug}/${folder}/${filename}`;
+    try {
+      const obj = await c.env.MEDIA.get(key, rangeOption(range));
+      if (obj) return serveObject(obj, range, 'public, max-age=31536000');
+    } catch {}
   }
   return c.json({ error: 'File not found', code: 'NOT_FOUND' }, 404);
 }

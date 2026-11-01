@@ -12,7 +12,14 @@ const run = (root, manifest) => {
   const result = spawnSync(process.execPath, ['scripts/generate.js'], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, PATH: '', ...(manifest ? { MEDIA_MANIFEST_FILE: manifest } : {}) },
+    env: {
+      ...process.env,
+      PATH: '',
+      // The benchmark still compares the legacy full `data/posts.json` payload,
+      // which is now an opt-in debug artifact (`MOSAIC_DEBUG_DATA=1`).
+      MOSAIC_DEBUG_DATA: '1',
+      ...(manifest ? { MEDIA_MANIFEST_FILE: manifest } : {}),
+    },
   });
   if (result.status) throw new Error(result.stderr);
   return Math.round(performance.now() - started);

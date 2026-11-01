@@ -17,12 +17,14 @@ const payload =
     : { previewId, ok: process.env.PREVIEW_OK !== 'false', error: process.env.PREVIEW_ERROR || '' };
 const raw = JSON.stringify(payload);
 const timestamp = String(Date.now());
-const signature = crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex');
+const nonce = crypto.randomBytes(16).toString('hex');
+const signature = crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${raw}`).digest('hex');
 const response = await fetch(`${target}/api/preview-build/${operation}`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
     'X-Mosaic-Time': timestamp,
+    'X-Mosaic-Nonce': nonce,
     'X-Mosaic-Signature': signature,
   },
   body: raw,

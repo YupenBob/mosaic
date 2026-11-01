@@ -17,7 +17,7 @@
  */
 
 /** @type {{observer: ResizeObserver|null, grid: HTMLElement|null, dispose: (() => void)|null}} */
-const state = { observer: null, grid: null, dispose: null };
+const state = { observer: null, grid: null, dispose: null, onLoad: null, onCardMedia: null };
 let scheduled = 0;
 
 /** @param {HTMLElement} grid @returns {CSSStyleDeclaration} */
@@ -168,11 +168,24 @@ export function initMasonry(grid = document.querySelector('.card-grid')) {
     state.observer.observe(grid);
   }
   if (document.fonts?.ready) document.fonts.ready.then(schedule).catch(() => {});
+  // Sub-resources (notably the icon webfont and the HD card images) can settle
+  // after the first pass and change a card's height by a line box. Re-pack when
+  // the page finishes loading and whenever a card image upgrades.
+  if (typeof window !== 'undefined') {
+    state.onLoad = schedule;
+    state.onCardMedia = schedule;
+    window.addEventListener('load', state.onLoad);
+    window.addEventListener('mosaic:card-media-upgraded', state.onCardMedia);
+  }
   state.dispose = () => {
     cancelAnimationFrame(scheduled);
     scheduled = 0;
     state.observer?.disconnect();
     state.observer = null;
+    if (state.onLoad) window.removeEventListener('load', state.onLoad);
+    if (state.onCardMedia) window.removeEventListener('mosaic:card-media-upgraded', state.onCardMedia);
+    state.onLoad = null;
+    state.onCardMedia = null;
     unmasonry(grid);
     state.grid = null;
     state.dispose = null;

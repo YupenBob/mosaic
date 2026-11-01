@@ -33,8 +33,9 @@ export function secretFor(c) {
  *   so the Worker can trust it without letting direct callers spoof it.
  * - Legacy transition: the previous static-header scheme (X-Mosaic-Proxy ===
  *   secret with X-Real-IP) is still accepted for one release cycle.
- * - When PROXY_SECRET is not configured (local dev), fall back to X-Real-IP /
- *   CF-Connecting-IP as-is.
+ * - Fail closed: without PROXY_SECRET only the header the Cloudflare edge sets
+ *   itself (CF-Connecting-IP) is trusted. X-Real-IP is caller-controlled and
+ *   is only honoured in explicit DEV_MODE, where there is no edge in front.
  */
 export async function clientIp(c) {
   const proxySecret = c.env.PROXY_SECRET;
@@ -50,7 +51,8 @@ export async function clientIp(c) {
     if (legacy === proxySecret && legacyIp) return legacyIp;
     return c.req.header('CF-Connecting-IP') || 'unknown';
   }
-  return c.req.header('X-Real-IP') || c.req.header('CF-Connecting-IP') || 'unknown';
+  if (c.env.DEV_MODE === 'true') return c.req.header('X-Real-IP') || c.req.header('CF-Connecting-IP') || 'unknown';
+  return c.req.header('CF-Connecting-IP') || 'unknown';
 }
 
 // Accepted clock skew between the Pages proxy and the Worker (minute buckets).
@@ -83,22 +85,57 @@ async function verifyHmac(secret, message, providedSig) {
   return safeEqual(expected, String(providedSig).toLowerCase());
 }
 
+/**
+ * Constant-time password check. Both values are hashed first so the comparison
+ * always runs over the same fixed-length digest — a direct string compare would
+ * leak the password length through timing (and start comparing attacker input
+ * before the expected value is even known).
+ */
+export async function passwordMatches(provided, expected) {
+  const digest = async (value) => {
+    const bytes = new TextEncoder().encode(String(value ?? ''));
+    const hash = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  const [a, b] = await Promise.all([digest(provided), digest(expected)]);
+  return safeEqual(a, b);
+}
+
 // ── Login rate limiting (in-memory, per-isolate) ──
+// The map is bounded and TTL-pruned: an attacker rotating IPs can neither grow
+// it without bound nor keep stale entries alive forever.
 const MAX_FAILS = 5;
 const LOCK_MS = 5 * 60 * 1000;
+const FAILURE_TTL_MS = 30 * 60 * 1000;
+const FAILURES_MAX = 5000;
 const _failures = new Map();
+
+function pruneFailures(now = Date.now()) {
+  if (_failures.size < FAILURES_MAX) return;
+  for (const [ip, entry] of _failures) {
+    if (now - (entry.updatedAt || 0) > FAILURE_TTL_MS) _failures.delete(ip);
+  }
+  while (_failures.size > FAILURES_MAX / 2) _failures.delete(_failures.keys().next().value);
+}
 
 function isLocked(ip) {
   const entry = _failures.get(ip);
   if (!entry) return false;
-  if (entry.lockedUntil && Date.now() < entry.lockedUntil) return true;
-  if (entry.lockedUntil && Date.now() >= entry.lockedUntil) _failures.delete(ip);
+  const now = Date.now();
+  if (entry.updatedAt && now - entry.updatedAt > FAILURE_TTL_MS) {
+    _failures.delete(ip);
+    return false;
+  }
+  if (entry.lockedUntil && now < entry.lockedUntil) return true;
+  if (entry.lockedUntil && now >= entry.lockedUntil) _failures.delete(ip);
   return false;
 }
 
 function recordFailure(ip) {
+  pruneFailures();
   const entry = _failures.get(ip) || { fails: 0, lockedUntil: 0 };
   entry.fails += 1;
+  entry.updatedAt = Date.now();
   if (entry.fails >= MAX_FAILS) {
     entry.lockedUntil = Date.now() + LOCK_MS;
     entry.fails = 0;
@@ -160,7 +197,7 @@ export async function loginHandler(c) {
   if (isLocked(ip)) {
     return c.json({ error: 'Too many attempts, try again later', code: 'AUTH_RATE_LIMITED' }, 429);
   }
-  if (adminPw && password !== adminPw) {
+  if (adminPw && !(await passwordMatches(password, adminPw))) {
     recordFailure(ip);
     return c.json({ error: 'Invalid password', code: 'AUTH_INVALID' }, 401);
   }

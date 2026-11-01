@@ -9,6 +9,15 @@ import { assetId, validSegment } from '../shared/media-manifest.mjs';
 import { jsStr } from '../cloud-admin/js/escape.js';
 import { contentsUrl } from '../worker/src/services/github-client.js';
 import { deletePost } from '../worker/src/services/content.js';
+import { mediaKey, SITE_DATA_FILES } from '../worker/src/r2.js';
+import { clientIp, passwordMatches } from '../worker/src/auth.js';
+import { validStatsSlug } from '../worker/src/stats-do.js';
+import { validTrackSlug } from '../worker/src/routes/stats.js';
+import {
+  pipelineNonce,
+  pipelineSignatureMessage,
+  PIPELINE_NONCE_RE,
+} from '../worker/src/services/pipeline-signature.js';
 
 const unsafe = [
   `x');alert(1)//`,
@@ -58,3 +67,51 @@ assert.equal(jsStr('秋日.jpg'), '&quot;秋日.jpg&quot;');
 assert.equal(jsStr(null), '&quot;&quot;');
 
 console.log('Security smoke: segment validation and JS-string escaping passed');
+
+// ── Worker R2 write channels: site-data whitelist + reserved namespaces ──
+for (const name of SITE_DATA_FILES) assert.equal(mediaKey('site-data', name), `site-data/${name}`);
+for (const name of ['robots.txt', 'favicon.exe', 'app.js', '..', 'a/b.svg'])
+  assert.throws(() => mediaKey('site-data', name), /Invalid media name/, `site-data/${name} must be rejected`);
+for (const slug of ['assets', 'previews', 'drafts']) assert.throws(() => mediaKey(slug, 'x.jpg'), /Invalid media name/);
+assert.equal(mediaKey('post', 'cover.jpg'), 'originals/post/photos/cover.jpg');
+assert.equal(mediaKey('post', 'clip.mp4'), 'originals/post/videos/clip.mp4');
+
+// ── Fail-closed client IP + constant-time password comparison ──
+const headerIp = (env, headers) => {
+  const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+  return clientIp({ env, req: { header: (name) => lower[name.toLowerCase()] || '' } });
+};
+assert.equal(
+  await headerIp({ DEV_MODE: 'false' }, { 'X-Real-IP': '1.2.3.4', 'CF-Connecting-IP': '5.6.7.8' }),
+  '5.6.7.8',
+  'X-Real-IP must not be trusted without the proxy HMAC',
+);
+assert.equal(
+  await headerIp({ DEV_MODE: 'true' }, { 'X-Real-IP': '1.2.3.4' }),
+  '1.2.3.4',
+  'DEV_MODE keeps local fallback',
+);
+assert.equal(await passwordMatches('admin123', 'admin123'), true);
+assert.equal(await passwordMatches('admin124', 'admin123'), false);
+assert.equal(await passwordMatches('', 'admin123'), false);
+assert.equal(await passwordMatches(undefined, undefined), true, 'both unset cannot throw');
+
+// ── Stats tracking slug rules (DO + Worker route agree) ──
+for (const slug of ['', '.', '..', 'a/b', 'a\\b', 'a'.repeat(121), 'a\u0000b'])
+  assert.equal(validStatsSlug(slug), false, `stats must reject ${JSON.stringify(slug)}`);
+for (const slug of ['my-post', '秋日的光', 'a b', 'a'.repeat(120)])
+  assert.equal(validStatsSlug(slug), true, `stats must accept ${slug}`);
+for (const slug of ['', '..', 'a/b', 'a'.repeat(121), 'a\u0001b'])
+  assert.equal(validTrackSlug(slug), false, `track must reject ${JSON.stringify(slug)}`);
+assert.equal(validTrackSlug('my-post'), true);
+
+// ── Pipeline HMAC: optional nonce is part of the signed message ──
+assert.equal(pipelineSignatureMessage('123', '', '{}'), '123.{}');
+assert.equal(pipelineSignatureMessage('123', 'a'.repeat(16), '{}'), `123.${'a'.repeat(16)}.{}`);
+assert.equal(PIPELINE_NONCE_RE.test('0123456789abcdef'), true);
+assert.equal(PIPELINE_NONCE_RE.test('0123456789ABCDEF'), false, 'nonce must be lowercase hex');
+assert.equal(PIPELINE_NONCE_RE.test('short'), false);
+const noNonceReq = { req: { header: () => '' } };
+assert.equal(pipelineNonce(noNonceReq), '');
+
+console.log('Security smoke: segment validation, R2 write channels, auth fail-closed and HMAC nonce passed');
