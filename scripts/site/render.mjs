@@ -4,6 +4,7 @@ import ejs from 'ejs';
 import { renderCard, renderCards, renderEmptyState } from '../../src/assets/js/cards/render.js';
 import { categoryRoute, tagSlug } from '../../shared/taxonomy.mjs';
 import { resolveTheme } from './theme.mjs';
+import { bundleSiteCss } from '../lib/site-css.mjs';
 
 /** Escape a value for XML text/attribute content. */
 function escapeXml(value) {
@@ -295,6 +296,10 @@ export function renderSite(context, posts, indexes) {
         fs.copyFileSync(from, to);
       }
     }
+    // The layouts link a single stylesheet, so every generation path (build,
+    // preview, browser tests calling generateSite directly) must emit it.
+    const bundled = bundleSiteCss(targetAssets);
+    if (bundled) console.log(`CSS bundle: ${bundled.files} files -> assets/css/bundle.css (${bundled.bytes} B)`);
   }
 
   console.log(`Generated: ${posts.length} posts, ${categories.length} categories, ${tags.length} tags`);
