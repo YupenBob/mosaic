@@ -138,3 +138,31 @@ npm run test:admin:local
 
 
 
+
+### 2026-11-01 P0–P2 审计修复上线
+
+- 代码：`main` 合并提交 `0e37f31`（PR #7），来自 `fix/p0-p2-audit`
+  （`7ad55fd` worker 安全/Stats v2/content overlay、`0bb2755` 构建正确性/媒体管线/产物、
+  `aa5f6f2` CI/部署/可观测/边缘、`515ebff` CSS bundle 生成时机、`e5df918` 瀑布流重排 + WAF 降级）。
+- 上线：Infrastructure（Worker + admin + WAF 步骤）与 Site（build→e2e→Pages）均成功；
+  Site 首次 push 因**新旧签名窗口**（新脚本带 nonce、旧 Worker 不识别）失败，
+  Infrastructure 完成后手动 `workflow_dispatch` 重跑成功。后续发布保持
+  Infrastructure → Site 顺序，或先在分支上验证。
+- 线上核验：`build-snapshot.gitSha=0e37f31`；首页只引用 `assets/css/bundle.css`（76.6KB）、
+  `screenshot.png` 404；`/api/stats/posts`、`/api/stats/traffic` 401；`/api/media/file/site-data/*`
+  404（favicon 除外）；`/api/media/object?key=site-data/*` 400；track 非法 slug 400；
+  Range 回源 206；Stats DO 迁移后 16 个 slug 的 views/likes 与迁移前备份逐项一致，
+  `site-data/stats.json`（含历史 `_recentIps`）已从 R2 删除；probe 13 passed / 4 warnings。
+- **残余风险 R-0（已与用户确认降级上线）**：媒体自定义域上 `site-data/*`（manifest、posts-index、
+  media-manifests、迁移标记）仍然公开，因为仓库缺少 `CLOUDFLARE_ZONE_ID` 且现有
+  `CLOUDFLARE_API_TOKEN` 未验证 WAF 权限。补完步骤见 `docs/security-media.md` 的“渐进上线”：
+  ① 配置 Zone ID/必要时 `MEDIA_ORIGIN`；② 手动 dispatch `infrastructure.yml`，确认 WAF 步骤
+  写入规则（默认降级、`--strict` 才失败）；③ 跑 `probe.mjs` 确认私有前缀 403/404 后打开
+  `PROBE_STRICT_PRIVATE`，并把 WAF step 改为 `--strict`。
+- 其他残余：`drafts/`、`previews/` 依赖 WAF 落地才真正私有（探测当前 404 只是对象不存在）；
+  `originals/` 按设计继续公开（18 处图集原图依赖，EXIF 隐私待媒体回填后收窄）；
+  `/data/posts.json` 已不再随构建发布，但旧 CDN 缓存可能仍返回数天；Dependabot 已启用，
+  会持续开依赖升级 PR。
+- 回退：Pages 用 `rollback.yml`（默认 dry-run，`confirm=rollback` 才执行）到上一个
+  deployment；Worker 用 `wrangler rollback`；Stats 旧 `stats` key 保留 30 天供旧代码读取；
+  迁移前统计备份在本地 `.mosaic/backup/`（未入库）。
