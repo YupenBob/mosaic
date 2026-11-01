@@ -11,6 +11,13 @@ import {
 import { getConfig } from './site-config.js';
 import { isDirty } from './publication.js';
 import { validSegment } from '../../../shared/media-manifest.mjs';
+import { assertValidFrontmatter } from '../../../shared/content-schema.mjs';
+import {
+  applyContentOverlay,
+  readContentOverlay,
+  upsertContentOverlay,
+  removeFromContentOverlay,
+} from './content-overlay.mjs';
 
 /** Reject unsafe or ambiguous post slugs before they reach GitHub/R2 paths. */
 export function assertPostSlug(slug) {
@@ -34,6 +41,32 @@ async function readPostsIndex(c) {
   } catch {
     return null;
   }
+}
+
+/** Normalise a build-index entry (or parsed frontmatter) into a listPosts record. */
+export function postRecord(slug, source = {}, extras = {}) {
+  return {
+    slug,
+    title: source.title || slug,
+    category: source.category,
+    tags: Array.isArray(source.tags) ? source.tags : [],
+    date: source.date,
+    description: source.description,
+    media: source.media || null,
+    cover: source.cover || '',
+    ...(extras.coverLqip ? { coverLqip: extras.coverLqip } : {}),
+    ...(extras.coverAspect ? { coverAspect: extras.coverAspect } : {}),
+    ...(extras.coverSrcset ? { coverSrcset: extras.coverSrcset } : {}),
+    ...(source.type ? { type: source.type } : {}),
+    ...(source.stats ? { stats: source.stats } : {}),
+  };
+}
+
+/** The build-time index entries mapped to the listPosts record shape. */
+function indexRecords(index) {
+  return (index || [])
+    .filter((post) => post && typeof post.slug === 'string')
+    .map((post) => postRecord(post.slug, post, post));
 }
 
 async function listPostsUncached(c) {
@@ -75,40 +108,30 @@ async function listPostsUncached(c) {
   );
 }
 
-async function listPostsFromR2(c) {
-  try {
-    const posts = await readPostsIndex(c);
-    if (!posts) return null;
-    return posts.map((p) => ({
-      slug: p.slug,
-      title: p.title || p.slug,
-      category: p.category,
-      tags: p.tags || [],
-      date: p.date,
-      description: p.description,
-      media: p.media || null,
-      cover: p.cover || '',
-      ...(p.coverLqip ? { coverLqip: p.coverLqip } : {}),
-      ...(p.coverAspect ? { coverAspect: p.coverAspect } : {}),
-      ...(p.coverSrcset ? { coverSrcset: p.coverSrcset } : {}),
-      ...(p.type ? { type: p.type } : {}),
-      ...(p.stats ? { stats: p.stats } : {}),
-    }));
-  } catch {
-    return null;
-  }
-}
-
+/**
+ * List posts from the build-time R2 index plus the content overlay.
+ *
+ * - index + overlay          → merge (no GitHub call at all)
+ * - index, no overlay, clean → index as-is
+ * - index, no overlay, dirty → full GitHub read (legacy behaviour: without an
+ *                              overlay we cannot know what changed)
+ * - overlay.refresh          → full GitHub read (change not expressible)
+ * - no index at all          → full GitHub read
+ */
 export async function listPosts(c) {
   const cache = cacheFor(c.env);
   const config = await getConfig(c);
   if (cache.posts && Date.now() - cache.postsTime < config.cache.postsMs) return cache.posts;
   let fresh = null;
-  // Prefer the build-time R2 cache (fast, no GitHub rate-limit cost). Fall
-  // back to GitHub when there are unbuilt changes (dirty) or the cache is missing.
   try {
-    const dirty = await isDirty(c.env);
-    if (!dirty || (c.env.JOBS ? !dirty.contentDirty : !dirty.count)) fresh = await listPostsFromR2(c);
+    const index = await readPostsIndex(c);
+    if (index) {
+      const dirty = await isDirty(c.env);
+      const contentDirty = c.env.JOBS ? !!dirty?.contentDirty : !!dirty?.count;
+      const overlay = await readContentOverlay(c);
+      if (overlay && !overlay.refresh) fresh = applyContentOverlay(indexRecords(index), overlay);
+      else if (!overlay && !contentDirty) fresh = indexRecords(index);
+    }
   } catch {}
   if (!fresh) fresh = await listPostsUncached(c);
   cache.posts = fresh;
@@ -140,6 +163,14 @@ function yamlValue(value) {
 
 export async function createOrUpdatePost(c, slug, frontMatter, body, message, baseSha) {
   assertPostSlug(slug);
+  // Shared schema (build scripts use the same rules): unsafe categories/tags
+  // must fail here, before they reach Git or the content overlay.
+  try {
+    assertValidFrontmatter(frontMatter && typeof frontMatter === 'object' ? frontMatter : {}, { slug });
+  } catch (error) {
+    const invalid = Object.assign(new Error(error.message), { status: 422, code: 'INVALID_CONTENT' });
+    throw invalid;
+  }
   const existing = await getPost(c, slug);
   // Optimistic concurrency: admin sends the blob SHA it loaded. `null` means
   // "this is a new post", so an existing slug is a conflict instead of an
@@ -173,7 +204,34 @@ export async function createOrUpdatePost(c, slug, frontMatter, body, message, ba
   });
   if (!resp.ok) throw new Error(`GitHub createPost(${slug}): ${resp.status}`);
   bustCache();
-  return resp.json();
+  const result = await resp.json();
+  // Layer the save over the build-time index. Best-effort: if the overlay write
+  // fails, the dirty flag (set by the route) still routes listPosts through the
+  // authoritative GitHub read.
+  try {
+    const index = await readPostsIndex(c);
+    const cached = (index || []).find((post) => post.slug === slug) || {};
+    await upsertContentOverlay(c, [
+      postRecord(
+        slug,
+        {
+          title: frontMatter.title ?? cached.title,
+          category: frontMatter.category ?? cached.category,
+          tags: Array.isArray(frontMatter.tags) ? frontMatter.tags : cached.tags,
+          date: frontMatter.date ?? cached.date,
+          description: frontMatter.description ?? cached.description,
+          media: frontMatter.media ?? cached.media,
+          cover: frontMatter.cover ?? cached.cover,
+          type: cached.type,
+          stats: cached.stats,
+        },
+        cached,
+      ),
+    ]);
+  } catch (error) {
+    console.error(`content overlay upsert failed for ${slug} (falling back to GitHub reads):`, error?.message || error);
+  }
+  return result;
 }
 
 function assertContentPath(pathname) {
@@ -209,5 +267,37 @@ export async function deletePost(c, slug, message) {
   const msg = message || `Delete ${slug}`;
   const count = await deleteDir(c, `content/posts/${slug}`, msg);
   bustCache();
+  try {
+    await removeFromContentOverlay(c, [slug]);
+  } catch (error) {
+    console.error(`content overlay remove failed for ${slug} (falling back to GitHub reads):`, error?.message || error);
+  }
   return { deleted: true, count };
+}
+
+/**
+ * Fresh listPosts record for one post, read from GitHub and enriched with the
+ * build-index cover metadata. Used by write paths that cannot build the record
+ * from the request body (e.g. history restore).
+ */
+export async function snapshotPostForOverlay(c, slug) {
+  const post = await getPost(c, slug);
+  if (!post) return null;
+  const index = await readPostsIndex(c);
+  const cached = (index || []).find((entry) => entry.slug === slug) || {};
+  return postRecord(
+    slug,
+    {
+      title: post.frontMatter.title ?? cached.title,
+      category: post.frontMatter.category ?? cached.category,
+      tags: Array.isArray(post.frontMatter.tags) ? post.frontMatter.tags : cached.tags,
+      date: post.frontMatter.date ?? cached.date,
+      description: post.frontMatter.description ?? cached.description,
+      media: post.frontMatter.media ?? cached.media,
+      cover: post.frontMatter.cover ?? cached.cover,
+      type: cached.type,
+      stats: cached.stats,
+    },
+    cached,
+  );
 }

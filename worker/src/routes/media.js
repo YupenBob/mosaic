@@ -19,14 +19,9 @@ import {
 import { defer } from '../shared.js';
 
 export function registerMediaPublic(app) {
-  // Media file serving — public (uses R2_PUBLIC_URL or falls back to config.mediaBase)
-  app.get('/api/media/file/:slug/:filename', async (c) => {
-    let cfg = {};
-    try {
-      cfg = await getConfig(c);
-    } catch {}
-    return serveMediaFile(c, cfg.mediaBase);
-  });
+  // Media file serving — public. The fallback path derives folders itself and
+  // never needs the site config.
+  app.get('/api/media/file/:slug/:filename', async (c) => serveMediaFile(c));
 
   // Object proxy for previews when no public media domain is configured.
   app.get('/api/media/object', async (c) => serveMediaObject(c));

@@ -1,29 +1,32 @@
 import { jobsRequest, interpolateMedia, reconcileMedia } from '../services/jobs.js';
 import { getConfig } from '../services/site-config.js';
 import { GITHUB_API, headers } from '../services/github-client.js';
+import { pipelineNonce, verifyPipelineSignature } from '../services/pipeline-signature.js';
 
+/**
+ * Internal pipeline auth: HMAC over `timestamp[.nonce].body`.
+ *
+ * When a nonce is present the request is additionally checked against the Jobs
+ * Durable Object replay store. A duplicate nonce returns 200 with
+ * `{ ok: true, duplicate: true }` (the original request already ran), which
+ * makes the callback idempotent instead of failing the workflow step.
+ */
 async function pipelineAuth(c, next) {
   const secret = c.env.PIPELINE_SECRET;
   if (!secret) return c.json({ error: 'PIPELINE_SECRET is not configured' }, 503);
-  const timestamp = c.req.header('X-Mosaic-Time') || '';
-  const signature = c.req.header('X-Mosaic-Signature') || '';
-  if (
-    !/^\d+$/.test(timestamp) ||
-    Math.abs(Date.now() - Number(timestamp)) > 300000 ||
-    !/^[a-f0-9]{64}$/.test(signature)
-  )
-    return c.json({ error: 'Invalid pipeline signature' }, 401);
   const body = await c.req.text();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  );
-  const bytes = Uint8Array.from(signature.match(/../g), (pair) => parseInt(pair, 16));
-  if (!(await crypto.subtle.verify('HMAC', key, bytes, new TextEncoder().encode(`${timestamp}.${body}`))))
-    return c.json({ error: 'Invalid pipeline signature' }, 401);
+  if (!(await verifyPipelineSignature(c, body))) return c.json({ error: 'Invalid pipeline signature' }, 401);
+  const nonce = pipelineNonce(c);
+  if (nonce) {
+    try {
+      const result = await jobsRequest(c.env, 'nonce-check', { nonce });
+      if (result?.duplicate) return c.json({ ok: true, duplicate: true });
+    } catch (error) {
+      // Fail closed: without the replay store a nonce-signed callback cannot be
+      // proven fresh, so do not execute it twice.
+      return c.json({ error: `Nonce replay store unavailable: ${error.message}` }, 503);
+    }
+  }
   await next();
 }
 export function registerInternalJobs(app) {

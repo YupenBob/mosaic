@@ -348,3 +348,71 @@ assert.notEqual(processedAsset.generation, 'legacy', 'post-hoc interpolation use
 // filter construction and the persisted media-dispatch state machine.
 await import('./media-options-smoke.mjs');
 await import('./media-dispatch-smoke.mjs');
+
+// ── Site deploy retry state machine + HMAC nonce replay protection ──
+const retryRuntime = createRuntime();
+let dispatchCount = 0;
+globalThis.fetch = async (url) => {
+  const target = String(url);
+  if (target.includes('/dispatches')) {
+    dispatchCount++;
+    return new Response(null, { status: 204 });
+  }
+  if (target.includes('/actions/runs'))
+    return new Response(JSON.stringify({ workflow_runs: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  return new Response(null, { status: 204 });
+};
+try {
+  const attempt = await retryRuntime.call('build-begin', { runId: 'retry-1', gitSha: 'sha' });
+  await retryRuntime.call('build-done', { runId: 'retry-1', token: attempt.token, success: false });
+  let buildState = await retryRuntime.call('build-state');
+  assert.equal(buildState.buildRetry?.attempts, 1, 'a failed deploy schedules a retry');
+  assert.equal(buildState.buildRetry.exhausted, false);
+  // Make the backoff due and let the alarm dispatch it once.
+  retryRuntime.persistent.get('state').buildRetry.nextAt = 0;
+  retryRuntime.restart();
+  await retryRuntime.alarm();
+  assert.equal(dispatchCount, 1, 'a due retry dispatches the site workflow exactly once');
+  assert.ok(
+    (await retryRuntime.call('build-state')).buildRetry.nextAt > Date.now(),
+    'the retry is throttled until the next callback window',
+  );
+  const succeeded = await retryRuntime.call('build-begin', { runId: 'retry-2', gitSha: 'sha' });
+  await retryRuntime.call('build-done', { runId: 'retry-2', token: succeeded.token, success: true });
+  assert.equal((await retryRuntime.call('build-state')).buildRetry, null, 'a successful deploy clears the retry');
+  for (let i = 0; i <= retryRuntime.config.media.maxRetries; i++) {
+    const run = await retryRuntime.call('build-begin', { runId: `fail-${i}`, gitSha: 'sha' });
+    await retryRuntime.call('build-done', { runId: `fail-${i}`, token: run.token, success: false });
+  }
+  buildState = await retryRuntime.call('build-state');
+  assert.equal(buildState.buildRetry.exhausted, true, 'retries stop after media.maxRetries');
+  const exhaustedDispatches = dispatchCount;
+  retryRuntime.persistent.get('state').buildRetry.nextAt = 0;
+  retryRuntime.restart();
+  await retryRuntime.alarm();
+  assert.equal(dispatchCount, exhaustedDispatches, 'exhausted retries never dispatch again');
+} finally {
+  globalThis.fetch = previousFetch;
+}
+
+const nonceRuntime = createRuntime();
+const nonce = 'f'.repeat(32);
+assert.deepEqual(await nonceRuntime.call('nonce-check', { nonce }), { duplicate: false });
+assert.deepEqual(await nonceRuntime.call('nonce-check', { nonce }), { duplicate: true });
+nonceRuntime.restart();
+assert.deepEqual(await nonceRuntime.call('nonce-check', { nonce }), { duplicate: true }, 'nonces survive a DO restart');
+nonceRuntime.persistent.get('state').pipelineNonces[nonce] = Date.now() - 16 * 60 * 1000;
+nonceRuntime.restart();
+assert.deepEqual(
+  await nonceRuntime.call('nonce-check', { nonce }),
+  { duplicate: false },
+  'expired nonces are accepted again',
+);
+await assert.rejects(
+  nonceRuntime.call('nonce-check', {}),
+  (error) => error.status === 400,
+  'a missing nonce is rejected',
+);

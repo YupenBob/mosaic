@@ -88,11 +88,11 @@ export function registerBuild(app) {
       if (c.env.JOBS) {
         const state = await jobsRequest(c.env, 'build-state');
         const latest = state.builds.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))[0];
-        return c.json(
-          latest
-            ? { ...latest, updatedAt: latest.updatedAt || latest.finishedAt || latest.startedAt }
-            : { stage: '', updatedAt: null },
-        );
+        const progress = latest
+          ? { ...latest, updatedAt: latest.updatedAt || latest.finishedAt || latest.startedAt }
+          : { stage: '', updatedAt: null };
+        if (state.buildRetry) progress.buildRetry = state.buildRetry;
+        return c.json(progress);
       }
       const obj = await c.env.MEDIA.get('site-data/build-progress.json');
       if (!obj) return c.json({ stage: '', updatedAt: null });

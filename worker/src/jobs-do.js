@@ -34,6 +34,7 @@ import {
   settleTask,
 } from './jobs/media-task-ops.mjs';
 import { reconcileBatch } from './jobs/reconcile.mjs';
+import { clearContentOverlay } from './services/content-overlay.mjs';
 
 export class JobsDurableObject {
   constructor(state, env) {
@@ -79,6 +80,7 @@ export class JobsDurableObject {
       builds: {},
       deployments: [],
       buildPending: false,
+      buildRetry: null,
       config: null,
       mediaDispatch: createMediaDispatch(),
     });
@@ -136,9 +138,12 @@ export class JobsDurableObject {
     const outstanding = Object.values(state.jobs).some((job) => ['pending', 'running'].includes(job.status));
     const buildsActive = hasUnfinishedBuilds(state);
     const dispatchActive = dispatch.status !== 'idle';
+    const retry = state.buildRetry && typeof state.buildRetry === 'object' ? state.buildRetry : null;
+    const buildRetryActive = !!(retry && !retry.exhausted && Number.isFinite(retry.nextAt));
     if (
       !outstanding &&
       !state.buildPending &&
+      !buildRetryActive &&
       !state.manifestPending &&
       !state.reconcile &&
       !buildsActive &&
@@ -152,6 +157,7 @@ export class JobsDurableObject {
     if (taskWake) wakes.push(taskWake);
     const dispatchWake = mediaDispatchWakeAt(dispatch, config, now);
     if (dispatchWake) wakes.push(dispatchWake);
+    if (buildRetryActive) wakes.push(Math.max(now, Number(retry.nextAt)));
     if (state.buildPending || state.manifestPending || state.reconcile || buildsActive)
       wakes.push(now + config.media.pollMs);
     const next = Math.min(...wakes);
@@ -313,12 +319,17 @@ export class JobsDurableObject {
       return publicJobView(job, state.manifest.assets[job.assetId]);
     }
     if (operation === 'build-state')
-      return { builds: Object.values(state.builds).map(({ token: _token, ...build }) => build) };
+      return {
+        builds: Object.values(state.builds).map(({ token: _token, ...build }) => build),
+        buildRetry: state.buildRetry || null,
+      };
     if (operation === 'state')
       return {
         dirty: state.dirty,
         manifest: state.manifest,
         deployments: state.deployments,
+        buildPending: state.buildPending,
+        buildRetry: state.buildRetry || null,
         mediaDispatch: normalizeMediaDispatch(state.mediaDispatch, state),
         builds: Object.values(state.builds).map(({ token: _token, ...build }) => build),
         jobs: Object.values(state.jobs).map(({ config: _config, lease: _lease, ...job }) => job),
@@ -347,9 +358,33 @@ export class JobsDurableObject {
     if (operation === 'retry' || operation === 'cancel') return settleTask({ ...this.context(state, data), operation });
     if (['heartbeat', 'publish', 'complete', 'failed'].includes(operation))
       return recordProgress({ ...this.context(state, data), operation });
+    if (operation === 'nonce-check') return this.checkNonce(state, data.nonce);
     if (operation === 'build-begin') return this.buildBegin(state, data);
     if (operation === 'build-progress' || operation === 'build-done') return this.buildProgress(state, operation, data);
     throw Object.assign(new Error('Unknown coordinator operation'), { status: 404 });
+  }
+  /**
+   * Replay protection for HMAC-signed internal pipeline callbacks.
+   * Nonces live in pinned metadata (`state.pipelineNonces`) and expire after
+   * 15 minutes; the map is capped so a caller cannot grow DO metadata forever.
+   */
+  checkNonce(state, nonce) {
+    const value = typeof nonce === 'string' ? nonce : '';
+    if (!value) throw Object.assign(new Error('Nonce required'), { status: 400 });
+    const now = Date.now();
+    const ttl = 15 * 60 * 1000;
+    const max = 1000;
+    const map = state.pipelineNonces && typeof state.pipelineNonces === 'object' ? state.pipelineNonces : {};
+    for (const [key, ts] of Object.entries(map)) if (!(now - Number(ts) < ttl)) delete map[key];
+    if (map[value]) {
+      state.pipelineNonces = map;
+      return { duplicate: true };
+    }
+    map[value] = now;
+    const keys = Object.keys(map);
+    for (const key of keys.slice(0, Math.max(0, keys.length - max))) delete map[key];
+    state.pipelineNonces = map;
+    return { duplicate: false };
   }
   async buildBegin(state, data) {
     if (this.env.REQUIRE_MEDIA_MIGRATION === 'true' && !state.initialized) {
@@ -379,6 +414,32 @@ export class JobsDurableObject {
     state.builds[runId] = snapshot;
     return { ...snapshot, manifest: state.manifest };
   }
+  /**
+   * Durable site-deploy retry: a failed pipeline callback (or a run that ends
+   * without reporting) is retried with exponential backoff instead of leaving
+   * the site permanently dirty until an admin clicks rebuild.
+   * @param {object} state
+   * @param {number} [now]
+   */
+  scheduleBuildRetry(state, now = Date.now()) {
+    const config = this.config(state);
+    const max = Number.isInteger(config.media?.maxRetries) ? config.media.maxRetries : DEFAULTS.media.maxRetries;
+    const base = Number(config.media?.retryMs) > 0 ? Number(config.media.retryMs) : DEFAULTS.media.retryMs;
+    const retry = state.buildRetry && typeof state.buildRetry === 'object' ? state.buildRetry : { attempts: 0 };
+    retry.attempts = (retry.attempts || 0) + 1;
+    if (retry.attempts > max) {
+      retry.exhausted = true;
+      retry.nextAt = 0;
+      retry.lastError = 'Deploy retries exhausted';
+    } else {
+      retry.exhausted = false;
+      retry.nextAt = now + Math.min(15 * 60 * 1000, Math.max(5000, base * 2 ** (retry.attempts - 1)));
+    }
+    retry.updatedAt = new Date(now).toISOString();
+    state.buildRetry = retry;
+    state.buildPending = false;
+    return retry;
+  }
   async buildProgress(state, operation, data) {
     const snapshot = state.builds[String(data.runId)];
     if (!snapshot || snapshot.token !== data.token)
@@ -398,13 +459,25 @@ export class JobsDurableObject {
         snapshot.cachePublished &&
         snapshot.coversContent &&
         snapshot.contentRevision === (state.dirty.contentRevision || 0)
-      )
+      ) {
         state.dirty.contentDirty = false;
+        // The build published the content snapshot, so the live content overlay
+        // (unbuilt admin edits) is no longer needed. Same lifecycle as
+        // contentDirty: clear only when the deployment covers this revision.
+        try {
+          await clearContentOverlay(this.env);
+        } catch (error) {
+          state.lastDispatchError = `Content overlay clear: ${error.message}`;
+        }
+      }
       state.deployments.unshift({ ...snapshot, token: undefined });
       state.deployments = state.deployments.slice(0, this.config(state).media.deploymentHistory);
       if (snapshot.dirtyRevision === state.dirty.revision && snapshot.mediaRevision === state.manifest.revision)
         state.dirty.count = 0;
       else state.buildPending = true;
+      state.buildRetry = null;
+    } else {
+      this.scheduleBuildRetry(state);
     }
     return { ok: true, dirty: state.dirty.count > 0 };
   }
@@ -443,12 +516,26 @@ export class JobsDurableObject {
         }
         // 5. Site build dispatch: independent retry/outbox.
         try {
-          if (state.buildPending) {
+          const retryState = state.buildRetry && typeof state.buildRetry === 'object' ? state.buildRetry : null;
+          const retryDue = !!(
+            retryState &&
+            !retryState.exhausted &&
+            Number.isFinite(retryState.nextAt) &&
+            retryState.nextAt <= now
+          );
+          if (state.buildPending || retryDue) {
             await dispatchWorkflow({ env: this.env }, 'site', {}, config);
             state.buildPending = false;
+            if (retryDue) {
+              retryState.lastDispatchAt = new Date().toISOString();
+              // Throttle: do not dispatch again until this attempt had a chance
+              // to report back (the callback-missing sweep re-arms the timer).
+              retryState.nextAt = now + config.media.leaseMs;
+            }
           }
         } catch (error) {
           state.lastBuildDispatchError = error.message;
+          if (state.buildRetry) state.buildRetry.lastError = error.message;
         }
         // 6. Recover deployments whose callback never arrived (GitHub run done).
         for (const snapshot of Object.values(state.builds))
@@ -459,6 +546,10 @@ export class JobsDurableObject {
                 snapshot.finishedAt = new Date().toISOString();
                 snapshot.success = false;
                 snapshot.callbackMissing = true;
+                if (!snapshot.retryScheduled) {
+                  snapshot.retryScheduled = true;
+                  this.scheduleBuildRetry(state, now);
+                }
               }
             } catch (error) {
               state.lastBuildDispatchError = error.message;

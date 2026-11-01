@@ -300,14 +300,25 @@ await record('GET /api/health/github (real probe, up/down)', async () => {
   mockGithubDown = false;
 });
 
-await record('GET /api/health/r2 (real probe, up/down)', async () => {
-  const ok = await (await call('/api/health/r2')).json();
+await record('GET /api/health/r2 (real read probe, up/down)', async () => {
+  let reads = 0;
+  const probing = env({
+    MEDIA: {
+      ...media,
+      get: async (key) => {
+        reads++;
+        return media.get(key);
+      },
+    },
+  });
+  const ok = await (await call('/api/health/r2', { bindings: probing })).json();
   assert.equal(ok.status, 'ok');
   assert.ok(Number.isFinite(ok.latency));
+  assert.ok(reads >= 1, 'health probe performs a real read');
   const broken = env({
     MEDIA: {
       ...media,
-      head: async () => {
+      get: async () => {
         throw new Error('boom');
       },
     },
@@ -368,7 +379,157 @@ await record('concurrent views serialized (10/10 counted)', async () => {
   assert.equal(r.views, 10);
 });
 
-// ── 6. Config deep merge ──
+// ── 5c. Stats DO v2 storage schema ──
+await record('stats DO v2 schema (s:/day:/meta/agg, no R2 stats mirror)', async () => {
+  const keys = [...statsStore.keys()];
+  assert.ok(
+    keys.some((key) => key.startsWith('s:test-post')),
+    'per-post key present',
+  );
+  assert.ok(
+    keys.some((key) => key.startsWith('day:')),
+    'per-day key present',
+  );
+  assert.ok(keys.includes('meta'), 'schema meta written');
+  assert.ok(keys.includes('agg'), 'slug registry written');
+  assert.equal(statsStore.get('meta').schema, 2);
+  assert.ok(!store.has('site-data/stats.json'), 'stats are never mirrored back to R2');
+});
+
+await record('view dedupe lives in memory (same IP counted once)', async () => {
+  const ip = { 'CF-Connecting-IP': '10.9.9.9' };
+  await call('/api/track/view/dedupe-post', { method: 'POST', headers: ip });
+  await call('/api/track/view/dedupe-post', { method: 'POST', headers: ip });
+  assert.equal((await (await call('/api/stats/dedupe-post')).json()).views, 1);
+  await call('/api/track/view/dedupe-post', { method: 'POST', headers: { 'CF-Connecting-IP': '10.9.9.10' } });
+  assert.equal((await (await call('/api/stats/dedupe-post')).json()).views, 2);
+});
+
+await record('track slug validation (length, slash, dotdot)', async () => {
+  for (const slug of ['a'.repeat(121), 'bad%2Fslug']) {
+    const r = await call(`/api/track/view/${slug}`, { method: 'POST' });
+    assert.equal(r.status, 400, `must reject ${slug}`);
+  }
+  // `..` cannot reach the route (URL normalisation), so assert the DO guard.
+  const dotdot = await statsDO.fetch(
+    new Request('https://stats.local/view?slug=..', { method: 'POST', headers: { 'X-Real-IP': '10.4.4.4' } }),
+  );
+  assert.equal(dotdot.status, 400, 'DO rejects .. itself');
+  const long = await statsDO.fetch(
+    new Request(`https://stats.local/view?slug=${'a'.repeat(121)}`, {
+      method: 'POST',
+      headers: { 'X-Real-IP': '10.4.4.5' },
+    }),
+  );
+  assert.equal(long.status, 400);
+  assert.equal((await call('/api/track/view/ok-slug', { method: 'POST' })).status, 200);
+});
+
+await record('stats reports are protected (/posts, /traffic)', async () => {
+  assert.equal((await call('/api/stats/posts')).status, 401);
+  assert.equal((await call('/api/stats/traffic')).status, 401);
+});
+
+await record('traffic report field-equivalent + cache invalidated by writes', async () => {
+  const first = await (await call('/api/stats/traffic', { token: TOKEN })).json();
+  for (const key of ['total', 'totalLikes', 'posts', 'byDay', 'byCategory', 'byTag', 'top5'])
+    assert.ok(Object.hasOwn(first, key), `traffic exposes ${key}`);
+  assert.equal(first.byDay.length, 30, '30-day chart');
+  assert.ok(Array.isArray(first.byCategory) && Array.isArray(first.byTag) && Array.isArray(first.top5));
+  await call('/api/track/view/traffic-post', { method: 'POST', headers: { 'CF-Connecting-IP': '203.0.113.99' } });
+  const second = await (await call('/api/stats/traffic', { token: TOKEN })).json();
+  assert.ok(second.total > first.total, 'a write invalidates the 30s DO traffic cache');
+});
+
+await record('GET /api/stats/posts uses one DO call and joins defaults', async () => {
+  const body = await (await call('/api/stats/posts', { token: TOKEN })).json();
+  assert.ok(body.stats && typeof body.stats === 'object');
+  assert.ok(Object.hasOwn(body.stats, 'a'), 'posts without counters default to zero');
+  assert.equal(body.stats.a.views, 0);
+  assert.ok(typeof body.updatedAt === 'string');
+});
+
+// ── 5d. Stats DO v2 migration ──
+await record('stats DO v2 migrates legacy map + R2 seed, keeps legacy key 30d', async () => {
+  const legacyStore = new Map([
+    [
+      'stats',
+      {
+        alpha: {
+          views: 4,
+          likes: 2,
+          dwell_time: 30,
+          category: 'Tech/Web',
+          tags: ['js'],
+          history: [new Date().toISOString()],
+        },
+        beta: 3,
+      },
+    ],
+  ]);
+  const seedStore = new Map([['site-data/stats.json', JSON.stringify({ alpha: { views: 9, likes: 1 } })]]);
+  const storage = {
+    get: async (key) => (legacyStore.has(key) ? legacyStore.get(key) : null),
+    put: async (key, value) => void legacyStore.set(key, value),
+    delete: async (key) => void legacyStore.delete(key),
+  };
+  const seedMedia = {
+    get: async (key) => (seedStore.has(key) ? { text: async () => seedStore.get(key) } : null),
+    delete: async (key) => void seedStore.delete(key),
+  };
+  const legacyDO = new StatsDurableObject({ storage }, { MEDIA: seedMedia });
+  const alpha = await (
+    await legacyDO.fetch(new Request('https://stats.local/stats?slug=alpha', { method: 'POST' }))
+  ).json();
+  assert.equal(alpha.views, 4, 'in-storage legacy map wins over the R2 seed');
+  assert.ok(legacyStore.has('stats'), 'legacy map kept for rollback');
+  assert.ok(legacyStore.get('meta').legacyUntil, 'legacy expiry recorded');
+  assert.ok(!seedStore.has('site-data/stats.json'), 'one-time R2 seed deleted after import');
+  assert.equal(legacyStore.get('s:beta').views, 3, 'legacy map migrated per post');
+  const traffic = await (await legacyDO.fetch(new Request('https://stats.local/traffic', { method: 'POST' }))).json();
+  assert.equal(traffic.total, 7);
+  assert.deepEqual(
+    traffic.byCategory,
+    [
+      { name: 'Tech', count: 4 },
+      { name: 'uncategorized', count: 3 },
+    ],
+    'category split preserved',
+  );
+  assert.ok(
+    traffic.byDay.some((day) => day.count === 1),
+    'legacy view history rebuilt into day counters',
+  );
+
+  // R2-only seed path (fresh deployment, no in-storage legacy map).
+  const freshStore = new Map();
+  const freshStorage = {
+    get: async (key) => (freshStore.has(key) ? freshStore.get(key) : null),
+    put: async (key, value) => void freshStore.set(key, value),
+    delete: async (key) => void freshStore.delete(key),
+  };
+  const r2Only = new Map([['site-data/stats.json', JSON.stringify({ gamma: { views: 5, likes: 1 } })]]);
+  const freshDO = new StatsDurableObject(
+    { storage: freshStorage },
+    {
+      MEDIA: {
+        get: async (key) => (r2Only.has(key) ? { text: async () => r2Only.get(key) } : null),
+        delete: async (key) => void r2Only.delete(key),
+      },
+    },
+  );
+  const gamma = await (
+    await freshDO.fetch(new Request('https://stats.local/stats?slug=gamma', { method: 'POST' }))
+  ).json();
+  assert.equal(gamma.views, 5, 'R2 seed imported when no legacy map exists');
+  assert.ok(!r2Only.has('site-data/stats.json'), 'R2 seed removed after the one-time import');
+
+  // Bulk endpoint is a single DO round-trip over every tracked slug.
+  const bulk = await (await legacyDO.fetch(new Request('https://stats.local/bulk', { method: 'POST' }))).json();
+  assert.equal(bulk.stats.alpha.views, 4);
+  assert.equal(bulk.stats.beta.views, 3);
+});
+
 await record('listPosts reads R2 posts cache (when not dirty)', async () => {
   await media.put('site-data/posts.json', JSON.stringify([{ slug: 'cached', title: 'Cached Post' }]));
   const r = await call('/api/posts', { token: TOKEN });
@@ -449,6 +610,114 @@ await record('upload auth/size-limit/site-data namespace', async () => {
   });
   assert.equal(favicon.status, 200);
   assert.ok(store.has('site-data/favicon.svg'));
+});
+
+// ── 9a. WP1 write-channel hardening ──
+await record('site-data whitelist (only favicon.* uploadable)', async () => {
+  for (const name of ['robots.txt', 'favicon.exe', 'app.js']) {
+    const r = await call(`/api/upload/direct/site-data/${name}`, {
+      method: 'POST',
+      token: TOKEN,
+      headers: { 'Content-Length': '3' },
+      body: 'abc',
+    });
+    assert.equal(r.status, 400, `site-data/${name} must be rejected`);
+    assert.ok(!store.has(`site-data/${name}`), 'rejected upload is not written');
+  }
+  const png = await call('/api/upload/direct/site-data/favicon.png', {
+    method: 'POST',
+    token: TOKEN,
+    headers: { 'Content-Length': '2' },
+    body: 'xx',
+  });
+  assert.equal(png.status, 200);
+});
+
+await record('write channels reject reserved slugs + traversal names', async () => {
+  for (const slug of ['assets', 'previews', 'drafts']) {
+    const direct = await call(`/api/upload/direct/${slug}/x.jpg`, {
+      method: 'POST',
+      token: TOKEN,
+      headers: { 'Content-Length': '1' },
+      body: 'x',
+    });
+    assert.equal(direct.status, 400, `direct upload rejects ${slug}`);
+    const presign = await call('/api/upload/presign', {
+      method: 'POST',
+      token: TOKEN,
+      body: { slug, filename: 'x.jpg' },
+    });
+    assert.equal(presign.status, 400, `presign rejects ${slug}`);
+  }
+  const siteData = await call('/api/upload/presign', {
+    method: 'POST',
+    token: TOKEN,
+    body: { slug: 'site-data', filename: 'evil.js' },
+  });
+  assert.equal(siteData.status, 400, 'presign cannot write arbitrary site-data files');
+  const complete = await call('/api/upload/complete/assets/x.jpg', { method: 'POST', token: TOKEN });
+  assert.equal(complete.status, 400);
+});
+
+await record('deleteMediaFile validates slug/filename', async () => {
+  store.set('site-data/favicon.svg', 'x');
+  const siteData = await call('/api/media/site-data/favicon.svg', { method: 'DELETE', token: TOKEN });
+  assert.equal(siteData.status, 400, 'site-data is not a deletable media slug');
+  assert.ok(store.has('site-data/favicon.svg'));
+  assert.equal((await call('/api/media/assets/x.jpg', { method: 'DELETE', token: TOKEN })).status, 400);
+  // Encoded separators/traversal in a param must be rejected, not routed away.
+  assert.equal((await call('/api/media/a%2F..%2Fx/x.jpg', { method: 'DELETE', token: TOKEN })).status, 400);
+});
+
+await record('serveMediaFile derives folder (2 GETs) + Range → 206', async () => {
+  store.set('originals/a/photos/shot.jpg', '0123456789');
+  let gets = 0;
+  const ranged = {
+    ...media,
+    get: async (key, options) => {
+      gets++;
+      if (!store.has(key)) return null;
+      const bytes = Buffer.from(store.get(key));
+      const range = options?.range;
+      if (range) {
+        const offset = range.offset || 0;
+        const end = range.length ? offset + range.length : bytes.length;
+        return {
+          body: bytes.subarray(offset, end),
+          size: bytes.length,
+          httpMetadata: { contentType: 'image/jpeg' },
+          httpEtag: 'etag1',
+        };
+      }
+      return { body: bytes, size: bytes.length, httpMetadata: { contentType: 'image/jpeg' }, httpEtag: 'etag1' };
+    },
+  };
+  const bindings = env({ MEDIA: ranged });
+  const full = await call('/api/media/file/a/shot.jpg', { bindings });
+  assert.equal(full.status, 200);
+  assert.equal(await full.text(), '0123456789');
+  assert.equal(gets, 2, 'processed miss then originals hit = at most 2 GETs');
+  gets = 0;
+  const partial = await call('/api/media/file/a/shot.jpg', {
+    bindings,
+    headers: { Range: 'bytes=2-5' },
+  });
+  assert.equal(partial.status, 206);
+  assert.equal(partial.headers.get('content-range'), 'bytes 2-5/10');
+  assert.equal(await partial.text(), '2345');
+  assert.ok(gets <= 2, 'range requests never add lookups');
+  assert.equal((await call('/api/media/file/a/missing.jpg', { bindings })).status, 404);
+  // site-data serving is whitelist-only too.
+  assert.equal((await call('/api/media/file/site-data/robots.txt', { bindings })).status, 404);
+  assert.equal((await call('/api/media/file/site-data/favicon.svg', { bindings })).status, 200);
+});
+
+await record('malformed JSON body → uniform 400 envelope', async () => {
+  const r = await call('/api/posts', { method: 'POST', token: TOKEN, body: '{bad json' });
+  assert.equal(r.status, 400);
+  const data = await r.json();
+  assert.equal(data.code, 'INVALID_PARAMS');
+  assert.ok(data.error);
 });
 
 // ── 9b. Presigned direct upload flow ──
@@ -532,7 +801,8 @@ await record('login rate limit (429 after 5 failures)', async () => {
 });
 
 await record('track rate limit (429 after burst, per-IP)', async () => {
-  const h = { 'X-Real-IP': '203.0.113.77' };
+  // Fail-closed clientIp: without PROXY_SECRET only CF-Connecting-IP is trusted.
+  const h = { 'CF-Connecting-IP': '203.0.113.77' };
   let limitedAt = null;
   for (let i = 0; i < 65; i++) {
     const r = await call('/api/track/view/ratelimit-probe', { method: 'POST', headers: h });
@@ -544,9 +814,22 @@ await record('track rate limit (429 after burst, per-IP)', async () => {
   assert.equal(limitedAt, 61, `expected 429 on request 61, got ${limitedAt}`);
   const other = await call('/api/track/view/ratelimit-probe', {
     method: 'POST',
-    headers: { 'X-Real-IP': '198.51.100.9' },
+    headers: { 'CF-Connecting-IP': '198.51.100.9' },
   });
   assert.equal(other.status, 200, 'a different IP is not rate-limited');
+});
+
+await record('clientIp fails closed (X-Real-IP ignored outside DEV_MODE)', async () => {
+  const spoof = await clientIp({
+    env: { DEV_MODE: 'false' },
+    req: { header: (name) => (name === 'X-Real-IP' ? '1.2.3.4' : name === 'CF-Connecting-IP' ? '5.6.7.8' : '') },
+  });
+  assert.equal(spoof, '5.6.7.8', 'X-Real-IP is caller-controlled and must be ignored');
+  const dev = await clientIp({
+    env: { DEV_MODE: 'true' },
+    req: { header: (name) => (name === 'X-Real-IP' ? '1.2.3.4' : '') },
+  });
+  assert.equal(dev, '1.2.3.4', 'DEV_MODE keeps the local X-Real-IP fallback');
 });
 
 await record('track rate limit global (DO-level 429 after burst)', async () => {
@@ -850,4 +1133,4 @@ await record('GET /api/dirty (count state)', async () => {
 globalThis.fetch = realFetch;
 console.log(results.map((r) => `  ${r}`).join('\n'));
 console.log(`\nWorker smoke: ${passed} groups passed`);
-if (passed < 37) process.exit(1);
+if (passed < 51) process.exit(1);
