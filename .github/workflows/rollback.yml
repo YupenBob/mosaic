@@ -31,7 +31,7 @@ jobs:
     env:
       SITE_BRANCH: ${{ vars.SITE_BRANCH }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # rollback.mjs only needs Node's built-in fetch, so no npm ci here.
       - name: Read deployment configuration
         run: node scripts/deployment-env.mjs
