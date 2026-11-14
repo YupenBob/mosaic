@@ -102,28 +102,31 @@ try {
             const imgs = [...document.querySelectorAll('.post-card-img')];
             return imgs.length > 0 && imgs.every((img) => img.dataset.upgraded === 'true');
           });
+          // Reveal/motion transforms animate `getBoundingClientRect`, so wait for
+          // them to finish and measure the packed layout geometry instead.
+          await page.evaluate(() =>
+            Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => {}))),
+          );
           const result = await page.evaluate(() => {
             const grid = document.querySelector('.card-grid');
             const cards = [...document.querySelectorAll('.post-card')].map((card) => {
-              const rect = card.getBoundingClientRect();
               const img = card.querySelector('.post-card-img');
               return {
-                width: rect.width,
-                height: rect.height,
+                width: card.offsetWidth,
+                height: card.offsetHeight,
                 src: img?.getAttribute('src') || '',
                 lqip: img?.classList.contains('is-lqip'),
-                top: rect.top,
-                left: rect.left,
+                top: card.offsetTop,
+                left: card.offsetLeft,
               };
             });
-            const gridRect = grid.getBoundingClientRect();
             return {
               isMasonry: grid.classList.contains('is-masonry'),
               display: getComputedStyle(grid).display,
               // Resolved CSS gap in px (rem must be converted, not parsed as 2).
               gap: parseFloat(getComputedStyle(grid).columnGap),
-              gridHeight: Math.round(gridRect.height),
-              gridWidth: Math.round(gridRect.width),
+              gridHeight: grid.offsetHeight,
+              gridWidth: grid.offsetWidth,
               overflow: document.documentElement.scrollWidth - window.innerWidth,
               cards,
             };
