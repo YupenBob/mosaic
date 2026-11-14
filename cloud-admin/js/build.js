@@ -167,9 +167,9 @@ export default async function renderBuild(signal) {
         }
       };
 
-      async function poll() {
+      async function poll(options = {}) {
         try {
-          const s = await build.status();
+          const s = await build.status(options);
           lastPollAt = Date.now();
           const running = !!(s && (s.status === 'in_progress' || s.status === 'queued'));
           window.setBuildTriggerStates && window.setBuildTriggerStates(running);
@@ -250,7 +250,8 @@ export default async function renderBuild(signal) {
         clearStepHighlight();
       };
       const refresh = () => {
-        if (!stopped) poll();
+        clearTimeout(pollTimer);
+        if (!stopped) poll({ cache: 'no-store' });
       };
       window.mosaicRefreshBuild = refresh;
       signal.addEventListener(

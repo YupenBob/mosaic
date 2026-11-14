@@ -9,8 +9,6 @@ import { t } from './i18n.js?v=1';
 import { escHtml, toast, modalConfirm, modalInput, emptyState } from './ui.js?v=1';
 import { jsStr } from './escape.js';
 
-let deleteSupported = null;
-
 export default async function renderTaxonomy(signal) {
   let tax = { categories: [], tags: [] };
   try {
@@ -18,12 +16,8 @@ export default async function renderTaxonomy(signal) {
   } catch {}
   if (signal.aborted) return '';
 
-  // Detect whether the DELETE endpoints are deployed (non-mutating probe)
-  if (deleteSupported === null) {
-    const supported = await probeDeleteSupport(signal);
-    if (signal.aborted) return '';
-    deleteSupported = supported;
-  }
+  // Older Workers omit this read-only capability and keep delete controls hidden.
+  const deleteSupported = tax.capabilities?.delete === true;
 
   const cats = tax.categories || [];
   const tags = tax.tags || [];
@@ -42,14 +36,14 @@ export default async function renderTaxonomy(signal) {
           </div>
         </div>
 
-        ${deleteSupported === false ? `<p class="draft-banner" style="background:var(--color-info-soft);color:var(--color-info)"><i class="ri-information-line"></i> Taxonomy delete requires the latest Worker API.</p>` : ''}
+        ${deleteSupported === false ? `<p class="draft-banner"><i class="ri-information-line"></i> Taxonomy delete requires the latest Worker API.</p>` : ''}
 
         <div class="tax-layout">
           <div class="tax-panel">
             <div class="tax-panel-header">
               <h2><i class="ri-price-tag-3-line"></i> ${t('taxonomy.categories')} <span class="badge badge-neutral">${cats.length}</span></h2>
             </div>
-            ${cats.length ? buildCatTree(cats, '') : emptyState('ri-price-tag-3-line', t('taxonomy.emptyCat'))}
+            ${cats.length ? buildCatTree(cats, '', deleteSupported) : emptyState('ri-price-tag-3-line', t('taxonomy.emptyCat'))}
           </div>
           <div class="tax-panel">
             <div class="tax-panel-header">
@@ -75,7 +69,7 @@ export default async function renderTaxonomy(signal) {
   };
 }
 
-function buildCatTree(cats, prefix, depth = 0) {
+function buildCatTree(cats, prefix, deleteSupported, depth = 0) {
   return cats
     .map((c) => {
       const fullName = prefix ? `${prefix}/${c.name}` : c.name;
@@ -97,26 +91,10 @@ function buildCatTree(cats, prefix, depth = 0) {
             ${deleteSupported ? `<button class="icon-btn" style="color:var(--color-danger)" onclick="removeCategory(${jsStr(fullName)}, ${Number(c.count) || 0})" title="${t('taxonomy.delete')}" aria-label="${t('taxonomy.delete')}"><i class="ri-delete-bin-line"></i></button>` : ''}
           </span>
         </div>
-        ${hasChildren ? `<div class="cat-children" data-cat="${escHtml(fullName)}">${buildCatTree(c.children, fullName, depth + 1)}</div>` : ''}
+        ${hasChildren ? `<div class="cat-children" data-cat="${escHtml(fullName)}">${buildCatTree(c.children, fullName, deleteSupported, depth + 1)}</div>` : ''}
       </div>`;
     })
     .join('');
-}
-
-async function probeDeleteSupport(signal) {
-  const API = window.__API_BASE__ || '/api';
-  const token = localStorage.getItem('mosaic_admin_token');
-  try {
-    const resp = await fetch(`${API}/taxonomy/category`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || '') },
-      body: JSON.stringify({ name: '' }),
-      signal,
-    });
-    return resp.status !== 404;
-  } catch {
-    return false;
-  }
 }
 
 window.toggleCatChildren = (icon) => {

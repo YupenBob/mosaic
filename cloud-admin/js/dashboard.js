@@ -32,12 +32,18 @@ export default function renderDashboard(signal) {
     onMount() {
       let chartRevision = 0;
       const sections = {
-        dashData: ['.dash-cards', '[data-dashboard-quickstart]'],
+        dashData: ['[data-dashboard-posts]', '[data-dashboard-quickstart]'],
         healthData: ['.dash-health-bar', '.page-subtitle'],
         healthGithub: ['.dash-health-bar', '.page-subtitle'],
         healthR2: ['.dash-health-bar', '.page-subtitle'],
-        trafficData: ['.dash-cards', '.dash-charts', '.dash-bottom'],
-        diskData: ['.dash-cards'],
+        trafficData: [
+          '[data-dashboard-total-views]',
+          '[data-dashboard-today-views]',
+          '.page-subtitle',
+          '.dash-charts',
+          '.dash-bottom',
+        ],
+        diskData: ['[data-dashboard-disk]'],
         cfg: ['[data-dashboard-site-link]'],
         taxData: ['.dash-charts'],
         postList: ['.dash-bottom', '[data-dashboard-quickstart]'],
@@ -163,6 +169,8 @@ function renderSnapshot(
   const delta = yesterdayViews > 0 ? Math.round(((todayViews - yesterdayViews) / yesterdayViews) * 100) : null;
   const num = (value) => (typeof value === 'number' ? new Intl.NumberFormat('zh-CN').format(value) : (value ?? '...'));
 
+  const cardValue = (key, value) => (loaded.has(key) ? num(value) : settled.has(key) ? '—' : '...');
+
   // Recent activity
   const activities = [];
   postList.slice(0, 5).forEach((p) => {
@@ -284,27 +292,27 @@ function renderSnapshot(
         }
 
         <div class="dash-cards">
-          <div class="dash-big-card dash-kpi">
+          <div class="dash-big-card dash-kpi" data-dashboard-posts>
             <span class="dash-big-label">${t('dashboard.posts')}</span>
-            <span class="dash-big-num">${num(dashData.posts)}</span>
+            <span class="dash-big-num">${cardValue('dashData', dashData.posts)}</span>
             <span class="dash-kpi-hint">${t('dashboard.postsHint')}</span>
           </div>
-          <div class="dash-big-card dash-kpi">
+          <div class="dash-big-card dash-kpi" data-dashboard-total-views>
             <span class="dash-big-label">${t('dashboard.totalViews')}</span>
-            <span class="dash-big-num">${num(trafficData.total)}</span>
+            <span class="dash-big-num">${cardValue('trafficData', trafficData.total)}</span>
             <span class="dash-kpi-hint">${t('dashboard.totalViewsHint')}</span>
           </div>
-          <div class="dash-big-card dash-kpi">
+          <div class="dash-big-card dash-kpi" data-dashboard-today-views>
             <span class="dash-big-label">${t('dashboard.todayViews')}</span>
-            <span class="dash-big-num">${num(todayViews)}</span>
+            <span class="dash-big-num">${cardValue('trafficData', todayViews)}</span>
             <span class="dash-kpi-hint">
-              ${delta == null ? `${num(weekViews)}${t('dashboard.weekSuffix')}` : `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}% ${t('dashboard.vsYesterday')}`}
+              ${!loaded.has('trafficData') ? cardValue('trafficData') : delta == null ? `${num(weekViews)}${t('dashboard.weekSuffix')}` : `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}% ${t('dashboard.vsYesterday')}`}
             </span>
           </div>
-          <div class="dash-big-card dash-kpi">
+          <div class="dash-big-card dash-kpi" data-dashboard-disk>
             <span class="dash-big-label">${t('dashboard.r2Usage')}</span>
-            <span class="dash-big-num">${diskData.sizeMB ?? '...'} MB</span>
-            <span class="dash-kpi-hint">${t('dashboard.r2Meta', { objects: diskData.objects ?? '...', cost: diskData.cost ?? '...' })}</span>
+            <span class="dash-big-num">${cardValue('diskData', diskData.sizeMB)} MB</span>
+            <span class="dash-kpi-hint">${t('dashboard.r2Meta', { objects: cardValue('diskData', diskData.objects), cost: cardValue('diskData', diskData.cost) })}</span>
           </div>
         </div>
 
@@ -379,8 +387,13 @@ function renderSnapshot(
       const dayData = (trafficData.byDay || []).map((d) => d.count);
       // "分类 & 标签" reflects the real site taxonomy (article counts),
       // not the traffic view distribution (stats.json has no category data).
-      const catList = (taxData.categories || [])
-        .slice()
+      const categoryCounts = new Map();
+      for (const category of taxData.categories || []) {
+        const name = String(category.name ?? '').trim();
+        const label = !name || /^(null|uncategorized)$/i.test(name) ? t('posts.uncategorized') : name;
+        categoryCounts.set(label, (categoryCounts.get(label) || 0) + (Number(category.count) || 0));
+      }
+      const catList = Array.from(categoryCounts, ([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 8);
       const tagList = (taxData.tags || [])
