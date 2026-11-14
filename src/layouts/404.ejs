@@ -33,9 +33,11 @@
   <%# Keep this the only assets/css link: scripts/minify.mjs bundles the site
       stylesheets into assets/css/bundle.css (as index.ejs/post.ejs do). %>
   <link rel="stylesheet" href="<%= rp %>assets/css/bundle.css" />
+  <meta name="robots" content="noindex" />
 <script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality, themeMode: site.themeMode, experience: site.experience }).replace(/</g, '\\u003c') %>;</script>
 </head>
 <body data-page="404">
+  <a class="skip-link" href="#main-content"><%= t('skip_to_content') %></a>
   <header class="header">
     <div class="container">
       <a href="<%= rp %>index.html" class="header-logo"><img src="<%= rp %>assets/logo.svg" alt="" class="header-logo-icon" width="28" height="28" /><%= site.title %></a>
@@ -44,7 +46,7 @@
       </button>
     </div>
   </header>
-  <main class="main">
+  <main class="main" id="main-content" tabindex="-1">
     <div class="container" style="text-align:center;padding:var(--space-20) var(--space-4);">
       <i class="ri-error-warning-line" style="font-size:4rem;color:var(--color-text-tertiary);display:block;margin-bottom:var(--space-6);"></i>
       <h1 style="font-size:var(--font-size-3xl);margin-bottom:var(--space-4);">404</h1>

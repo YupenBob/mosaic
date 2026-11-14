@@ -36,9 +36,10 @@ function videoElementHTML(vid) {
   var multiSrc = !!(vid.sources);
   var hasHLS = !!(vid.hls);
   var videoStyle = ' style="aspect-ratio:' + escAttr(vid.aspect || site.player.defaultAspect) + '"';
+  var videoLabel = escAttr(t('video_label') + (post && post.title ? '：' + post.title : ''));
   var h = '<div class="video-player-overlay"><button class="video-big-play" aria-label="Play"><i class="ri-play-fill"></i></button></div>';
   if (hasHLS) {
-    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.hls) + '" poster="' + escAttr(vid.poster || '') + '" class="video-element" data-hls="true">';
+    h += '<video crossorigin="anonymous" preload="none" playsinline aria-label="' + videoLabel + '"' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.hls) + '" poster="' + escAttr(vid.poster || '') + '" class="video-element" data-hls="true">';
     h += '<source src="' + escAttr(playbackUrl(vid.hls)) + '" type="application/x-mpegURL" />';
     // MP4 tier fallbacks (only consumed if hls.js hits an unrecoverable fatal
     // error, so playback degrades to a file instead of dying).
@@ -50,14 +51,14 @@ function videoElementHTML(vid) {
     }
     h += '</video>';
   } else if (multiSrc) {
-    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.file) + '" poster="' + escAttr(vid.poster || '') + '" class="video-element">';
+    h += '<video crossorigin="anonymous" preload="none" playsinline aria-label="' + videoLabel + '"' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.file) + '" poster="' + escAttr(vid.poster || '') + '" class="video-element">';
     var resKeys = Object.keys(vid.sources).sort().reverse();
     for (var r = 0; r < resKeys.length; r++) {
       h += '<source data-res="' + escAttr(resKeys[r]) + '" src="' + escAttr(playbackUrl(vid.sources[resKeys[r]])) + '" type="video/mp4" />';
     }
     h += '</video>';
   } else if (vid.src) {
-    h += '<video crossorigin="anonymous" preload="none" playsinline' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.src) + '" poster="' + escAttr(vid.poster || '') + '" src="' + escAttr(playbackUrl(vid.src)) + '" class="video-element"></video>';
+    h += '<video crossorigin="anonymous" preload="none" playsinline aria-label="' + videoLabel + '"' + videoStyle + ' data-media-id="' + escAttr(vid.id || vid.src) + '" poster="' + escAttr(vid.poster || '') + '" src="' + escAttr(playbackUrl(vid.src)) + '" class="video-element"></video>';
   }
   return h;
 }
@@ -220,6 +221,8 @@ function renderBlock(block) {
   <meta property="og:description" content="<%= post.description %>" />
     <% var postUrl = (site.url || '') + '/posts/' + post.slug + '/'; %>
   <% if (post.type === 'video') { %><meta property="og:type" content="video.movie" /><% } else { %><meta property="og:type" content="article" /><% } %>
+  <link rel="canonical" href="<%= postUrl %>" />
+  <% if (site.mediaBase) { %><link rel="preconnect" href="<%= site.mediaBase %>" crossorigin /><% } %>
   <meta property="og:url" content="<%= postUrl %>" />
   <% if (post.cover) { %><meta property="og:image" content="<%= post.cover %>" /><% } else { %><meta property="og:image" content="<%= (site.url || '') %>/assets/og-card.png" /><% } %>
   <meta property="og:site_name" content="<%= site.title %>" />
@@ -243,6 +246,7 @@ document.addEventListener('click', function(event) {
 </script>
 </head>
 <body data-page="post" data-slug="<%= post.slug %>" data-category="<%= post.category || '' %>" data-tags="<%= (post.tags || []).join(',') %>" data-post-type="<%= post.type || 'text' %>">
+<a class="skip-link" href="#main-content"><%= t('skip_to_content') %></a>
 
 <header class="header">
   <div class="container">
@@ -261,7 +265,7 @@ document.addEventListener('click', function(event) {
   </div>
 </header>
 
-<main class="main">
+<main class="main" id="main-content" tabindex="-1">
   <<%= post.videoMode === 'playlist' && post.videos && post.videos.length > 1 ? 'div class="post-page-wrapper"' : 'div' %>>
   <article class="post-page">
     <!-- Breadcrumb -->

@@ -1,38 +1,154 @@
 {
-  "home": { "zh-CN": "首页", "en": "Home" },
-  "theme_light": { "zh-CN": "切换到亮色模式", "en": "Switch to light mode" },
-  "theme_dark": { "zh-CN": "切换到暗色模式", "en": "Switch to dark mode" },
-  "search_placeholder": { "zh-CN": "搜索...", "en": "Search..." },
-  "search_results_label": { "zh-CN": "搜索结果", "en": "Search results" },
-  "categories_label": { "zh-CN": "分类", "en": "Categories" },
-  "tags_label": { "zh-CN": "标签", "en": "Tags" },
-  "no_posts": { "zh-CN": "还没有帖子。", "en": "No posts yet." },
-  "no_results": { "zh-CN": "没有找到", "en": "No results" },
-  "results_count": { "zh-CN": "{count} 条结果", "en": "{count} results" },
-  "prev_page": { "zh-CN": "上一页", "en": "Prev" },
-  "next_page": { "zh-CN": "下一页", "en": "Next" },
-  "built_with": { "zh-CN": "由 Mosaic 构建", "en": "Built with Mosaic" },
-  "page_not_found": { "zh-CN": "页面未找到。", "en": "Page not found." },
-  "back_home": { "zh-CN": "返回首页", "en": "Back to Home" },
-  "failed_load": { "zh-CN": "内容加载失败，请稍后重试。", "en": "Failed to load content. Please try again later." },
-  "photos_title": { "zh-CN": "照片", "en": "Photos" },
-  "videos_title": { "zh-CN": "视频", "en": "Videos" },
-  "playlist_label": { "zh-CN": "播放列表", "en": "Playlist" },
-  "music": { "zh-CN": "音乐", "en": "Music" },
-  "gallery_fit": { "zh-CN": "适应窗口", "en": "Fit" },
-  "gallery_fill": { "zh-CN": "填满屏幕", "en": "Fill" },
-  "views": { "zh-CN": "浏览", "en": "views" },
-  "comments_title": { "zh-CN": "评论", "en": "Comments" },
-  "theme_menu": { "zh-CN": "主题设置", "en": "Theme settings" },
-  "theme_mode": { "zh-CN": "模式", "en": "Mode" },
-  "theme_mode_auto": { "zh-CN": "自动", "en": "Auto" },
-  "theme_mode_light": { "zh-CN": "亮色", "en": "Light" },
-  "theme_mode_dark": { "zh-CN": "暗色", "en": "Dark" },
-  "theme_accent": { "zh-CN": "主题色", "en": "Accent" },
-  "accent_blue": { "zh-CN": "蓝色", "en": "Blue" },
-  "accent_violet": { "zh-CN": "紫罗兰", "en": "Violet" },
-  "accent_emerald": { "zh-CN": "翡翠", "en": "Emerald" },
-  "accent_rose": { "zh-CN": "玫瑰", "en": "Rose" },
-  "accent_amber": { "zh-CN": "琥珀", "en": "Amber" },
-  "accent_slate": { "zh-CN": "石板", "en": "Slate" }
+  "home": {
+    "zh-CN": "首页",
+    "en": "Home"
+  },
+  "theme_light": {
+    "zh-CN": "切换到亮色模式",
+    "en": "Switch to light mode"
+  },
+  "theme_dark": {
+    "zh-CN": "切换到暗色模式",
+    "en": "Switch to dark mode"
+  },
+  "search_placeholder": {
+    "zh-CN": "搜索...",
+    "en": "Search..."
+  },
+  "search_results_label": {
+    "zh-CN": "搜索结果",
+    "en": "Search results"
+  },
+  "categories_label": {
+    "zh-CN": "分类",
+    "en": "Categories"
+  },
+  "tags_label": {
+    "zh-CN": "标签",
+    "en": "Tags"
+  },
+  "no_posts": {
+    "zh-CN": "还没有帖子。",
+    "en": "No posts yet."
+  },
+  "no_results": {
+    "zh-CN": "没有找到",
+    "en": "No results"
+  },
+  "results_count": {
+    "zh-CN": "{count} 条结果",
+    "en": "{count} results"
+  },
+  "prev_page": {
+    "zh-CN": "上一页",
+    "en": "Prev"
+  },
+  "next_page": {
+    "zh-CN": "下一页",
+    "en": "Next"
+  },
+  "built_with": {
+    "zh-CN": "由 Mosaic 构建",
+    "en": "Built with Mosaic"
+  },
+  "page_not_found": {
+    "zh-CN": "页面未找到。",
+    "en": "Page not found."
+  },
+  "back_home": {
+    "zh-CN": "返回首页",
+    "en": "Back to Home"
+  },
+  "failed_load": {
+    "zh-CN": "内容加载失败，请稍后重试。",
+    "en": "Failed to load content. Please try again later."
+  },
+  "photos_title": {
+    "zh-CN": "照片",
+    "en": "Photos"
+  },
+  "videos_title": {
+    "zh-CN": "视频",
+    "en": "Videos"
+  },
+  "playlist_label": {
+    "zh-CN": "播放列表",
+    "en": "Playlist"
+  },
+  "music": {
+    "zh-CN": "音乐",
+    "en": "Music"
+  },
+  "gallery_fit": {
+    "zh-CN": "适应窗口",
+    "en": "Fit"
+  },
+  "gallery_fill": {
+    "zh-CN": "填满屏幕",
+    "en": "Fill"
+  },
+  "views": {
+    "zh-CN": "浏览",
+    "en": "views"
+  },
+  "comments_title": {
+    "zh-CN": "评论",
+    "en": "Comments"
+  },
+  "theme_menu": {
+    "zh-CN": "主题设置",
+    "en": "Theme settings"
+  },
+  "theme_mode": {
+    "zh-CN": "模式",
+    "en": "Mode"
+  },
+  "theme_mode_auto": {
+    "zh-CN": "自动",
+    "en": "Auto"
+  },
+  "theme_mode_light": {
+    "zh-CN": "亮色",
+    "en": "Light"
+  },
+  "theme_mode_dark": {
+    "zh-CN": "暗色",
+    "en": "Dark"
+  },
+  "theme_accent": {
+    "zh-CN": "主题色",
+    "en": "Accent"
+  },
+  "accent_blue": {
+    "zh-CN": "蓝色",
+    "en": "Blue"
+  },
+  "accent_violet": {
+    "zh-CN": "紫罗兰",
+    "en": "Violet"
+  },
+  "accent_emerald": {
+    "zh-CN": "翡翠",
+    "en": "Emerald"
+  },
+  "accent_rose": {
+    "zh-CN": "玫瑰",
+    "en": "Rose"
+  },
+  "accent_amber": {
+    "zh-CN": "琥珀",
+    "en": "Amber"
+  },
+  "accent_slate": {
+    "zh-CN": "石板",
+    "en": "Slate"
+  },
+  "skip_to_content": {
+    "zh-CN": "跳到主要内容",
+    "en": "Skip to content"
+  },
+  "video_label": {
+    "zh-CN": "视频",
+    "en": "Video"
+  }
 }

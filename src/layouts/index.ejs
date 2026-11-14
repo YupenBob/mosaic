@@ -57,6 +57,8 @@ const accentOptions = [
   <%# scripts/minify.mjs concatenates the site stylesheets (in cascade order)
       into this single bundle; keep this the only assets/css link here. %>
   <link rel="stylesheet" href="<%= rp %>assets/css/bundle.css" />
+  <% if (canonicalUrl) { %><link rel="canonical" href="<%= canonicalUrl %>" /><% } %>
+  <% if (site.mediaBase) { %><link rel="preconnect" href="<%= site.mediaBase %>" crossorigin /><% } %>
   <meta property="og:title" content="<%= pageDataTitle %>" />
   <meta property="og:description" content="<%= pageDesc %>" />
   <meta property="og:type" content="website" />
@@ -92,6 +94,7 @@ const accentOptions = [
   </script>
 </head>
 <body data-page="list" data-category="<%= activeCategory || '' %>" data-tag="<%= activeTag || '' %>" data-card-size="<%= cardCfg.size || 'large' %>" data-card-image="<%= cardCfg.image || 'full' %>" data-card-layout="<%= cardCfg.layout || 'masonry' %>">
+<a class="skip-link" href="#main-content"><%= t('skip_to_content') %></a>
 
 <header class="header">
   <div class="container">
@@ -151,7 +154,7 @@ const accentOptions = [
   </div>
 </header>
 
-<main class="main">
+<main class="main" id="main-content" tabindex="-1">
   <h1 class="sr-only"><%= site.title %></h1>
   <div class="container">
     <!-- Filter Bar -->
