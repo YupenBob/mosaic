@@ -1,0 +1,665 @@
+[
+  {
+    "id": "AD-01",
+    "area": "admin",
+    "title": "Fixture login and dirty status",
+    "surface": "dashboard",
+    "steps": [
+      "Submit fixture password"
+    ],
+    "expected": "App opens and dirty status is visible",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-02",
+    "area": "admin",
+    "title": "Account menu closes with Escape",
+    "surface": "dashboard",
+    "steps": [
+      "Open account menu and press Escape"
+    ],
+    "expected": "Three appearance options exist and menu closes",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-03",
+    "area": "admin",
+    "title": "Editor attaches library image",
+    "surface": "editor",
+    "steps": [
+      "Pick library asset and save"
+    ],
+    "expected": "Photo placeholder and media reference are included in save payload",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-04",
+    "area": "admin",
+    "title": "Library reference warning",
+    "surface": "library",
+    "steps": [
+      "Open asset detail and delete confirmation"
+    ],
+    "expected": "Confirmation identifies referencing post",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-05",
+    "area": "admin",
+    "title": "Draft preview and publish requests",
+    "surface": "editor",
+    "steps": [
+      "Open fixture draft, save, preview and publish"
+    ],
+    "expected": "Preview creation and polling and publish requests are sent",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-06",
+    "area": "admin",
+    "title": "Mobile post list",
+    "surface": "posts",
+    "steps": [
+      "Open posts at 390px"
+    ],
+    "expected": "Cards show, table hides and page does not overflow",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-07",
+    "area": "admin",
+    "title": "Task polling stops on navigation",
+    "surface": "tasks",
+    "steps": [
+      "Retry and cancel a job then leave tasks"
+    ],
+    "expected": "Media-job polling stops after leaving",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-08",
+    "area": "admin",
+    "title": "Default API path configuration saves",
+    "surface": "config",
+    "steps": [
+      "Click save with relative /api"
+    ],
+    "expected": "Config PUT is sent without validation errors",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-09",
+    "area": "admin",
+    "title": "Thirteen admin routes render accessibly",
+    "surface": "admin",
+    "steps": [
+      "Visit each hash route in both themes"
+    ],
+    "expected": "Page renders and axe reports no violations",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-10",
+    "area": "admin",
+    "title": "Dashboard metrics retry",
+    "surface": "dashboard",
+    "steps": [
+      "Load slow failing metrics and retry"
+    ],
+    "expected": "Actions render promptly and charts recover with site link",
+    "status": "pass",
+    "coveredBy": "tests/admin-experience.mjs",
+    "evidence": [
+      "tests/admin-experience.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-11",
+    "area": "admin",
+    "title": "Posts search and category filter",
+    "surface": "posts",
+    "steps": [
+      "Search Apple and select parent/child"
+    ],
+    "expected": "Exactly one visible result remains",
+    "status": "pass",
+    "coveredBy": "tests/admin-experience.mjs",
+    "evidence": [
+      "tests/admin-experience.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-12",
+    "area": "admin",
+    "title": "Editor cover unsaved guard",
+    "surface": "editor",
+    "steps": [
+      "Select video cover and try leaving; cancel"
+    ],
+    "expected": "Cover preview updates and selected cover remains in editor",
+    "status": "pass",
+    "coveredBy": "tests/admin-experience.mjs",
+    "evidence": [
+      "tests/admin-experience.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-13",
+    "area": "admin",
+    "title": "Upload confirmation retry",
+    "surface": "editor",
+    "steps": [
+      "Upload fixture clip and retry failed confirmation"
+    ],
+    "expected": "Existing upload is confirmed without duplicate PUT",
+    "status": "pass",
+    "coveredBy": "tests/admin-experience.mjs",
+    "evidence": [
+      "tests/admin-experience.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-14",
+    "area": "admin",
+    "title": "Build detail navigation",
+    "surface": "build",
+    "steps": [
+      "Open first available build history row and return"
+    ],
+    "expected": "Detail has steps and back control; history returns",
+    "status": "pass",
+    "coveredBy": "tests/admin-smoke.mjs",
+    "evidence": [
+      "tests/admin-smoke.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "AD-15",
+    "area": "admin",
+    "title": "Admin page smoke",
+    "surface": "admin",
+    "steps": [
+      "Log in and visit editor, config, taxonomy and cleanup"
+    ],
+    "expected": "Core fields and page markers render",
+    "status": "pass",
+    "coveredBy": "tests/admin-smoke.mjs",
+    "evidence": [
+      "tests/admin-smoke.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "E-01",
+    "area": "edge",
+    "title": "History payload does not execute",
+    "surface": "history",
+    "steps": [
+      "Open fixture history detail containing script payload"
+    ],
+    "expected": "Injected global is undefined",
+    "status": "pass",
+    "coveredBy": "tests/admin-local.mjs",
+    "evidence": [
+      "tests/admin-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "E-02",
+    "area": "edge",
+    "title": "Lazy playback avoids pre-play media",
+    "surface": "post",
+    "steps": [
+      "Open stacked videos before clicking play"
+    ],
+    "expected": "Only nearby players initialize and no HLS fragments download",
+    "status": "pass",
+    "coveredBy": "tests/playback-browser.mjs",
+    "evidence": [
+      "tests/playback-browser.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "E-03",
+    "area": "edge",
+    "title": "Editor retains focus during polling",
+    "surface": "editor",
+    "steps": [
+      "Edit text while media polls"
+    ],
+    "expected": "Textarea node and focus remain and body retains edits",
+    "status": "pass",
+    "coveredBy": "tests/admin-experience.mjs",
+    "evidence": [
+      "tests/admin-experience.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "E-04",
+    "area": "edge",
+    "title": "Missing route returns 404",
+    "surface": "404",
+    "steps": [
+      "Request a nonexistent route"
+    ],
+    "expected": "HTTP 404 and production page marker are returned",
+    "status": "pass",
+    "coveredBy": "tests/check-site.mjs",
+    "evidence": [
+      "tests/check-site.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "E-05",
+    "area": "edge",
+    "title": "Feed and sitemap available",
+    "surface": "seo",
+    "steps": [
+      "Fetch feed.xml and sitemap.xml"
+    ],
+    "expected": "Both respond successfully; production sitemap targets resolve",
+    "status": "pass",
+    "coveredBy": "tests/check-site.mjs",
+    "evidence": [
+      "tests/check-site.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "E-06",
+    "area": "edge",
+    "title": "Home uses thin index",
+    "surface": "home",
+    "steps": [
+      "Open generated home"
+    ],
+    "expected": "Posts index is requested and full articles JSON is not",
+    "status": "pass",
+    "coveredBy": "tests/frontend-local.mjs",
+    "evidence": [
+      "tests/frontend-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-01",
+    "area": "visitor",
+    "title": "Home feed renders",
+    "surface": "home",
+    "steps": [
+      "Open /"
+    ],
+    "expected": "At least 14 feed nodes and a nonempty title",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "tests/ux/journeys/public-smoke.spec.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-02",
+    "area": "visitor",
+    "title": "Post page renders",
+    "surface": "post",
+    "steps": [
+      "Navigate to first card href"
+    ],
+    "expected": "Article or main and nonempty h1 exist",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "tests/ux/journeys/public-smoke.spec.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-03",
+    "area": "visitor",
+    "title": "Search filters results",
+    "surface": "home",
+    "steps": [
+      "Enter fixture search query"
+    ],
+    "expected": "One dropdown result and matching grid card appear",
+    "status": "pass",
+    "coveredBy": "tests/frontend.spec.js",
+    "evidence": [
+      "tests/frontend.spec.js"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-04",
+    "area": "visitor",
+    "title": "Category fixture displays cards",
+    "surface": "category",
+    "steps": [
+      "Open /categories/parent/"
+    ],
+    "expected": "Two sized cards appear in masonry",
+    "status": "pass",
+    "coveredBy": "tests/frontend-local.mjs",
+    "evidence": [
+      "tests/frontend-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-05",
+    "area": "visitor",
+    "title": "Theme selection changes appearance",
+    "surface": "home",
+    "steps": [
+      "Open theme menu and select opposite mode; reload"
+    ],
+    "expected": "Root theme changes and theme storage key exists",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "tests/ux/journeys/public-smoke.spec.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-06",
+    "area": "visitor",
+    "title": "Gallery quality selection",
+    "surface": "post",
+    "steps": [
+      "Open gallery and select 720p"
+    ],
+    "expected": "Current image uses expected fixture source",
+    "status": "pass",
+    "coveredBy": "tests/frontend-local.mjs",
+    "evidence": [
+      "tests/frontend-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-07",
+    "area": "visitor",
+    "title": "Gallery zoom keeps cursor anchor",
+    "surface": "post",
+    "steps": [
+      "Open gallery and wheel zoom"
+    ],
+    "expected": "Zoom scale increases with less than one pixel anchor drift",
+    "status": "pass",
+    "coveredBy": "tests/frontend.spec.js",
+    "evidence": [
+      "tests/frontend.spec.js"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-08",
+    "area": "visitor",
+    "title": "Gallery blur-up and masonry",
+    "surface": "post",
+    "steps": [
+      "Open available gallery post"
+    ],
+    "expected": "Placeholder upgrades to sharp image; many-photo grid retains aspect",
+    "status": "pass",
+    "coveredBy": "tests/frontend.spec.js",
+    "evidence": [
+      "tests/frontend.spec.js"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-09",
+    "area": "visitor",
+    "title": "Responsive card images and layout",
+    "surface": "home",
+    "steps": [
+      "Open generated feed at desktop and mobile sizes"
+    ],
+    "expected": "Images upgrade and masonry columns have correct sizes without overflow",
+    "status": "pass",
+    "coveredBy": "tests/cards-media.mjs",
+    "evidence": [
+      "tests/cards-media.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-10",
+    "area": "visitor",
+    "title": "Video playback resumes",
+    "surface": "post",
+    "steps": [
+      "Play video, seek, pause, reload and play"
+    ],
+    "expected": "HLS or MP4 plays and resumes saved position",
+    "status": "pass",
+    "coveredBy": "tests/experience-local.mjs",
+    "evidence": [
+      "tests/experience-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-11",
+    "area": "visitor",
+    "title": "Early video click is retained",
+    "surface": "post",
+    "steps": [
+      "Click play while app script is delayed"
+    ],
+    "expected": "Video starts after script loads",
+    "status": "pass",
+    "coveredBy": "tests/experience-local.mjs",
+    "evidence": [
+      "tests/experience-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-12",
+    "area": "visitor",
+    "title": "Video quality switch during play",
+    "surface": "post",
+    "steps": [
+      "Play HLS and select 480p"
+    ],
+    "expected": "Published quality is selected without pausing playback",
+    "status": "pass",
+    "coveredBy": "tests/playback-browser.mjs",
+    "evidence": [
+      "tests/playback-browser.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-13",
+    "area": "visitor",
+    "title": "Broken HLS falls back",
+    "surface": "post",
+    "steps": [
+      "Play video with broken manifest"
+    ],
+    "expected": "Progressive MP4 starts playing",
+    "status": "pass",
+    "coveredBy": "tests/playback-browser.mjs",
+    "evidence": [
+      "tests/playback-browser.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-14",
+    "area": "visitor",
+    "title": "Playlist advances once",
+    "surface": "post",
+    "steps": [
+      "Play first item and seek near its end"
+    ],
+    "expected": "Second item becomes active once",
+    "status": "pass",
+    "coveredBy": "tests/playback-browser.mjs",
+    "evidence": [
+      "tests/playback-browser.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-15",
+    "area": "visitor",
+    "title": "Playlist item selection",
+    "surface": "post",
+    "steps": [
+      "Click second playlist item"
+    ],
+    "expected": "Second item becomes active and mobile layout does not overflow",
+    "status": "pass",
+    "coveredBy": "tests/frontend-local.mjs",
+    "evidence": [
+      "tests/frontend-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-16",
+    "area": "visitor",
+    "title": "Music track renders",
+    "surface": "post",
+    "steps": [
+      "Open fixture blocks post"
+    ],
+    "expected": "One music track and its template data exist",
+    "status": "pass",
+    "coveredBy": "tests/frontend-local.mjs",
+    "evidence": [
+      "tests/frontend-local.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-17",
+    "area": "visitor",
+    "title": "Public accessibility scan",
+    "surface": "public",
+    "steps": [
+      "Open available representative routes in light and dark"
+    ],
+    "expected": "No serious or critical axe violations",
+    "status": "pass",
+    "coveredBy": "tests/a11y-front.mjs",
+    "evidence": [
+      "tests/a11y-front.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-18",
+    "area": "visitor",
+    "title": "Homepage and post media availability",
+    "surface": "public",
+    "steps": [
+      "Open home and first post"
+    ],
+    "expected": "Home returns 200 with title and links; images avoid local media paths",
+    "status": "pass",
+    "coveredBy": "tests/check-site.mjs",
+    "evidence": [
+      "tests/check-site.mjs"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/catalog.json"
+  }
+]

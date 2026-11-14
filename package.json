@@ -1,7 +1,7 @@
 {
   "name": "mosaic-ssg",
   "version": "1.0.0",
-  "description": "A pure static multimedia content sharing site — like Hexo but for photo & video posts",
+  "description": "A pure static multimedia content sharing site \u2014 like Hexo but for photo & video posts",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -27,7 +27,14 @@
     "test:site": "node tests/site-smoke.mjs",
     "test:media": "node tests/media-integration.mjs && node tests/music-meta-smoke.mjs && node tests/waveform-smoke.mjs && node tests/video-interpolation.mjs",
     "test:admin:local": "node tests/admin-local.mjs && node tests/admin-experience.mjs",
-    "test:online": "node tests/check-site.mjs && node tests/admin-smoke.mjs && node tests/a11y-admin.mjs"
+    "test:online": "node tests/check-site.mjs && node tests/admin-smoke.mjs && node tests/a11y-admin.mjs",
+    "qa:build": "node scripts/qa/build-local.mjs",
+    "qa:journeys": "node scripts/qa/run-journeys.mjs --target local",
+    "qa:journeys:prod": "node scripts/qa/run-journeys.mjs --target prod",
+    "qa:admin": "node scripts/qa/run-journeys.mjs --target admin-local --area admin",
+    "qa:admin:prod": "node scripts/qa/run-journeys.mjs --target admin-prod --area admin",
+    "qa:a11y": "node scripts/qa/run-journeys.mjs --target local --area a11y",
+    "qa:perf": "node scripts/qa/run-journeys.mjs --target prod --area perf"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",
