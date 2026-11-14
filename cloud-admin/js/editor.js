@@ -92,6 +92,7 @@ function serializeBlocks(blocks) {
     if (b.type === 'text') {
       if (b.text.trim()) parts.push(b.text.trim());
     } else {
+      // Keep indexed tokens (photo:N / video:N) when editing surrounding blocks.
       parts.push('{{' + b.raw + '}}');
     }
   }
@@ -227,6 +228,7 @@ function refreshBlockMedia() {
 }
 
 function commitBlocks() {
+  state.editor.bodyEdited = true;
   syncBodyFromBlocks();
   renderBlocksInto(document.getElementById('fm-blocks'));
 }
@@ -369,6 +371,7 @@ function wireBodyDnD() {
     if (!ta) return;
     const i = Number(ta.closest('.fm-text-block-wrap')?.dataset.index);
     if (Number.isFinite(i) && editorBlocks[i]) {
+      state.editor.bodyEdited = true;
       editorBlocks[i].text = ta.value;
       autoGrow(ta);
       syncBodyFromBlocks();
@@ -433,6 +436,8 @@ export default async function renderEditor(signal) {
   state.editor.baseSha = slug ? post.sha || null : null;
 
   const fm = post.frontMatter || {};
+  state.editor.loadedDate = fm.date || '';
+  state.editor.mediaLoaded = Object.hasOwn(fm, 'media');
   state.editor.mediaRefs = normalizeMediaRefs(fm.media);
   state.editor.assetCache = {};
   state.editor.draftMode = Boolean(cloudDraft);
@@ -445,6 +450,9 @@ export default async function renderEditor(signal) {
   const fmv = (key, fallback = '') =>
     draft && draft[key] !== undefined && draft[key] !== null ? draft[key] : (fm[key] ?? fallback);
   const body = draft ? (draft.body !== undefined ? draft.body : post.body || '') : post.body || '';
+  // Parsing blocks is for display; an untouched save must retain whitespace and tokens verbatim.
+  state.editor.originalBody = body;
+  state.editor.bodyEdited = false;
   const catValue = fmv('category') || prefillCat;
   const tagsValue = fmv('tags') || prefillTags;
 
@@ -496,7 +504,7 @@ export default async function renderEditor(signal) {
             <div class="editor-section-title">${t('editor.infoTitle')}</div>
             <label class="field">
               <span class="field-label">${t('editor.date')}</span>
-              <input type="date" id="fm-date" class="input" value="${escHtml(fmv('date') || new Date().toISOString().split('T')[0])}" />
+              <input type="date" id="fm-date" class="input" value="${escHtml((fmv('date') || new Date().toISOString()).split('T')[0])}" />
             </label>
             <label class="field">
               <span class="field-label">${t('editor.category')}</span>
@@ -675,26 +683,50 @@ function forgetCloudDraft(slug) {
   } catch {}
 }
 
+/**
+ * Typed frontmatter from the current form state, shared by the direct save and
+ * the cloud-draft save so both paths round-trip nulls, dates and media refs.
+ */
+function collectFrontMatter() {
+  const field = (id) => document.getElementById(id)?.value || '';
+  const title = field('fm-title').trim();
+  const date = field('fm-date');
+  const loadedDate = String(state.editor.loadedDate || '');
+  const category = field('fm-category').trim();
+  const description = field('fm-desc').trim();
+  const cover = state.editor.mediaRefs?.cover || field('fm-cover').trim() || null;
+  const frontMatter = {
+    title,
+    // The date input is date-only; keep the original timestamp when the day did
+    // not change so a no-op save never truncates the time.
+    date: date ? (date === loadedDate.split('T')[0] ? loadedDate : `${date}T00:00:00.000Z`) : loadedDate,
+    category: category || null,
+    tags: field('fm-tags')
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+    description: description || null,
+    cover,
+    views: parseInt(field('fm-views')) || 0,
+    likes: parseInt(field('fm-likes')) || 0,
+  };
+  const media = state.editor.mediaRefs;
+  if (media && (state.editor.mediaLoaded || refsIds(media).length)) frontMatter.media = media;
+  return frontMatter;
+}
+
+/** The body to persist: untouched saves keep the loaded markdown verbatim. */
+function collectBody() {
+  return state.editor.bodyEdited ? document.getElementById('fm-body').value : state.editor.originalBody;
+}
+
 function cloudDraftPayload() {
-  const fields = (id) => document.getElementById(id)?.value || '';
   return {
     slug: getCurrentSlug(),
-    title: fields('fm-title'),
-    body: fields('fm-body'),
+    title: document.getElementById('fm-title')?.value || '',
+    body: collectBody(),
     baseSha: state.editor.baseSha ?? null,
-    frontMatter: {
-      title: fields('fm-title'),
-      date: fields('fm-date'),
-      category: fields('fm-category'),
-      tags: fields('fm-tags')
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      description: fields('fm-desc'),
-      cover: fields('fm-cover'),
-      views: parseInt(fields('fm-views')) || 0,
-      likes: parseInt(fields('fm-likes')) || 0,
-    },
+    frontMatter: collectFrontMatter(),
     media: state.editor.mediaRefs || normalizeMediaRefs(null),
     revision: state.editor.cloudDraftRevision || undefined,
   };
@@ -775,7 +807,7 @@ window.restoreCloudDraft = () => {
   const fm = draft.frontMatter || {};
   set('fm-slug', draft.slug || '');
   set('fm-title', draft.title || fm.title || '');
-  set('fm-date', fm.date || '');
+  set('fm-date', (fm.date || '').split('T')[0]);
   set('fm-category', fm.category || '');
   set('fm-tags', Array.isArray(fm.tags) ? fm.tags.join(', ') : fm.tags || '');
   set('fm-desc', fm.description || '');
@@ -783,6 +815,8 @@ window.restoreCloudDraft = () => {
   set('fm-views', fm.views || 0);
   set('fm-likes', fm.likes || 0);
   set('fm-body', draft.body || '');
+  state.editor.bodyEdited = true;
+  state.editor.mediaLoaded ||= Object.hasOwn(draft, 'media');
   state.editor.mediaRefs = normalizeMediaRefs(draft.media);
   renderSelectedMedia();
   loadSelectedAssets();
@@ -950,7 +984,8 @@ function wireEditorInputs() {
   const fields = document.querySelectorAll(
     '#fm-title, #fm-date, #fm-category, #fm-tags, #fm-desc, #fm-cover, #fm-views, #fm-likes, #fm-slug, #fm-body',
   );
-  const onInput = () => {
+  const onInput = (event) => {
+    if (event.target.id === 'fm-body') state.editor.bodyEdited = true;
     state.editorDirty = true;
     clearTimeout(draftTimer);
     draftTimer = setTimeout(saveDraft, 1500);
@@ -967,7 +1002,7 @@ window.restoreDraft = () => {
   };
   set('fm-slug', d.slug || '');
   set('fm-title', d.title || '');
-  set('fm-date', d.date || '');
+  set('fm-date', (d.date || '').split('T')[0]);
   set('fm-category', d.category || '');
   set('fm-tags', (d.tags || []).join(', '));
   set('fm-desc', d.description || '');
@@ -975,6 +1010,7 @@ window.restoreDraft = () => {
   set('fm-views', d.views || 0);
   set('fm-likes', d.likes || 0);
   set('fm-body', d.body || '');
+  state.editor.bodyEdited = true;
   renderBlocksFromBody();
   state.editorDirty = true;
   updateCoverPreview();
@@ -1170,30 +1206,14 @@ window.doSavePost = async (goBack) => {
     await window.saveDraftNow?.();
     return;
   }
-  let slug = document.getElementById('fm-slug').value.trim();
-  const title = document.getElementById('fm-title').value.trim();
+  const slug = document.getElementById('fm-slug').value.trim();
   if (!slug) {
     toast(t('editor.noSlug'), 'error');
     document.getElementById('fm-slug')?.focus();
     return;
   }
-  const frontMatter = {
-    title,
-    date: document.getElementById('fm-date').value,
-    category: document.getElementById('fm-category').value.trim(),
-    tags: document
-      .getElementById('fm-tags')
-      .value.split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-    description: document.getElementById('fm-desc').value,
-    cover: state.editor.mediaRefs?.cover || document.getElementById('fm-cover').value.trim(),
-    views: parseInt(document.getElementById('fm-views')?.value) || 0,
-    likes: parseInt(document.getElementById('fm-likes')?.value) || 0,
-  };
-  const media = state.editor.mediaRefs;
-  if (media && refsIds(media).length) frontMatter.media = media;
-  const body = document.getElementById('fm-body').value;
+  const frontMatter = collectFrontMatter();
+  const body = collectBody();
   const btn = document.getElementById('editor-save-btn');
   btn.disabled = true;
   try {

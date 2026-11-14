@@ -14,7 +14,7 @@ const types = {
   '.mp3': 'audio/mpeg',
   '.woff2': 'font/woff2',
 };
-export async function serveDirectory(directory) {
+export async function serveDirectory(directory, { notFoundFile = '' } = {}) {
   const root = path.resolve(directory);
   const server = http.createServer((request, response) => {
     let file;
@@ -30,6 +30,12 @@ export async function serveDirectory(directory) {
     }
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
     if (!fs.existsSync(file)) {
+      const fallback = notFoundFile ? path.join(root, notFoundFile) : '';
+      if (fallback && fs.existsSync(fallback)) {
+        response.writeHead(404, { 'Content-Type': 'text/html' });
+        fs.createReadStream(fallback).pipe(response);
+        return;
+      }
       response.writeHead(404).end();
       return;
     }

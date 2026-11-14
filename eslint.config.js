@@ -10,6 +10,8 @@ export default [
       'worker/.wrangler/**',
       '**/vendor/**',
       'test-results/**',
+      // QA reports are throwaway artifacts with ad-hoc browser probes.
+      'qa/**',
       '.playwright-cli/**',
       '.pw/**',
       '.secrets/**',

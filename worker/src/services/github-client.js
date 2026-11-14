@@ -1,3 +1,5 @@
+export { parseFrontMatter } from './frontmatter.js';
+
 export const GITHUB_API = 'https://api.github.com';
 export function contentsUrl(c, repoPath) {
   const encodedPath = String(repoPath)
@@ -41,26 +43,4 @@ export function encodeBase64(str) {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
-}
-
-// ====== Helpers ======
-
-export function parseFrontMatter(content) {
-  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
-  if (!match) return {};
-  const fm = {};
-  match[1].split('\n').forEach((line) => {
-    const m = line.match(/^(\w[\w_-]*):\s*(.*)$/);
-    if (!m) return;
-    let val = m[2].trim();
-    if (val.startsWith('[') && val.endsWith(']')) {
-      val = val
-        .slice(1, -1)
-        .split(',')
-        .map((s) => s.trim().replace(/^"(.*)"$/, '$1'))
-        .filter(Boolean);
-    }
-    fm[m[1]] = val;
-  });
-  return fm;
 }
