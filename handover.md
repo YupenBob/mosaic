@@ -166,3 +166,32 @@ npm run test:admin:local
 - 回退：Pages 用 `rollback.yml`（默认 dry-run，`confirm=rollback` 才执行）到上一个
   deployment；Worker 用 `wrangler rollback`；Stats 旧 `stats` key 保留 30 天供旧代码读取；
   迁移前统计备份在本地 `.mosaic/backup/`（未入库）。
+
+### 2026-11-14 QA 轮次 0/1：后台保存无损 + YAML frontmatter + 404 修复
+
+- 背景：以用户行为为入口的 QA 计划开始执行。Round 0 发现 **P0 数据完整性缺陷**：
+  后台编辑器保存会把 `category: null` 写成字符串 `"null"`、把日期截断成日期、丢 tags/media、
+  并把正文 `{{video:0}}` 改写成 `{{gallery}}`。生产两篇内容已被该缺陷改坏
+  （`ebb0241 Update fsdfsdgsfgsd`、`d4efa33 Update text-only`）。
+  根因：Worker 用逐行正则解析 frontmatter（`github-client.js`），后台编辑器再按字符串回写。
+- 代码：PR #16（合并提交 `01dd3a9`，来自 `release/qa-round1`）
+  - Worker：改用 `js-yaml` 解析 + 类型化 normalize（日期/null 哨兵/tags/media/统计数字，
+    旧的无标题文章保持 null 可无损保存）+ `js-yaml dump` 序列化、保留正文空白；
+    新增 `tests/frontmatter-roundtrip.mjs`（14 篇文章全量往返 + 边界 + mock 保存）并入 `test:unit`。
+  - 后台：直接保存与云草稿共用类型化收集器（日期保留时间、空值为 null、media 不丢）；
+    正文未编辑时原样回写（不再重排占位符）；新增 `admin-roundtrip*` 浏览器回归（修复前 3/3 红，修复后绿）。
+  - 站点：404 页面改为根相对链接（深层 404 的“返回首页”不再指到 `/posts/<slug>/index.html`）；
+    本地测试服务器对未知路径回退 `404.html`，新增嵌套 404 用例。
+  - 内容：把 `text-only`/`fsdfsdgsfgsd` 恢复到 `2906789` 的已知良好元数据。
+- 验证：Verify #43618760754 全绿（含 Chromium+WebKit e2e）；Infrastructure/Site 部署成功；
+  生产 `build-snapshot.gitSha=01dd3a9`；`/data/posts-index.json` 分类/日期/tags 已恢复；
+  深层 404 返回根相对 `index.html`；后台只读巡检测试 4/4 绿，编辑器加载
+  `text-only`（随笔/极简/2026-05-01）与 `fsdfsdgsfgsd`（空分类/空描述/2026-08-03）均为类型化值，
+  证明新 Worker 解析已在线上生效；`probe.mjs` 13 passed / 4 warnings（WAF 残余同 R-0）。
+- 新增 QA 资产（仓库内）：`tests/ux/`（Playwright 旅程框架：公开/媒体/后台/移动无障碍/性能）、
+  `scripts/qa/`（本地全量站点构建、旅程 runner、目录合并）、`docs/qa/`（行为目录，
+  当前 134 条，含通过/失败/阻塞状态）、`qa/reports/`（本地证据，gitignore）。
+- 测试稳定性：`tests/cards-media.mjs` 改为等待揭示动画结束并读取布局几何（offset*），
+  消除慢机/WebKit 下的亚像素波动。
+- 回退：上一成功站点/后台为 `d4efa33`；Worker 用 Infrastructure 历史版本回退；
+  内容回退到 `2906789` 的对应文件。
