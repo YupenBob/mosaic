@@ -53,7 +53,7 @@ export const journeys = [
         timeout: 30000,
         message: 'dashboard content',
       });
-      // Stat cards render placeholder dots until the parallel API responses settle.
+      // Each stat card renders placeholder dots until its own API response settles.
       await waitFor(async () => !(await t.page.locator('.dash-cards').innerText()).includes('...'), {
         timeout: 20000,
         message: 'dashboard stats loaded',
@@ -96,10 +96,11 @@ export const journeys = [
         await t.shot(page);
       }
       t.note(`pages=${rendered.join(', ')}`);
-      // The taxonomy page probes DELETE support with an empty-name request on
-      // every load; any other write is unexpected.
-      const unexpected = t.writeAttempts.filter((entry) => entry !== 'DELETE /api/taxonomy/category');
-      t.assertEqual(unexpected.length, 0, `read-only guard recorded write attempts: ${unexpected.join(', ')}`);
+      t.assertEqual(
+        t.writeAttempts.length,
+        0,
+        `read-only guard recorded write attempts: ${t.writeAttempts.join(', ')}`,
+      );
       const mistakes = t.diagnostics.pageErrors;
       t.assertEqual(mistakes.length, 0, `page errors: ${mistakes.join(' | ')}`);
     },
@@ -158,8 +159,7 @@ export const journeys = [
         message: '#posts route',
       });
       await t.shot('mobile-posts');
-      const unexpected = t.writeAttempts.filter((entry) => entry !== 'DELETE /api/taxonomy/category');
-      t.assertEqual(unexpected.length, 0, `write attempts: ${unexpected.join(', ')}`);
+      t.assertEqual(t.writeAttempts.length, 0, `write attempts: ${t.writeAttempts.join(', ')}`);
     },
   }),
 ];

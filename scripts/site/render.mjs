@@ -153,6 +153,14 @@ export function renderSite(context, posts, indexes) {
     // The 404 document is served for arbitrary deep URLs, so its links must
     // resolve from the domain root instead of the requested path.
     const rp = rootRelative ? '/' : relativePath(outPath);
+    // Canonical URL for the generated directory route (index.html -> dir/).
+    const canonicalUrl = (() => {
+      const base = (SITE.url || '').replace(/\/+$/, '');
+      if (!base || rootRelative) return '';
+      const rel = path.relative(DIST, outPath).replace(/\\/g, '/');
+      const dir = path.posix.dirname(rel);
+      return `${base}/${dir === '.' ? '' : `${dir}/`}`;
+    })();
     const templatePath = theme.layoutPath(template);
     if (!compiled.has(templatePath))
       compiled.set(
@@ -165,6 +173,7 @@ export function renderSite(context, posts, indexes) {
     const html = compiled.get(templatePath)({
       ...data,
       rp,
+      canonicalUrl,
       site: SITE,
       t,
       i18n,

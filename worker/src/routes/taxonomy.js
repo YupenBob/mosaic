@@ -19,11 +19,12 @@ export function registerTaxonomy(app) {
         });
       });
       return c.json({
+        capabilities: { delete: true },
         categories: Object.entries(cats).map(([n, c]) => ({ name: n, count: c })),
         tags: Object.entries(tags).map(([n, c]) => ({ name: n, count: c })),
       });
     } catch {
-      return c.json({ categories: [], tags: [] });
+      return c.json({ categories: [], tags: [], capabilities: { delete: true } });
     }
   });
 

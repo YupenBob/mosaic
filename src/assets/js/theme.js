@@ -223,12 +223,14 @@ export function initThemeMenu(root = document) {
         preset: 'snappy',
       });
     } else {
+      // Restore focus synchronously: waiting for the closing animation made
+      // Escape leave focus on the menu contents for a frame.
+      if (focusToggle) toggle.focus();
       if (closing) return;
       closing = true;
       await animateOut(panel, { to: { opacity: 0, y: -4, scale: 0.99 }, preset: 'snappy' });
       closing = false;
       if (!open) panel.hidden = true;
-      if (focusToggle) toggle.focus();
     }
   };
 

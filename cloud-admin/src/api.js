@@ -121,9 +121,12 @@ export function apiFetch(path, options = {}) {
     : /^(\/config|\/taxonomy|\/stats(?:\/.*)?|\/posts(?:\?.*)?)$/.test(path)
       ? (policy.cacheMs ?? 15000)
       : 0;
+  // Explicit refreshes bypass both stored reads and older in-flight requests.
+  const noCache = options.cache === 'no-store';
+  if (noCache) readCache.delete(path);
   const cached = readCache.get(path);
   if (cached && cached.expires > Date.now()) return Promise.resolve(structuredClone(cached.value));
-  let entry = inFlight.get(path);
+  let entry = noCache ? null : inFlight.get(path);
   if (!entry) {
     const controller = new AbortController(),
       revision = cacheRevision,
@@ -135,7 +138,7 @@ export function apiFetch(path, options = {}) {
     );
     entry.promise = performFetch(path, { ...options, signal: controller.signal })
       .then((value) => {
-        if (ttl && revision === cacheRevision && token === getToken())
+        if (!noCache && ttl && revision === cacheRevision && token === getToken() && inFlight.get(path) === entry)
           readCache.set(path, { value, expires: Date.now() + ttl });
         return value;
       })

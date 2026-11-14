@@ -570,6 +570,17 @@ await record('media delete (both prefixes, keeps others)', async () => {
 });
 
 // ── 8. Taxonomy rename (category + tag) ──
+await record('taxonomy GET advertises delete capability without changing content', async () => {
+  const before = [...gh.entries()];
+  const response = await call('/api/taxonomy', { token: TOKEN });
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.capabilities.delete, true);
+  assert.ok(Array.isArray(data.categories));
+  assert.ok(Array.isArray(data.tags));
+  assert.deepEqual([...gh.entries()], before);
+});
+
 await record('taxonomy rename (category + tag)', async () => {
   const rc = await call('/api/taxonomy/category', {
     method: 'PUT',

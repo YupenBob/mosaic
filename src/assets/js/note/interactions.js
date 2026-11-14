@@ -67,6 +67,9 @@ export function createNoteInteractions({ doc, getHost, getNote }) {
     scrollFrame = requestAnimationFrame(() => updateCarousel());
   }
 
+  /** Localized accessible name for a mounted video element. */
+  const videoLabel = () => ((doc.documentElement.lang || '').startsWith('zh') ? '视频' : 'Video');
+
   // ── inline media ────────────────────────────────────────────────────────
   /**
    * Replace a poster frame with a native video element. HLS-only media is
@@ -78,13 +81,14 @@ export function createNoteInteractions({ doc, getHost, getNote }) {
   function mountVideo(container, video) {
     const sources = Object.entries(video.sources || {}).sort(([a], [b]) => parseInt(b, 10) - parseInt(a, 10));
     const nativeHls = doc.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+    const note = getNote();
     if (!sources.length && !(video.hls && nativeHls)) {
-      const note = getNote();
       if (note) window.location.assign(postUrl(note.slug));
       return;
     }
     const el = doc.createElement('video');
     el.className = 'note-media-video';
+    el.setAttribute('aria-label', `${videoLabel()}${note && note.title ? `：${note.title}` : ''}`);
     el.controls = true;
     el.playsInline = true;
     el.autoplay = true;

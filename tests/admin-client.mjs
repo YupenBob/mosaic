@@ -33,6 +33,36 @@ try {
   await apiFetch('/posts', { method: 'POST', body: '{}' });
   await apiFetch('/config', { signal: null });
   assert.equal(calls, 3, 'writes invalidate read caches');
+  configureClient({ buildCacheMs: 60000, requestTimeoutMs: 1000 });
+  const responses = [];
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    return new Promise((resolve) => responses.push({ resolve, cache: options.cache }));
+  };
+  const initialStatus = apiFetch('/build/status');
+  responses[0].resolve(Response.json({ runNumber: 1 }));
+  await initialStatus;
+  const cachedCalls = calls;
+  assert.equal((await apiFetch('/build/status')).runNumber, 1);
+  assert.equal(calls, cachedCalls, 'background build reads keep the cache');
+  const refreshed = apiFetch('/build/status', { cache: 'no-store' });
+  assert.equal(calls, cachedCalls + 1, 'explicit refresh bypasses a warm build cache');
+  assert.equal(responses[1].cache, 'no-store', 'refresh also bypasses the browser HTTP cache');
+  responses[1].resolve(Response.json({ runNumber: 2 }));
+  assert.equal((await refreshed).runNumber, 2);
+  const olderPoll = apiFetch('/build/status');
+  const freshDuringPoll = apiFetch('/build/status', { cache: 'no-store' });
+  assert.equal(calls, cachedCalls + 3, 'refresh bypasses an older in-flight poll');
+  responses[3].resolve(Response.json({ runNumber: 4 }));
+  assert.equal((await freshDuringPoll).runNumber, 4);
+  responses[2].resolve(Response.json({ runNumber: 3 }));
+  await olderPoll;
+  const nextPoll = apiFetch('/build/status');
+  assert.equal(calls, cachedCalls + 4, 'older poll cannot repopulate the cache after refresh');
+  responses[4].resolve(Response.json({ runNumber: 4 }));
+  await nextPoll;
+  await apiFetch('/build/status');
+  assert.equal(calls, cachedCalls + 4, 'subsequent background polling still caches');
   globalThis.fetch = async (_url, options) =>
     new Promise((_resolve, reject) => {
       upstreamSignal = options.signal;
@@ -49,7 +79,9 @@ try {
     name: 'TimeoutError',
   });
   setNavigationSignal(null);
-  console.log('Admin client: coalesced reads, cache invalidation, independent cancellation and bounded timeout passed');
+  console.log(
+    'Admin client: coalesced reads, fresh refreshes, cache invalidation, independent cancellation and bounded timeout passed',
+  );
 } finally {
   setToken(null);
   globalThis.fetch = original;

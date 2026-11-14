@@ -85,11 +85,7 @@ async function openEditor(t, post = fixture) {
       await waitFor(async () => !(await t.page.locator('#editor-save-btn').isDisabled()), {
         message: 'save completed',
       });
-      assert.deepEqual(
-        writes.filter((entry) => entry !== 'DELETE /api/taxonomy/category'),
-        ['POST /api/posts'],
-        'only the expected post save may write to the API',
-      );
+      assert.deepEqual(writes, ['POST /api/posts'], 'only the expected post save may write to the API');
       return saves[0];
     },
   };
