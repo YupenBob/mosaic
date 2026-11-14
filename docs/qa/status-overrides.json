@@ -1,0 +1,67 @@
+{
+  "AD-37": {
+    "status": "pass",
+    "expected": "Explicit Refresh bypasses the 3s read cache and issues a fresh GET; background polling may stay cached"
+  },
+  "C-17": {
+    "title": "Video card opens the note detail and plays in place",
+    "status": "pass",
+    "expected": "Card click opens the note detail; its play button mounts the video (readyState>=3, currentTime advances); the 竖屏 entry opens the vertical feed"
+  },
+  "D-01": {
+    "status": "pass"
+  },
+  "D-02": {
+    "status": "pass"
+  },
+  "D-03": {
+    "status": "pass"
+  },
+  "D-06": {
+    "status": "pass",
+    "expected": "At a 320px viewport no page-level horizontal scroll (WCAG 1.4.10 reflow)"
+  },
+  "D-102": {
+    "status": "pass"
+  },
+  "D-103": {
+    "title": "Mobile navigation uses the header links",
+    "status": "pass",
+    "expected": "Header navigation links are reachable at 390px (no drawer control exists); each link is a 44px target"
+  },
+  "E-05": {
+    "status": "pass",
+    "expected": "A failed index disables search with a visible 'search unavailable' notice and keeps the SSR feed"
+  },
+  "E-06": {
+    "status": "pass"
+  },
+  "E-07": {
+    "status": "pass"
+  },
+  "E-11": {
+    "status": "blocked",
+    "expected": "No offline-first requirement: a cold offline navigation shows the browser error page"
+  },
+  "E-18": {
+    "status": "pass",
+    "expected": "Unknown track slugs -> 404 UNKNOWN_POST; malformed JSON bodies are ignored (view beacon is body-less); no stack traces"
+  },
+  "G-02": {
+    "status": "pass"
+  },
+  "G-05": {
+    "status": "pass"
+  },
+  "V-86": {
+    "status": "pass",
+    "expected": "Video card opens the note detail and plays after the play button; the 竖屏 entry opens the vertical feed"
+  },
+  "V-94": {
+    "status": "pass"
+  },
+  "G-107": {
+    "status": "pass",
+    "expected": "Like/unlike updates the count and persists via localStorage; tracking calls are sent"
+  }
+}
