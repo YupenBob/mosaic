@@ -195,6 +195,16 @@ export const journeys = [
           await t.goto(url);
           await t.page.evaluate((theme) => localStorage.setItem('mosaic_theme', theme), theme);
           await t.page.reload({ waitUntil: 'domcontentloaded' });
+          // Axe must scan the settled state: reveal animations fade cards in and
+          // would otherwise report transient low-contrast text.
+          await t.page
+            .waitForFunction(() => document.querySelectorAll('.post-card:not(.is-revealed)').length === 0, null, {
+              timeout: 15000,
+            })
+            .catch(() => {});
+          await t.page.evaluate(() =>
+            Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => {}))),
+          );
           await t.page.addScriptTag({ path: path.resolve('node_modules/axe-core/axe.min.js') });
           const results = await t.page.evaluate(async () => {
             const r = await globalThis.axe.run(document, {
@@ -214,21 +224,22 @@ export const journeys = [
     },
     { timeoutMs: 150000 },
   ),
-  journey('D-06', '320px reflow and 200% zoom', async (t) => {
-    const paths = await routes(t),
-      bad = [];
+  journey('D-06', '320px reflow without horizontal page scroll', async (t) => {
+    // WCAG 1.4.10 reflow: a 1280px viewport at 400% zoom equals 320 CSS px.
+    // Emulating that with CSS `zoom` changes the layout in ways browsers do not
+    // when zooming, so test the honest 320px viewport instead.
+    const paths = await routes(t);
+    const bad = [];
     await t.page.setViewportSize({ width: 320, height: 800 });
-    for (const url of [paths[0], paths[1]])
-      for (const zoom of [1, 2]) {
-        await t.goto(url);
-        await t.page.evaluate((z) => (document.body.style.zoom = z), zoom);
-        const m = await t.page.evaluate(() => ({
-          scroll: document.documentElement.scrollWidth,
-          client: document.documentElement.clientWidth,
-        }));
-        t.note(`${url} zoom=${zoom} ${JSON.stringify(m)}`);
-        if (m.scroll > m.client + 1) bad.push(`${url} zoom ${zoom} ${JSON.stringify(m)}`);
-      }
+    for (const url of [paths[0], paths[1], `${paths[0]}#search`]) {
+      await t.goto(url);
+      const m = await t.page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        client: document.documentElement.clientWidth,
+      }));
+      t.note(`${url} ${JSON.stringify(m)}`);
+      if (m.scroll > m.client + 1) bad.push(`${url} ${JSON.stringify(m)}`);
+    }
     t.assert(!bad.length, bad.join('; '));
   }),
   journey(
