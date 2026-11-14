@@ -33,7 +33,9 @@ export async function startLocalSite() {
     const { buildLocalSite } = await import('../../../scripts/qa/build-local.mjs');
     await buildLocalSite({ refresh: process.env.QA_REFRESH === '1' });
   }
-  const server = await serveDirectory(directory);
+  // Cloudflare Pages serves 404.html for unknown paths; mirror that locally so
+  // nested-URL journeys reproduce the real document and its root-relative links.
+  const server = await serveDirectory(directory, { notFoundFile: '404.html' });
   return { base: server.url, close: server.close, directory };
 }
 
@@ -41,7 +43,7 @@ export async function startLocalSite() {
 export async function startLocalAdmin() {
   const staged = fs.mkdtempSync(path.join(os.tmpdir(), 'mosaic-qa-admin-'));
   const dist = path.join(staged, 'dist');
-  stageAdmin(path.join(ROOT, 'cloud-admin'), dist, ROOT);
+  stageAdmin(path.join(ROOT, 'cloud-admin'), dist, staged);
   const server = await serveDirectory(dist);
   return { base: server.url, close: server.close, directory: dist, config: {} };
 }

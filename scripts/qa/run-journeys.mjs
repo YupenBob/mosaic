@@ -60,7 +60,10 @@ async function collectSpecs(options) {
     entries.push({ file: path.resolve(options.file), name: path.basename(options.file) });
   } else {
     if (!fs.existsSync(SPECS_DIR)) return entries;
-    for (const name of fs.readdirSync(SPECS_DIR).filter((entry) => entry.endsWith('.spec.mjs')).sort()) {
+    for (const name of fs
+      .readdirSync(SPECS_DIR)
+      .filter((entry) => entry.endsWith('.spec.mjs'))
+      .sort()) {
       entries.push({ file: path.join(SPECS_DIR, name), name });
     }
   }
@@ -69,7 +72,8 @@ async function collectSpecs(options) {
     const module = await import(entry.file);
     const area = module.area || path.basename(entry.name).split('-')[0];
     if (!options.file && area !== options.area) continue;
-    for (const journey of module.journeys || []) specs.push({ ...journey, area, file: path.relative(ROOT, entry.file) });
+    for (const journey of module.journeys || [])
+      specs.push({ ...journey, area, file: path.relative(ROOT, entry.file) });
   }
   return specs;
 }
@@ -103,11 +107,19 @@ async function main() {
     specs.length = 0;
     specs.push(...filtered);
   }
+  // A journey may pin itself to one target (e.g. production admin vs mocked admin).
+  const targeted = specs.filter((spec) => !spec.targets || spec.targets.includes(options.target));
+  if (targeted.length !== specs.length)
+    console.log(`skipping ${specs.length - targeted.length} journey(s) pinned to another target`);
+  specs.length = 0;
+  specs.push(...targeted);
   if (specs.length === 0) throw new Error(`no journeys found for area "${options.area}" in ${SPECS_DIR}`);
 
   const runDir = path.join(ROOT, 'qa/reports', `round-${options.round}`, `${options.area}-${options.target}`);
   fs.mkdirSync(runDir, { recursive: true });
-  console.log(`target=${options.target} base=${target.base} journeys=${specs.length} -> ${path.relative(ROOT, runDir)}`);
+  console.log(
+    `target=${options.target} base=${target.base} journeys=${specs.length} -> ${path.relative(ROOT, runDir)}`,
+  );
 
   const browser = await launchBrowser();
   const results = [];
@@ -117,7 +129,16 @@ async function main() {
       const started = Date.now();
       const { context, page, diagnostics } = await openPage(browser, { viewport: spec.viewport || 'desktop' });
       const writeAttempts = target.guardWrites ? await blockWrites(page) : [];
-      const t = createTestContext({ page, context, diagnostics, base: target.base, target: options.target, runDir, journey: spec, writeAttempts });
+      const t = createTestContext({
+        page,
+        context,
+        diagnostics,
+        base: target.base,
+        target: options.target,
+        runDir,
+        journey: spec,
+        writeAttempts,
+      });
       const result = {
         id: spec.id,
         title: spec.title,
@@ -163,7 +184,9 @@ async function main() {
         writeJourneyResult(runDir, result);
         results.push(result);
         await context.close().catch(() => {});
-        console.log(`${result.status.toUpperCase()} ${result.id} ${result.durationMs}ms${result.error ? ` — ${result.error.split('\n')[0]}` : ''}`);
+        console.log(
+          `${result.status.toUpperCase()} ${result.id} ${result.durationMs}ms${result.error ? ` — ${result.error.split('\n')[0]}` : ''}`,
+        );
       }
     }
   } finally {
