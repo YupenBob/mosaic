@@ -105,6 +105,40 @@ export const journeys = [
     },
   }),
   defineJourney({
+    id: 'admin-prod-editor-load',
+    title: 'Editor loads typed metadata for the repaired posts (read-only)',
+    priority: 'P1',
+    steps: async (t) => {
+      await login(t);
+      await t.page.evaluate(() => {
+        location.hash = 'editor&slug=text-only';
+      });
+      await waitFor(async () => (await t.page.locator('#fm-title').inputValue()).length > 0, {
+        timeout: 25000,
+        message: 'text-only form populated',
+      });
+      t.assertEqual(await t.page.locator('#fm-category').inputValue(), '随笔', 'category is typed, not "null"');
+      t.assert(
+        (await t.page.locator('#fm-tags').inputValue()).includes('极简'),
+        'tags load as a list instead of an empty field',
+      );
+      t.assertEqual(await t.page.locator('#fm-date').inputValue(), '2026-05-01', 'date input keeps the day');
+      t.assert((await t.page.locator('#fm-cover').inputValue()).length > 0, 'cover reference loads');
+      await t.page.evaluate(() => {
+        location.hash = 'editor&slug=fsdfsdgsfgsd';
+      });
+      await waitFor(async () => (await t.page.locator('#fm-title').inputValue()).length > 0, {
+        timeout: 25000,
+        message: 'fsdfsdgsfgsd form populated',
+      });
+      t.assertEqual(await t.page.locator('#fm-category').inputValue(), '', 'null category loads as an empty field');
+      t.assertEqual(await t.page.locator('#fm-desc').inputValue(), '', 'null description loads as an empty field');
+      t.assertEqual(await t.page.locator('#fm-date').inputValue(), '2026-08-03', 'repaired post date');
+      t.assertEqual(t.writeAttempts.length, 0, 'loading the editor must not write');
+      await t.shot('editor-text-only');
+    },
+  }),
+  defineJourney({
     id: 'admin-prod-mobile-drawer',
     title: 'Mobile admin: sidebar drawer opens, navigates, and closes',
     priority: 'P1',

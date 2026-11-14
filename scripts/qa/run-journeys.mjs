@@ -73,7 +73,7 @@ async function collectSpecs(options) {
     const area = module.area || path.basename(entry.name).split('-')[0];
     if (!options.file && area !== options.area) continue;
     for (const journey of module.journeys || [])
-      specs.push({ ...journey, area, file: path.relative(ROOT, entry.file) });
+      specs.push({ ...journey, area, file: path.relative(ROOT, entry.file), targets: module.targets });
   }
   return specs;
 }
