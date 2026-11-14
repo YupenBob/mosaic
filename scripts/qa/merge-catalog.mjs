@@ -9,6 +9,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { ROOT } from '../lib/context.mjs';
 
 const REPORTS = path.join(ROOT, 'qa/reports');
@@ -131,6 +132,8 @@ function main() {
     lines.push('');
   }
   fs.writeFileSync(OUT_MD, lines.join('\n') + '\n');
+  // Keep the tracked artifacts inside `npm run format:check` (repo-wide Prettier).
+  spawnSync('npx', ['prettier', '--write', OUT_JSON, OUT_MD], { cwd: ROOT, stdio: 'ignore' });
 
   console.log(`merged ${behaviors.length} behaviors from ${files.length} files -> docs/qa/behaviors.json`);
   console.log(
