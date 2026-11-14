@@ -12,6 +12,8 @@ import { getConfig } from './site-config.js';
 import { isDirty } from './publication.js';
 import { validSegment } from '../../../shared/media-manifest.mjs';
 import { assertValidFrontmatter } from '../../../shared/content-schema.mjs';
+import { normalizeFrontMatter, parsePostContent, serializePostContent } from './frontmatter.js';
+export { normalizeFrontMatter } from './frontmatter.js';
 import {
   applyContentOverlay,
   readContentOverlay,
@@ -146,27 +148,17 @@ export async function getPost(c, slug) {
   if (!resp.ok) return null;
   const md = await resp.json();
   const content = decodeBase64(md.content);
-  const fm = parseFrontMatter(content);
-  const body = content.replace(/^---[\s\S]*?---\n?/, '').trim();
+  const { frontMatter: fm, body } = parsePostContent(content);
   return { slug, frontMatter: fm, body, sha: md.sha };
-}
-
-function yamlValue(value) {
-  if (value === null || value === undefined) return 'null';
-  // JSON is a YAML 1.2 subset and handles nested `media`/`player` objects
-  // without writing "[object Object]" or losing array quoting.
-  if (typeof value === 'object' || Array.isArray(value)) return JSON.stringify(value);
-  if (typeof value === 'string') return JSON.stringify(value);
-  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
-  return JSON.stringify(String(value));
 }
 
 export async function createOrUpdatePost(c, slug, frontMatter, body, message, baseSha) {
   assertPostSlug(slug);
+  frontMatter = normalizeFrontMatter(frontMatter);
   // Shared schema (build scripts use the same rules): unsafe categories/tags
   // must fail here, before they reach Git or the content overlay.
   try {
-    assertValidFrontmatter(frontMatter && typeof frontMatter === 'object' ? frontMatter : {}, { slug });
+    assertValidFrontmatter(frontMatter, { slug });
   } catch (error) {
     const invalid = Object.assign(new Error(error.message), { status: 422, code: 'INVALID_CONTENT' });
     throw invalid;
@@ -189,11 +181,7 @@ export async function createOrUpdatePost(c, slug, frontMatter, body, message, ba
       throw error;
     }
   }
-  const yaml = Object.entries(frontMatter)
-    .filter(([key]) => /^[A-Za-z0-9_-]+$/.test(key))
-    .map(([key, value]) => `${key}: ${yamlValue(value)}`)
-    .join('\n');
-  const content = `---\n${yaml}\n---\n\n${body || ''}`;
+  const content = serializePostContent(frontMatter, body);
   const endpoint = contentsUrl(c, `content/posts/${slug}/index.md`);
   const payload = { ...branchPayload(c), message: message || `Update ${slug}`, content: encodeBase64(content) };
   if (existing?.sha) payload.sha = existing.sha;
@@ -215,13 +203,8 @@ export async function createOrUpdatePost(c, slug, frontMatter, body, message, ba
       postRecord(
         slug,
         {
-          title: frontMatter.title ?? cached.title,
-          category: frontMatter.category ?? cached.category,
-          tags: Array.isArray(frontMatter.tags) ? frontMatter.tags : cached.tags,
-          date: frontMatter.date ?? cached.date,
-          description: frontMatter.description ?? cached.description,
-          media: frontMatter.media ?? cached.media,
-          cover: frontMatter.cover ?? cached.cover,
+          ...cached,
+          ...frontMatter,
           type: cached.type,
           stats: cached.stats,
         },

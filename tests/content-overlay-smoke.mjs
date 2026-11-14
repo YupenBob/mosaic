@@ -292,7 +292,7 @@ await record('saving a post records it in the overlay (no GitHub list needed)', 
   const posts = await listPosts(c);
   assert.equal(githubCalls, 0, 'post save is visible without GitHub');
   assert.equal(posts.find((post) => post.slug === 'alpha').title, 'Saved Alpha');
-  assert.equal(posts.find((post) => post.slug === 'alpha').date, '2026-10-05');
+  assert.equal(posts.find((post) => post.slug === 'alpha').date, '2026-10-05T00:00:00.000Z');
 });
 
 await record('saving a post rejects unsafe frontmatter (shared schema)', async () => {

@@ -101,11 +101,15 @@ try {
   assert.equal(published.sha, 'new-sha');
   assert.ok(putPayload?.sha === undefined, 'new posts are create-only');
   const committed = Buffer.from(putPayload.content, 'base64').toString('utf8');
-  assert.match(committed, /media: \{"gallery":\["ast_0123456789abcdefghjkmnpq"\]/);
-  assert.match(committed, /cover: "ast_0123456789abcdefghjkmnpq"/);
   assert.doesNotMatch(committed, /\[object Object\]/);
   const parsed = matter(committed);
-  assert.deepEqual(parsed.data.media.gallery, ['ast_0123456789abcdefghjkmnpq']);
+  assert.deepEqual(parsed.data.media, {
+    gallery: ['ast_0123456789abcdefghjkmnpq'],
+    videos: [],
+    music: [],
+    cover: 'ast_0123456789abcdefghjkmnpq',
+  });
+  assert.equal(parsed.data.cover, 'ast_0123456789abcdefghjkmnpq');
   await assert.rejects(
     () => getDraft(context, publishable.id),
     (error) => error.status === 404,
