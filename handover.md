@@ -195,3 +195,35 @@ npm run test:admin:local
   消除慢机/WebKit 下的亚像素波动。
 - 回退：上一成功站点/后台为 `d4efa33`；Worker 用 Infrastructure 历史版本回退；
   内容回退到 `2906789` 的对应文件。
+
+### 2026-11-14 QA 轮次 2/3/4：移动无障碍/SEO、后台正确性、故障与安全
+
+- 范围：Round 2 媒体/移动无障碍/性能、Round 3 后台写路径（本地 mock）、Round 4 故障注入/边界/安全，
+  共 226 条行为目录（177 pass / 49 blocked，blocked 均为缺测试条件或非产品需求）。
+- 修复与上线（两批）：
+  - `38cfdcc`（PR #18，QA 轮次 2/3）：移动端主题/导航/筛选/浮层按钮 44px 触摸目标；
+    主题菜单 Escape 同步回焦；访客页 skip link 与 `main` 焦点目标；文章视频 `aria-label`；
+    每页 canonical（首页/文章/分类/标签/分页）与媒体域 preconnect；404 `noindex`；
+    搜索/音量滑块可见焦点环。后台：`#build` 手动刷新绕过 3s 读缓存；仪表盘统计卡片各自
+    落地加载、taxonomy `null` 归入“未分类”；taxonomy 删除能力改为 `GET /taxonomy`
+    的 `capabilities.delete`（页面加载不再发 DELETE 探测）。Worker 增加能力字段。
+  - `f45b319`（PR #19，QA 轮次 4）：`/api/track/{view,like,dwell}` 用 R2 已发布索引
+    校验 slug（未知 slug → 404 `UNKNOWN_POST`；索引缺失时 fail-open 不丢真实统计，
+    per-isolate 30s 缓存）；搜索索引加载失败时禁用输入并显示可见提示（SSR 卡片保持可用），
+    不再静默失效。
+- 线上核验（release 3）：`build-snapshot.gitSha=f45b319`；`probe.mjs` 13 passed / 4 warnings
+  （WAF 残余同 R-0）；未知 track slug 404 `UNKNOWN_POST`，合法 slug 200；首页/文章 canonical、
+  preconnect、视频 `aria-label` 均在线；后台只读巡检 4/4 绿、0 写请求；首页/分类/标签/404 正常。
+- 测试稳定性/防回归：`tests/cards-media.mjs` 等揭示动画结束并读布局几何；axe 扫描等待动画
+  结束（消除暗色卡片对比度误报）；D-06 用真实 320px reflow 取代 CSS-zoom 代理；
+  `admin-roundtrip` 修复前 3/3 红、修复后绿；新增 `edge-faults`/`edge-prod`/`admin-writes`/
+  `site-polish`/`media-playback`/`mobile-a11y`/`perf` 旅程与 `status-overrides.json` 目录校正。
+- 已知残余/后续 backlog（不阻塞上线）：
+  - WAF 未落地（R-0）：`site-data/*` 在媒体域仍公开，需 Zone ID 后按 `docs/security-media.md` 上线；
+  - 49 条 blocked 行为：多视频/音乐内容缺失、后台上传/删除/历史恢复等写分支需要更完整 mock，
+    离线首访（无 Service Worker）非产品需求；
+  - `enableBusuanzi: true` 会在文章页引入第三方统计（配置选择，性能/隐私提示）；
+  - 依赖升级 PR（Dependabot）待评估。
+- QA 资产：`tests/ux/`（7 个旅程 spec + lib）、`scripts/qa/`（本地全量构建/runner/目录合并）、
+  `docs/qa/behaviors.json` + `behavior-catalog.md`（226 条，含状态与覆盖来源）、
+  每轮证据在 `qa/reports/round-N/`（gitignore）。
