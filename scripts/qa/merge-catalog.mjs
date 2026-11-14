@@ -92,6 +92,15 @@ function main() {
     }
   }
 
+  // Curated status corrections live in a tracked file so re-merging keeps them.
+  const overridesFile = path.join(ROOT, 'docs/qa/status-overrides.json');
+  if (fs.existsSync(overridesFile)) {
+    const overrides = JSON.parse(fs.readFileSync(overridesFile, 'utf8'));
+    for (const [id, override] of Object.entries(overrides)) {
+      const record = merged.get(id);
+      if (record) merged.set(id, { ...record, ...override });
+    }
+  }
   const behaviors = [...merged.values()].sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
   fs.mkdirSync(path.dirname(OUT_JSON), { recursive: true });
   fs.writeFileSync(OUT_JSON, JSON.stringify(behaviors, null, 2) + '\n');
