@@ -255,6 +255,77 @@
     "source": "qa/reports/round-0/catalog.json"
   },
   {
+    "id": "D-01",
+    "area": "mobile",
+    "title": "Home card rendering mobile",
+    "surface": "home",
+    "steps": [
+      "Open home"
+    ],
+    "expected": "Cards render without horizontal overflow",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "M-01-home.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "D-02",
+    "area": "mobile",
+    "title": "Theme menu and target sizes",
+    "surface": "home",
+    "steps": [
+      "Open theme menu",
+      "Measure visible controls"
+    ],
+    "expected": "Main targets at least 44×44 CSS px",
+    "status": "fail",
+    "coveredBy": "",
+    "evidence": [
+      "M-02-menu.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "D-03",
+    "area": "mobile",
+    "title": "Mobile navigation drawer",
+    "surface": "home",
+    "steps": [
+      "Open mobile navigation"
+    ],
+    "expected": "Navigation opens on mobile",
+    "status": "blocked",
+    "coveredBy": "",
+    "evidence": [
+      "M-03-nav.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "D-04",
+    "area": "mobile",
+    "title": "Vertical feed scroll gesture",
+    "surface": "home",
+    "steps": [
+      "Open vertical feed",
+      "Swipe/scroll upward"
+    ],
+    "expected": "Feed opens and advances",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "M-04-feed.png",
+      "M-04-touch.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
     "id": "E-01",
     "area": "edge",
     "title": "History payload does not execute",
@@ -355,6 +426,132 @@
     ],
     "round": 0,
     "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "G-01",
+    "area": "post",
+    "title": "Post media and controls",
+    "surface": "/posts/20260703/",
+    "steps": [
+      "Open post",
+      "Inspect media and like state",
+      "Play video and inspect quality if present"
+    ],
+    "expected": "Content loads and video advances",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "P-01-post.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "G-02",
+    "area": "post",
+    "title": "Post media and controls",
+    "surface": "/posts/20260711222352/",
+    "steps": [
+      "Open post",
+      "Inspect media and like state",
+      "Play video and inspect quality if present"
+    ],
+    "expected": "Content loads and video advances",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "P-02-post.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "G-03",
+    "area": "post",
+    "title": "Post media and controls",
+    "surface": "/posts/text-only/",
+    "steps": [
+      "Open post",
+      "Inspect media and like state",
+      "Play video and inspect quality if present"
+    ],
+    "expected": "Content loads and video advances",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "P-03-post.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "G-04",
+    "area": "post",
+    "title": "Post media and controls",
+    "surface": "/posts/wp-20231016bf/",
+    "steps": [
+      "Open post",
+      "Inspect media and like state",
+      "Play video and inspect quality if present"
+    ],
+    "expected": "Content loads and video advances",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "P-04-post.png",
+      "P-04-gallery.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "G-05",
+    "area": "post",
+    "title": "Note deep link",
+    "surface": "home",
+    "steps": [
+      "Open /?note=text-only"
+    ],
+    "expected": "Note modal opens for the slug",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "P-05-note.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "G-06",
+    "area": "post",
+    "title": "Music post playback",
+    "surface": "post",
+    "steps": [
+      "Inspect available index and sampled posts for audio"
+    ],
+    "expected": "Music post can be played if one exists",
+    "status": "blocked",
+    "coveredBy": "",
+    "evidence": [],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "G-07",
+    "area": "post",
+    "title": "Like mutation",
+    "surface": "post",
+    "steps": [
+      "Inspect like button state"
+    ],
+    "expected": "Like can be activated",
+    "status": "blocked",
+    "coveredBy": "",
+    "evidence": [
+      "P-01-post.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
   },
   {
     "id": "V-01",
@@ -661,5 +858,929 @@
     ],
     "round": 0,
     "source": "qa/reports/round-0/catalog.json"
+  },
+  {
+    "id": "V-41",
+    "area": "visitor",
+    "title": "Fourteen home cards",
+    "surface": "home",
+    "steps": [
+      "See visitor-masonry journey"
+    ],
+    "expected": "Fourteen home cards",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-masonry.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-42",
+    "area": "visitor",
+    "title": "Card post URLs",
+    "surface": "home",
+    "steps": [
+      "See visitor-masonry journey"
+    ],
+    "expected": "Card post URLs",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-masonry.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-43",
+    "area": "visitor",
+    "title": "Server LQIP and deferred HD markup",
+    "surface": "home",
+    "steps": [
+      "See visitor-masonry journey"
+    ],
+    "expected": "Server LQIP and deferred HD markup",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-masonry.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-44",
+    "area": "visitor",
+    "title": "Visible card upgrades to HD",
+    "surface": "home",
+    "steps": [
+      "See visitor-masonry journey"
+    ],
+    "expected": "Visible card upgrades to HD",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-masonry.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-45",
+    "area": "visitor",
+    "title": "Desktop has no horizontal overflow",
+    "surface": "home",
+    "steps": [
+      "See visitor-masonry journey"
+    ],
+    "expected": "Desktop has no horizontal overflow",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-masonry.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-46",
+    "area": "visitor",
+    "title": "Mobile has no horizontal overflow",
+    "surface": "home",
+    "steps": [
+      "See visitor-masonry journey"
+    ],
+    "expected": "Mobile has no horizontal overflow",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-masonry.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-47",
+    "area": "visitor",
+    "title": "Card opens note and full post",
+    "surface": "home",
+    "steps": [
+      "See visitor-card-back journey"
+    ],
+    "expected": "Card opens note and full post",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-card-back.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-48",
+    "area": "visitor",
+    "title": "Browser Back restores scroll",
+    "surface": "home",
+    "steps": [
+      "See visitor-card-back journey"
+    ],
+    "expected": "Browser Back restores scroll",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-card-back.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-49",
+    "area": "visitor",
+    "title": "Category links on home",
+    "surface": "home",
+    "steps": [
+      "See visitor-categories journey"
+    ],
+    "expected": "Category links on home",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-categories.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-50",
+    "area": "visitor",
+    "title": "Category results match index",
+    "surface": "category",
+    "steps": [
+      "See visitor-categories journey"
+    ],
+    "expected": "Category results match index",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-categories.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-51",
+    "area": "visitor",
+    "title": "Empty category state",
+    "surface": "category",
+    "steps": [
+      "No generated category has zero posts; empty category route cannot be exercised on this build."
+    ],
+    "expected": "Empty category state",
+    "status": "blocked",
+    "coveredBy": "",
+    "evidence": [],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-52",
+    "area": "visitor",
+    "title": "Tag filter available",
+    "surface": "home",
+    "steps": [
+      "See visitor-tag journey"
+    ],
+    "expected": "Tag filter available",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-tag.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-53",
+    "area": "visitor",
+    "title": "Tag results match index",
+    "surface": "home",
+    "steps": [
+      "See visitor-tag journey"
+    ],
+    "expected": "Tag results match index",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-tag.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-54",
+    "area": "visitor",
+    "title": "Clear tag filter",
+    "surface": "home",
+    "steps": [
+      "See visitor-tag journey"
+    ],
+    "expected": "Clear tag filter",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-tag.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-55",
+    "area": "visitor",
+    "title": "Search configured minimum is two",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "Search configured minimum is two",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-56",
+    "area": "visitor",
+    "title": "One character keeps dropdown closed",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "One character keeps dropdown closed",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-57",
+    "area": "visitor",
+    "title": "Search dropdown shows matches",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "Search dropdown shows matches",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-58",
+    "area": "visitor",
+    "title": "Search filters grid",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "Search filters grid",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-59",
+    "area": "visitor",
+    "title": "Search no-result dropdown and grid",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "Search no-result dropdown and grid",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-60",
+    "area": "visitor",
+    "title": "Escape closes search dropdown",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "Escape closes search dropdown",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-61",
+    "area": "visitor",
+    "title": "Arrow keys select search result",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "Arrow keys select search result",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-62",
+    "area": "visitor",
+    "title": "Enter opens search result",
+    "surface": "home",
+    "steps": [
+      "See visitor-search journey"
+    ],
+    "expected": "Enter opens search result",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-search.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-63",
+    "area": "visitor",
+    "title": "Theme bootstrap before CSS",
+    "surface": "home",
+    "steps": [
+      "See visitor-theme journey"
+    ],
+    "expected": "Theme bootstrap before CSS",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-theme.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-64",
+    "area": "visitor",
+    "title": "Switch light and dark",
+    "surface": "home",
+    "steps": [
+      "See visitor-theme journey"
+    ],
+    "expected": "Switch light and dark",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-theme.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-65",
+    "area": "visitor",
+    "title": "Accent selection and persistence",
+    "surface": "home",
+    "steps": [
+      "See visitor-theme journey"
+    ],
+    "expected": "Accent selection and persistence",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-theme.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-66",
+    "area": "visitor",
+    "title": "Theme persistence after reload",
+    "surface": "home",
+    "steps": [
+      "See visitor-theme journey"
+    ],
+    "expected": "Theme persistence after reload",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-theme.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-67",
+    "area": "visitor",
+    "title": "Card opens note and sets URL",
+    "surface": "home",
+    "steps": [
+      "See visitor-note journey"
+    ],
+    "expected": "Card opens note and sets URL",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-note.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-68",
+    "area": "visitor",
+    "title": "Escape closes note and restores focus",
+    "surface": "home",
+    "steps": [
+      "See visitor-note journey"
+    ],
+    "expected": "Escape closes note and restores focus",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-note.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-69",
+    "area": "visitor",
+    "title": "Direct note deep link",
+    "surface": "home",
+    "steps": [
+      "See visitor-note journey"
+    ],
+    "expected": "Direct note deep link",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-note.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-70",
+    "area": "visitor",
+    "title": "Browser Back closes note",
+    "surface": "home",
+    "steps": [
+      "See visitor-note journey"
+    ],
+    "expected": "Browser Back closes note",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-note.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-71",
+    "area": "visitor",
+    "title": "Backdrop closes note",
+    "surface": "home",
+    "steps": [
+      "See visitor-note journey"
+    ],
+    "expected": "Backdrop closes note",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-note.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-72",
+    "area": "visitor",
+    "title": "Like count increments",
+    "surface": "post",
+    "steps": [
+      "See visitor-likes journey"
+    ],
+    "expected": "Like count increments",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-likes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-73",
+    "area": "visitor",
+    "title": "Liked state persists after reload",
+    "surface": "post",
+    "steps": [
+      "See visitor-likes journey"
+    ],
+    "expected": "Liked state persists after reload",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-likes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-74",
+    "area": "visitor",
+    "title": "Unlike decrements count",
+    "surface": "post",
+    "steps": [
+      "See visitor-likes journey"
+    ],
+    "expected": "Unlike decrements count",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-likes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-75",
+    "area": "visitor",
+    "title": "View and like requests sent",
+    "surface": "post",
+    "steps": [
+      "See visitor-likes journey"
+    ],
+    "expected": "View and like requests sent",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-likes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-76",
+    "area": "visitor",
+    "title": "Locale switch",
+    "surface": "home",
+    "steps": [
+      "The generated free-site UI exposes no locale switch; language is build configuration."
+    ],
+    "expected": "Locale switch",
+    "status": "blocked",
+    "coveredBy": "",
+    "evidence": [],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-77",
+    "area": "visitor",
+    "title": "RSS route responds",
+    "surface": "feed",
+    "steps": [
+      "See visitor-routes journey"
+    ],
+    "expected": "RSS route responds",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-routes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-78",
+    "area": "visitor",
+    "title": "Robots route responds",
+    "surface": "robots",
+    "steps": [
+      "See visitor-routes journey"
+    ],
+    "expected": "Robots route responds",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-routes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-79",
+    "area": "visitor",
+    "title": "Sitemap route responds",
+    "surface": "sitemap",
+    "steps": [
+      "See visitor-routes journey"
+    ],
+    "expected": "Sitemap route responds",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-routes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-80",
+    "area": "visitor",
+    "title": "404 page and missing route",
+    "surface": "404",
+    "steps": [
+      "See visitor-routes journey"
+    ],
+    "expected": "404 page and missing route",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-visitor.spec.mjs",
+    "evidence": [
+      "../public-local/visitor-routes.json"
+    ],
+    "round": 1,
+    "source": "qa/reports/round-1/public-visitor/catalog.json"
+  },
+  {
+    "id": "V-81",
+    "area": "visitor",
+    "title": "Home card rendering desktop",
+    "surface": "home",
+    "steps": [
+      "Open home"
+    ],
+    "expected": "Cards render without horizontal overflow",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "V-01-home.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-82",
+    "area": "visitor",
+    "title": "Home card rendering tablet",
+    "surface": "home",
+    "steps": [
+      "Open home"
+    ],
+    "expected": "Cards render without horizontal overflow",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "V-02-home.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-83",
+    "area": "visitor",
+    "title": "Search results, empty state and Escape",
+    "surface": "home",
+    "steps": [
+      "Type 壁纸",
+      "Type zzzz-no-such-post-42",
+      "Press Escape"
+    ],
+    "expected": "Matching results appear, no results is indicated and Escape dismisses results",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-03-results.png",
+      "V-03-empty.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-84",
+    "area": "visitor",
+    "title": "Category page",
+    "surface": "category",
+    "steps": [
+      "Open /categories/随笔/"
+    ],
+    "expected": "Shows matching posts",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-04-category.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-85",
+    "area": "visitor",
+    "title": "Tag page",
+    "surface": "tag",
+    "steps": [
+      "Open /tags/壁纸/"
+    ],
+    "expected": "Shows matching tagged posts",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-05-tag.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-86",
+    "area": "visitor",
+    "title": "Video card opens and plays vertical feed",
+    "surface": "home",
+    "steps": [
+      "Click a video card",
+      "Wait for playback"
+    ],
+    "expected": "Full-screen feed opens and plays",
+    "status": "fail",
+    "coveredBy": "",
+    "evidence": [
+      "V-06-feed.png",
+      "V-06-video-card.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-87",
+    "area": "visitor",
+    "title": "Theme and accent persistence",
+    "surface": "home",
+    "steps": [
+      "Choose dark and violet",
+      "Reload"
+    ],
+    "expected": "Choices persist and first paint is dark",
+    "status": "pass",
+    "coveredBy": "tests/ux/journeys/public-smoke.spec.mjs",
+    "evidence": [
+      "V-07-reload.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-88",
+    "area": "visitor",
+    "title": "Back navigation restores scroll",
+    "surface": "home",
+    "steps": [
+      "Scroll down",
+      "Open a card",
+      "Go back"
+    ],
+    "expected": "Scroll position restored",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-08-back.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-89",
+    "area": "visitor",
+    "title": "Admin login shell",
+    "surface": "admin",
+    "steps": [
+      "Open admin without login"
+    ],
+    "expected": "Login form renders without console errors",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-09-admin.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-90",
+    "area": "visitor",
+    "title": "Public route /not-a-real-qa-route-98765",
+    "surface": "/not-a-real-qa-route-98765",
+    "steps": [
+      "Open /not-a-real-qa-route-98765"
+    ],
+    "expected": "404 page and HTTP 404",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-10-route.png",
+      "V-10-broken-return.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-91",
+    "area": "visitor",
+    "title": "Public route /robots.txt",
+    "surface": "/robots.txt",
+    "steps": [
+      "Open /robots.txt"
+    ],
+    "expected": "HTTP 200 with expected content",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-11-route.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-92",
+    "area": "visitor",
+    "title": "Public route /feed.xml",
+    "surface": "/feed.xml",
+    "steps": [
+      "Open /feed.xml"
+    ],
+    "expected": "HTTP 200 with expected content",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-12-route.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-93",
+    "area": "visitor",
+    "title": "Public route /sitemap.xml",
+    "surface": "/sitemap.xml",
+    "steps": [
+      "Open /sitemap.xml"
+    ],
+    "expected": "HTTP 200 with expected content",
+    "status": "pass",
+    "coveredBy": "",
+    "evidence": [
+      "V-13-route.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
+  },
+  {
+    "id": "V-94",
+    "area": "visitor",
+    "title": "Nested 404 return-home navigation",
+    "surface": "/posts/20260711/",
+    "steps": [
+      "Open nonexistent /posts/20260711/",
+      "Click 返回首页"
+    ],
+    "expected": "Home page opens",
+    "status": "fail",
+    "coveredBy": "",
+    "evidence": [
+      "V-10-broken-return.png"
+    ],
+    "round": 0,
+    "source": "qa/reports/round-0/prod-baseline/catalog.json"
   }
 ]

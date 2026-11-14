@@ -32,8 +32,7 @@ function log(message) {
 
 async function ensureManifest({ refresh }) {
   fs.mkdirSync(QA_DIR, { recursive: true });
-  const fresh =
-    fs.existsSync(MANIFEST) && Date.now() - fs.statSync(MANIFEST).mtimeMs < MAX_AGE_MS;
+  const fresh = fs.existsSync(MANIFEST) && Date.now() - fs.statSync(MANIFEST).mtimeMs < MAX_AGE_MS;
   if (fresh && !refresh) {
     log(`reusing manifest (${(fs.statSync(MANIFEST).size / 1024).toFixed(0)} KiB)`);
     return;

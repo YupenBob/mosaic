@@ -81,7 +81,9 @@ function main() {
         continue;
       }
       if (existing.title && record.title && existing.title !== record.title) {
-        conflicts.push(`${record.id}: "${existing.title}" (${existing.source}) vs "${record.title}" (${record.source})`);
+        conflicts.push(
+          `${record.id}: "${existing.title}" (${existing.source}) vs "${record.title}" (${record.source})`,
+        );
       }
       if (record.round >= existing.round) {
         merged.set(record.id, { ...existing, ...record, round: record.round });
@@ -89,9 +91,7 @@ function main() {
     }
   }
 
-  const behaviors = [...merged.values()].sort((a, b) =>
-    a.id.localeCompare(b.id, 'en', { numeric: true }),
-  );
+  const behaviors = [...merged.values()].sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
   fs.mkdirSync(path.dirname(OUT_JSON), { recursive: true });
   fs.writeFileSync(OUT_JSON, JSON.stringify(behaviors, null, 2) + '\n');
 
@@ -133,7 +133,11 @@ function main() {
   fs.writeFileSync(OUT_MD, lines.join('\n') + '\n');
 
   console.log(`merged ${behaviors.length} behaviors from ${files.length} files -> docs/qa/behaviors.json`);
-  console.log(Object.entries(statusCounts).map(([status, count]) => `${status}=${count}`).join(' '));
+  console.log(
+    Object.entries(statusCounts)
+      .map(([status, count]) => `${status}=${count}`)
+      .join(' '),
+  );
   if (conflicts.length) {
     console.warn(`title conflicts (${conflicts.length}):`);
     for (const conflict of conflicts.slice(0, 20)) console.warn(`  ${conflict}`);

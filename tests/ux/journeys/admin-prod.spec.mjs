@@ -8,6 +8,8 @@
 import { defineJourney, waitFor } from '../lib/journey.mjs';
 
 export const area = 'admin';
+/** only runs against the live admin with the read-only guard */
+export const targets = ['admin-prod'];
 
 const NAV_PAGES = [
   'dashboard',
