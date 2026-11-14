@@ -149,8 +149,10 @@ export function renderSite(context, posts, indexes) {
     return rel.endsWith('/') ? rel : rel + '/';
   };
 
-  function renderFile(template, outPath, data) {
-    const rp = relativePath(outPath);
+  function renderFile(template, outPath, data, { rootRelative = false } = {}) {
+    // The 404 document is served for arbitrary deep URLs, so its links must
+    // resolve from the domain root instead of the requested path.
+    const rp = rootRelative ? '/' : relativePath(outPath);
     const templatePath = theme.layoutPath(template);
     if (!compiled.has(templatePath))
       compiled.set(
@@ -265,7 +267,7 @@ export function renderSite(context, posts, indexes) {
   }
 
   // 404
-  renderFile('404.ejs', path.join(DIST, '404.html'), { posts: [], categories: [], tags: [] });
+  renderFile('404.ejs', path.join(DIST, '404.html'), { posts: [], categories: [], tags: [] }, { rootRelative: true });
 
   // Copy assets
   // Publish only framework asset trees plus referenced top-level files;
