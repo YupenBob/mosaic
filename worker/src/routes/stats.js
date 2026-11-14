@@ -42,6 +42,43 @@ function collectTrackSlug(c) {
 
 const STATS_HEADERS = { 'Content-Type': 'application/json' };
 
+/**
+ * Public tracking writes are anonymous, so refuse slugs that no *published*
+ * post uses. The build index in R2 is the source of truth for pages that
+ * actually exist; when it is missing (cold deploy, rollback, first build) we
+ * fail open rather than lose real stats. The index is cached for a short while
+ * per isolate because tracking endpoints are hit on every page view.
+ */
+const INDEX_CACHE_MS = 30000;
+const postsIndexCache = new WeakMap();
+
+async function publishedSlugs(c) {
+  const cached = postsIndexCache.get(c.env);
+  if (cached && cached.slugs && Date.now() - cached.at < INDEX_CACHE_MS) return cached.slugs;
+  try {
+    const obj =
+      (await c.env.MEDIA.get('site-data/posts-index.json')) || (await c.env.MEDIA.get('site-data/posts.json'));
+    if (!obj) return null;
+    const posts = JSON.parse(await obj.text());
+    if (!Array.isArray(posts) || posts.length === 0) return null;
+    const slugs = new Set(posts.map((post) => post && post.slug).filter(Boolean));
+    postsIndexCache.set(c.env, { at: Date.now(), slugs });
+    return slugs;
+  } catch {
+    return null;
+  }
+}
+
+async function isKnownPost(c, slug) {
+  const slugs = await publishedSlugs(c);
+  if (!slugs) return true;
+  return slugs.has(slug);
+}
+
+function unknownPost(c) {
+  return c.json({ error: 'Unknown post', code: 'UNKNOWN_POST' }, 404);
+}
+
 async function doJson(c, path, slug, { body = {}, headers = {} } = {}) {
   const response = await statsFetch(c, path, slug, {
     method: 'POST',
@@ -59,6 +96,7 @@ export function registerStatsPublic(app) {
   app.post('/api/track/view/:slug', async (c) => {
     const slug = collectTrackSlug(c);
     if (!slug) return c.json({ error: 'Invalid slug', code: 'INVALID_PARAMS' }, 400);
+    if (!(await isKnownPost(c, slug))) return unknownPost(c);
     try {
       const { response, data } = await doJson(c, '/view', slug, { headers: { 'X-Real-IP': await clientIp(c) } });
       return new Response(JSON.stringify(data), { status: response.status, headers: STATS_HEADERS });
@@ -71,6 +109,7 @@ export function registerStatsPublic(app) {
   app.post('/api/track/like/:slug', async (c) => {
     const slug = collectTrackSlug(c);
     if (!slug) return c.json({ error: 'Invalid slug', code: 'INVALID_PARAMS' }, 400);
+    if (!(await isKnownPost(c, slug))) return unknownPost(c);
     let body = {};
     try {
       body = await c.req.json();
@@ -91,6 +130,7 @@ export function registerStatsPublic(app) {
   app.post('/api/track/dwell/:slug', async (c) => {
     const slug = collectTrackSlug(c);
     if (!slug) return c.json({ error: 'Invalid slug', code: 'INVALID_PARAMS' }, 400);
+    if (!(await isKnownPost(c, slug))) return unknownPost(c);
     let body = {};
     try {
       body = await c.req.json();

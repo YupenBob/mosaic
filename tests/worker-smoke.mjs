@@ -540,6 +540,20 @@ await record('listPosts reads R2 posts cache (when not dirty)', async () => {
   store.delete('site-data/posts.json');
 });
 
+await record('track endpoints reject unknown post slugs when the index is available', async () => {
+  await media.put('site-data/posts-index.json', JSON.stringify([{ slug: 'indexed-post', title: 'Indexed' }]));
+  // A fresh env starts with an empty isolate cache, so the R2 index above is read.
+  assert.equal((await call('/api/track/view/indexed-post', { method: 'POST', bindings: env() })).status, 200);
+  const unknown = await call('/api/track/view/not-a-real-post', { method: 'POST', bindings: env() });
+  assert.equal(unknown.status, 404);
+  assert.equal((await unknown.json()).code, 'UNKNOWN_POST');
+  assert.equal((await call('/api/track/like/not-a-real-post', { method: 'POST', bindings: env() })).status, 404);
+  assert.equal((await call('/api/track/dwell/not-a-real-post', { method: 'POST', bindings: env() })).status, 404);
+  // Without an index (cold deploy/rollback) tracking stays fail-open.
+  await media.delete('site-data/posts-index.json');
+  assert.equal((await call('/api/track/view/any-slug-here', { method: 'POST', bindings: env() })).status, 200);
+});
+
 // ── 7. Config deep merge ──
 await record('config deep merge (nested fields preserved)', async () => {
   const r = await call('/api/config', {
