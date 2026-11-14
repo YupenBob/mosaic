@@ -135,6 +135,24 @@ export const journeys = [
     },
   }),
   defineJourney({
+    id: 'polish-search-degraded',
+    title: 'A failed posts index shows a visible search-unavailable state',
+    priority: 'P1',
+    steps: async (t) => {
+      await mockPublicApi(t.page);
+      await t.page.route('**/data/posts-index.json', (route) => route.fulfill({ status: 500, body: 'boom' }));
+      await t.goto('/');
+      const notice = t.page.locator('.search-unavailable');
+      await notice.waitFor({ state: 'visible', timeout: 15000 });
+      const input = t.page.locator('.search-input');
+      t.assert(await input.isDisabled(), 'search input should be disabled when the index cannot load');
+      t.assertEqual(await input.getAttribute('aria-disabled'), 'true', 'aria-disabled on the disabled search');
+      t.assert((await notice.innerText()).trim().length > 0, 'the notice should explain the failure');
+      // The server-rendered feed stays interactive rather than going blank.
+      t.assert((await t.page.locator('a.post-card').count()) >= 14, 'SSR cards remain visible');
+    },
+  }),
+  defineJourney({
     id: 'polish-skip-link',
     title: 'The visitor skip link is the first focus stop and jumps to main',
     priority: 'P2',

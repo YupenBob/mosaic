@@ -148,7 +148,18 @@ register({
       posts = await response.json();
     } catch {
       input?.removeEventListener('input', capture);
-      if (input) input.placeholder = tFallback();
+      if (input) {
+        // Silent failure looked like an empty result set; disable the field and
+        // show a visible status so visitors know search is down, not empty.
+        input.placeholder = tFallback();
+        input.disabled = true;
+        input.setAttribute('aria-disabled', 'true');
+        const notice = document.createElement('p');
+        notice.className = 'search-unavailable';
+        notice.setAttribute('role', 'status');
+        notice.textContent = tFallback();
+        (input.closest('.search-container') || input.parentElement)?.appendChild(notice);
+      }
       return;
     }
     setPosts(posts);
