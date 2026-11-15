@@ -251,3 +251,21 @@ npm run test:admin:local
 - 残余 backlog：86 条 blocked（后台部分写分支 mock 不足、无 Service Worker 的离线首访、音乐/多视频内容形态、
   速率限制测试受匿名写预算限制、WAF 落地前 site-data 仍公开、legacy 相关封面仍有 960px 源）；
   `enableBusuanzi` 第三方统计为配置选择。
+
+### 2026-11-15 收尾（批次 10/11）：后台写分支修复 + 画廊 44px + 生产抽检
+
+- 代码：`a9bfde16`（PR #21，Infrastructure 部署成功；本次无站点内容变更，Site 未触发属预期）。
+  - 后台：素材删除需回填文件名/使用数确认；任务中心导航徽标显示失败数并在归零隐藏；
+    命令面板首个 Escape 清空查询、关闭时回焦；multipart 初始化 404 自动回退直传；
+    401 后重新登录保留未保存的编辑器标题（修复时序竞争）。
+  - 站点（`e49e097`，Site 已部署）：画廊查看器 Done/Fit/Download 控件 44px；
+    新增生产只读抽检 spec（画廊缩放/Escape 回焦、笔记 44px、feed 入口回焦、sitemap 分类可达）。
+  - 设计缺口记录（不改行为）：后台文章列表无服务端分页/排序请求（本地排序）；Enhance 是视频处理表单而非设置开关。
+- 最终目录：**344 条（263 pass / 81 blocked / 0 fail）**；22 个旅程 spec + 生产抽检；
+  本地验收全绿：fixtures 4 / feed 5 / note 6 / gallery 12 / player 6 / music 3 / search 4 /
+  pagination 3 / public 13 / a11y 13 / seo 4 / security 4 / admin 57；生产 admin 只读 4/4、生产抽检 4/4。
+- 线上核验：`probe.mjs` 13 passed / 4 warnings（WAF 残余 R-0）；生产画廊 44px 与 `?feed=` 回焦在线；
+  未知 track slug 404、超大 track body 413、HTML revalidate / hashed JS immutable / CSS 1h 均生效。
+- 残余（81 blocked，见 `docs/qa/backlog.md`）：后台上传失败/取消/孤儿封面/嵌套分类确认、自动构建阶段轮询、
+  草稿自动保存 401 媒体保留、发布状态重置等部分分支；无离线首访；匿名写预算限制压测；
+  WAF 未落地（site-data 公开）；legacy 相关封面 960px 源；busuanzi 第三方统计为配置选择。
