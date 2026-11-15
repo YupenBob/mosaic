@@ -149,6 +149,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  min-height: 44px;
   color: #fff;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -168,6 +169,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   color: rgba(255, 255, 255, 0.7);
   font-size: 1.2rem;
   padding: 6px 10px;
@@ -191,6 +194,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   color: rgba(255, 255, 255, 0.7);
   font-size: 1.15rem;
   padding: 6px 10px;
