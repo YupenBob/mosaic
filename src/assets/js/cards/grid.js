@@ -13,6 +13,16 @@ import { layoutMasonry } from './masonry.js';
 import { getPosts, t } from '../data.js';
 import { revealAll, withViewTransition } from '../motion/index.js';
 
+const initialGrids = new WeakMap();
+
+/** Capture the server-rendered browsing slice before any filter replaces it. */
+export function captureInitialGrid() {
+  const grid = document.querySelector('.card-grid');
+  if (grid && !initialGrids.has(grid)) {
+    initialGrids.set(grid, { html: grid.innerHTML, count: grid.querySelectorAll('.post-card').length });
+  }
+}
+
 /**
  * Relative prefix back to the site root, derived from `<meta data-base>`
  * (mirrors the EJS `rp` value: '', '../', '../../').
@@ -40,21 +50,25 @@ function statusRegion() {
 }
 
 /** Replace the grid content (shared by initial filter interactions). */
-function paint(grid, posts, base) {
-  if (!posts.length) {
+function paint(grid, posts, base, restoreInitial) {
+  const initial = restoreInitial && initialGrids.get(grid);
+  const count = initial ? initial.count : posts.length;
+  if (initial) {
+    grid.innerHTML = initial.html;
+  } else if (!posts.length) {
     grid.innerHTML = renderEmptyState(getPosts().length ? t('no_results') : t('no_posts'));
   } else {
     grid.innerHTML = renderCards(posts, { base });
-    // New DOM: re-pack the masonry columns, then start progressive LQIP upgrades.
-    layoutMasonry(grid);
-    upgradeCardMedia(grid);
   }
+  // New DOM: re-pack the masonry columns, then start progressive LQIP upgrades.
+  layoutMasonry(grid);
+  upgradeCardMedia(grid);
   revealAll(grid);
-  const label = !posts.length
+  const label = !count
     ? getPosts().length
       ? t('no_results')
       : t('no_posts')
-    : t('results_count').replace('{count}', String(posts.length));
+    : t('results_count').replace('{count}', String(count));
   statusRegion().textContent = label;
 }
 
@@ -66,7 +80,7 @@ function paint(grid, posts, base) {
  * reduced motion by the motion module).
  *
  * @param {Array<Record<string, unknown>>} posts already-filtered lite posts
- * @param {{ grid?: HTMLElement|null, animate?: boolean }} [options]
+ * @param {{ grid?: HTMLElement|null, animate?: boolean, restoreInitial?: boolean }} [options]
  */
 export function renderGrid(posts, options = {}) {
   const grid = options.grid || document.querySelector('.card-grid');
@@ -74,7 +88,7 @@ export function renderGrid(posts, options = {}) {
   const animate = options.animate !== false;
   let painted = false;
   const update = () => {
-    paint(grid, posts, siteBase());
+    paint(grid, posts, siteBase(), options.restoreInitial);
     painted = true;
   };
   if (animate) {

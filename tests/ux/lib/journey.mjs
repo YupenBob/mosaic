@@ -56,7 +56,17 @@ export async function waitFor(check, { timeout = 8000, interval = 100, message =
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Create the per-journey test context handed to `steps(t)`. */
-export function createTestContext({ page, context, diagnostics, base, target, runDir, journey, writeAttempts = [] }) {
+export function createTestContext({
+  page,
+  context,
+  diagnostics,
+  base,
+  target,
+  runDir,
+  journey,
+  writeAttempts = [],
+  mediaUrl = '',
+}) {
   const failures = [];
   const notes = [];
   const shots = [];
@@ -74,6 +84,7 @@ export function createTestContext({ page, context, diagnostics, base, target, ru
     shots,
     consoleAll,
     writeAttempts,
+    mediaUrl,
     async goto(route = '/', options = {}) {
       const url = route.startsWith('http') ? route : `${base}${route.startsWith('/') ? '' : '/'}${route}`;
       const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000, ...options });

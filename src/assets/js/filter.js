@@ -16,7 +16,7 @@ import {
   toggleTag,
   updateFilterState as setFilterState,
 } from './cards/state.js';
-import { renderGrid } from './cards/grid.js';
+import { captureInitialGrid, renderGrid } from './cards/grid.js';
 
 let wired = false;
 
@@ -42,6 +42,7 @@ function updateFilterUI() {
  * @param {Array<Record<string, unknown>>} posts lite listing posts
  */
 export function initFilter(posts) {
+  captureInitialGrid();
   const state = initialStateFrom({
     search: window.location.search,
     category: document.body.dataset.category,
@@ -98,5 +99,9 @@ export function getFilteredPosts(posts) {
  * @param {Array<Record<string, unknown>>} posts
  */
 export function renderCards(posts) {
-  renderGrid(filterPosts(posts || getPosts()));
+  const state = getFilterState();
+  const restoreInitial = !state.searchQuery.trim() && !state.activeCategory && state.activeTags.size === 0;
+  // Active queries/filters intentionally search the site-wide index; clearing
+  // all of them returns to the captured browsing page, including its order.
+  renderGrid(filterPosts(posts || getPosts()), { restoreInitial });
 }

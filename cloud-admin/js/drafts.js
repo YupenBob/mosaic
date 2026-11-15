@@ -6,6 +6,7 @@
 import { drafts as draftsApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { escHtml, toast, emptyState, formatTime, modalConfirm } from './ui.js?v=1';
+import { previewDraft } from './preview.js?v=1';
 
 export default async function renderDrafts(signal) {
   let drafts = [];
@@ -52,6 +53,7 @@ export default async function renderDrafts(signal) {
                   <span class="draft-row-time">${escHtml(formatTime(draft.updatedAt))}</span>
                   <div class="row-actions">
                     <button type="button" class="btn btn-secondary btn-sm" data-open-draft="${escHtml(draft.id)}">${t('drafts.continue')}</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-preview-draft="${escHtml(draft.id)}">${t('editor.previewAction')}</button>
                     <button type="button" class="icon-btn" data-delete-draft="${escHtml(draft.id)}" aria-label="${t('common.delete')}" title="${t('common.delete')}"><i class="ri-delete-bin-line" aria-hidden="true"></i></button>
                   </div>
                 </div>`,
@@ -79,6 +81,16 @@ export default async function renderDrafts(signal) {
           return;
         }
         const remove = event.target.closest('[data-delete-draft]');
+        const preview = event.target.closest('[data-preview-draft]');
+        if (preview) {
+          preview.disabled = true;
+          try {
+            await previewDraft(preview.dataset.previewDraft, signal);
+          } finally {
+            preview.disabled = false;
+          }
+          return;
+        }
         if (remove) {
           modalConfirm(t('drafts.deleteTitle'), t('drafts.deleteDesc'), async () => {
             try {

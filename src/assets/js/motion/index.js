@@ -91,7 +91,17 @@ export function withViewTransition(update) {
   }
   if (prefersReducedMotion()) return Promise.resolve(update()).then(() => {});
   try {
-    return document.startViewTransition(update).finished.then(() => {});
+    // Rapid filter/search updates can supersede an in-flight transition. Its
+    // DOM update still runs, but `finished` rejects when the animation skips.
+    // Skipping this optional animation must not become an unhandled rejection.
+    const transition = document.startViewTransition(update);
+    // `ready` rejects independently when another transition takes over before
+    // this one's animation starts, even if `finished` is already handled.
+    transition.ready.catch(() => {});
+    return transition.finished.then(
+      () => {},
+      () => {},
+    );
   } catch {
     return Promise.resolve(update()).then(() => {});
   }

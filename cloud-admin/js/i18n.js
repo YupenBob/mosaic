@@ -434,6 +434,8 @@ export const I18N = {
     build: {
       title: '上线',
       trigger: '上线',
+      triggerConfirmTitle: '开始上线？',
+      triggerConfirmBody: '将构建并发布当前站点内容。',
       refresh: '刷新',
       running: '运行中',
       queued: '等待中',
@@ -1276,6 +1278,8 @@ export const I18N = {
     build: {
       title: 'Go Live',
       trigger: 'Go Live',
+      triggerConfirmTitle: 'Start a build?',
+      triggerConfirmBody: 'Build and publish the current site content.',
       refresh: 'Refresh',
       running: 'Running',
       queued: 'Queued',

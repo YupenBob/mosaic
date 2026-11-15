@@ -146,7 +146,12 @@ try {
   });
   const publishedApp = stampApp(path.join(root, 'dist'));
   for (const engine of [webkit, chromium]) {
-    const browser = await engine.launch({ headless: true });
+    const browser = await engine.launch({
+      headless: true,
+      // Some bundled Chromium builds lack H.264; allow the same local browser
+      // override as the UX journey runner without changing playback assertions.
+      ...(engine === chromium && process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}),
+    });
     try {
       const page = await browser.newPage();
       // CI WebKit can need far longer than desktop Chromium to warm up.

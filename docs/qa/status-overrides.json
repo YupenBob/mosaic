@@ -63,5 +63,104 @@
   "G-107": {
     "status": "pass",
     "expected": "Like/unlike updates the count and persists via localStorage; tracking calls are sent"
+  },
+  "ADR-17": {
+    "status": "pass",
+    "expected": "Delete requires typed confirmation of the post slug; wrong text sends no request"
+  },
+  "ADR-39": {
+    "status": "pass",
+    "expected": "Build start asks for confirmation; cancel sends no POST, confirm sends POST /api/build"
+  },
+  "ADR-43": {
+    "status": "pass",
+    "expected": "Restore targets the SHA in the request path and sends {path:''}; contract documented in the spec"
+  },
+  "E-803": {
+    "status": "pass",
+    "expected": "Preflight recorded; unknown fields not reflected; unknown slug 404; oversized body 413; malformed body ignored on the body-less view beacon"
+  },
+  "E-804": {
+    "status": "pass",
+    "expected": "Anonymous admin/media/draft/stats routes answer 401/403; unknown asset rejects without stack traces"
+  },
+  "E-805": {
+    "status": "pass",
+    "expected": "Oversized track bodies rejected with 413; malformed JSON on the body-less view beacon is ignored, bounded non-5xx"
+  },
+  "E-806": {
+    "status": "blocked",
+    "expected": "Known residual: media-domain site-data/* stays public until the WAF rollout (needs CLOUDFLARE_ZONE_ID)"
+  },
+  "F-03": {
+    "status": "pass",
+    "expected": "Clicking the feed backdrop closes the feed and returns focus to the entry button; slide/control clicks stay inside"
+  },
+  "F-08": {
+    "status": "pass",
+    "expected": "Feed stays video-only by design (documented); mixed posts with video participate; card/modal covers other content"
+  },
+  "F-09": {
+    "status": "pass",
+    "expected": "Feed writes ?feed=<slug>, reopen deep link restores the slide, close removes it; unknown/non-video slugs do not open"
+  },
+  "F-13": {
+    "status": "pass",
+    "expected": "Carousel keeps position dots and adds a numeric aria-live counter for multi-item notes"
+  },
+  "F-21": {
+    "status": "pass"
+  },
+  "G-802": {
+    "status": "pass"
+  },
+  "G-803": {
+    "status": "pass",
+    "expected": "HTML revalidates, hashed JS is immutable, un-hashed CSS keeps >=1h cache; budgets met"
+  },
+  "G-804": {
+    "status": "pass",
+    "expected": "Images keep alt, aspect-ratio/dimensions and lazy loading; legacy related-cover posters are a media-reprocessing backlog item"
+  },
+  "G-music-error": {
+    "status": "pass",
+    "expected": "Audio failures show a visible error/retry state and keep the track list usable"
+  },
+  "G-pagination-sitemap": {
+    "status": "pass",
+    "expected": "Sitemap includes posts, taxonomy and paginated listing URLs, all absolute and well-formed"
+  },
+  "G-pagination-taxonomy": {
+    "status": "pass",
+    "expected": "Taxonomy routes use the generated slugified path (spaces -> dashes); no second encoded route"
+  },
+  "G-player-playlist": {
+    "status": "pass",
+    "expected": "Playlist items select the matching video, only one plays, auto-advance fires once"
+  },
+  "G-search-keyboard": {
+    "status": "pass",
+    "expected": "Search min-chars, IME, keyboard, highlight, clear restore the first-page slice; site-wide search while filtering is intentional"
+  },
+  "GZ-02": {
+    "status": "pass"
+  },
+  "GZ-04": {
+    "status": "pass"
+  },
+  "GZ-05": {
+    "status": "pass"
+  },
+  "GZ-08": {
+    "status": "pass"
+  },
+  "GZ-09": {
+    "status": "pass"
+  },
+  "GZ-11": {
+    "status": "pass"
+  },
+  "GZ-12": {
+    "status": "pass"
   }
 }

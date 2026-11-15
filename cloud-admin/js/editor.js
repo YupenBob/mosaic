@@ -2,18 +2,13 @@
  * Editor page — three-pane post editor with Markdown preview, autosave
  * drafts, cover picker, stats section and the media panel.
  */
-import {
-  posts as postsApi,
-  media as mediaApi,
-  assets as assetsApi,
-  drafts as draftsApi,
-  previews as previewsApi,
-} from '../src/api.js';
+import { posts as postsApi, media as mediaApi, assets as assetsApi, drafts as draftsApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
 import { escHtml, toast, loadLib, openModal, closeModal } from './ui.js?v=1';
 import { loadExistingMedia, setMediaPanelHooks } from './media-panel.js?v=1';
 import { jsStr } from './escape.js';
+import { previewDraft } from './preview.js?v=1';
 
 const MARKED_URL = 'js/vendor/marked.min.js';
 const PURIFY_URL = 'js/vendor/purify.min.js';
@@ -24,7 +19,7 @@ let previewVisible = false;
 let previewTimer = null;
 let cloudDraftTimer = null;
 let cloudDraftBusy = false;
-let previewPollTimer = null;
+let editorSignal = null;
 
 function getEditorMedia() {
   const refs = state.editor.mediaRefs;
@@ -405,6 +400,7 @@ function draftKey(slug) {
 }
 
 export default async function renderEditor(signal) {
+  editorSignal = signal;
   const draftId = state.params.draft || '';
   let cloudDraft = null;
   if (draftId) {
@@ -621,7 +617,6 @@ export default async function renderEditor(signal) {
           clearTimeout(previewTimer);
           clearTimeout(draftTimer);
           clearTimeout(cloudDraftTimer);
-          clearTimeout(previewPollTimer);
           state.editor.draftSnapshot = null;
         },
         { once: true },
@@ -902,44 +897,10 @@ window.publishDraft = async () => {
 };
 
 window.openPreview = async () => {
+  const signal = editorSignal;
   const saved = await persistDraft({ silent: true });
-  if (!saved) return;
-  const id = state.editor.cloudDraftId;
-  let created;
-  try {
-    created = await previewsApi.create(id);
-  } catch (error) {
-    toast(t('editor.previewFailed') + ': ' + (error.message || ''), 'error');
-    return;
-  }
-  toast(t('editor.previewBuilding'), 'info', 5000);
-  const url = `/api/preview/${created.token}/`;
-  const started = Date.now();
-  const poll = async () => {
-    if (state.page !== 'editor') return;
-    try {
-      const status = await previewsApi.status(created.previewId);
-      if (status.status === 'ready') {
-        toast(t('editor.previewReady'), 'success', 20000, {
-          label: t('editor.openPreview'),
-          onClick: () => window.open(url, '_blank', 'noopener'),
-        });
-        return;
-      }
-      if (status.status === 'failed') {
-        toast(t('editor.previewFailed') + ': ' + (status.error || ''), 'error', 10000);
-        return;
-      }
-      if (Date.now() - started > 5 * 60 * 1000) {
-        toast(t('editor.previewTimeout'), 'error');
-        return;
-      }
-      previewPollTimer = setTimeout(poll, 2500);
-    } catch {
-      previewPollTimer = setTimeout(poll, 4000);
-    }
-  };
-  poll();
+  if (!saved || signal.aborted) return;
+  await previewDraft(state.editor.cloudDraftId, signal);
 };
 
 // ── Drafts ─────────────────────────────────

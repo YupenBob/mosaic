@@ -41,6 +41,17 @@ function collectTrackSlug(c) {
 }
 
 const STATS_HEADERS = { 'Content-Type': 'application/json' };
+// Public beacons are tiny (view has no body, dwell a few bytes). Refuse oversized
+// bodies before they reach the Durable Object.
+const MAX_TRACK_BODY_BYTES = 8 * 1024;
+
+function tooLargeBody(c) {
+  const length = Number(c.req.header('content-length') || 0);
+  if (Number.isFinite(length) && length > MAX_TRACK_BODY_BYTES) {
+    return c.json({ error: 'Request body too large', code: 'PAYLOAD_TOO_LARGE' }, 413);
+  }
+  return null;
+}
 
 /**
  * Public tracking writes are anonymous, so refuse slugs that no *published*
@@ -96,6 +107,8 @@ export function registerStatsPublic(app) {
   app.post('/api/track/view/:slug', async (c) => {
     const slug = collectTrackSlug(c);
     if (!slug) return c.json({ error: 'Invalid slug', code: 'INVALID_PARAMS' }, 400);
+    const oversized = tooLargeBody(c);
+    if (oversized) return oversized;
     if (!(await isKnownPost(c, slug))) return unknownPost(c);
     try {
       const { response, data } = await doJson(c, '/view', slug, { headers: { 'X-Real-IP': await clientIp(c) } });
@@ -109,6 +122,8 @@ export function registerStatsPublic(app) {
   app.post('/api/track/like/:slug', async (c) => {
     const slug = collectTrackSlug(c);
     if (!slug) return c.json({ error: 'Invalid slug', code: 'INVALID_PARAMS' }, 400);
+    const oversized = tooLargeBody(c);
+    if (oversized) return oversized;
     if (!(await isKnownPost(c, slug))) return unknownPost(c);
     let body = {};
     try {
@@ -130,6 +145,8 @@ export function registerStatsPublic(app) {
   app.post('/api/track/dwell/:slug', async (c) => {
     const slug = collectTrackSlug(c);
     if (!slug) return c.json({ error: 'Invalid slug', code: 'INVALID_PARAMS' }, 400);
+    const oversized = tooLargeBody(c);
+    if (oversized) return oversized;
     if (!(await isKnownPost(c, slug))) return unknownPost(c);
     let body = {};
     try {

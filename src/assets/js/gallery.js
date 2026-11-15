@@ -18,6 +18,8 @@ let state = {
 };
 let _updateTimer = null;
 let scope, observer;
+let opener = null;
+let previousOverflow = '';
 
 export function initGallery(config = {}) {
   scope?.abort();
@@ -40,7 +42,23 @@ export function initGallery(config = {}) {
   if (config.lazyLoad === false) items.forEach(loadThumb);
   else setupLazyLoading();
   if (config.zoom !== false) {
-    items.forEach((img, i) => img.addEventListener('click', () => open(i), { signal: scope.signal }));
+    items.forEach((img, i) => {
+      img.tabIndex = 0;
+      img.setAttribute('role', 'button');
+      img.setAttribute('aria-haspopup', 'dialog');
+      img.setAttribute('aria-label', `Open photo ${i + 1}`);
+      img.addEventListener('click', () => open(i, img), { signal: scope.signal });
+      img.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            open(i, img);
+          }
+        },
+        { signal: scope.signal },
+      );
+    });
     createOverlay();
     document.addEventListener('keydown', handleKeyboard, { signal: scope.signal });
   }
@@ -121,7 +139,8 @@ async function loadThumb(img) {
 
 /* ========== Overlay ========== */
 function createOverlay() {
-  const ov = document.createElement('div');
+  $('#gallery-overlay')?.remove();
+  const ov = document.createElement('dialog');
   ov.className = 'gallery-overlay';
   ov.id = 'gallery-overlay';
   ov.setAttribute('role', 'dialog');
@@ -130,18 +149,19 @@ function createOverlay() {
   ov.innerHTML = `
     <div class="gallery-toolbar">
       <button class="gallery-done-btn" id="gallery-done"><i class="ri-close-line"></i> Done</button>
-      <span class="gallery-counter" id="gallery-counter">1 / ${state.photos.length}</span>
+      <span class="gallery-counter" id="gallery-counter" aria-live="polite">1 / ${state.photos.length}</span>
       <div class="gallery-quality-pills" id="gallery-quality">
         ${RESOLUTIONS.map((r) => `<button class="gq-pill" data-res="${r}">${RES_LABELS[r]}</button>`).join('')}
       </div>
       <div class="gallery-toolbar-right">
-        <button class="gallery-fit-btn" id="gallery-fit" aria-label="${t('gallery_fit')}" title="${t('gallery_fit')}"><i class="ri-fullscreen-line"></i></button>
-        <a class="gallery-dl-btn" id="gallery-download" href="#" download title="Download"><i class="ri-download-line"></i></a>
+        <button class="gallery-fit-btn" id="gallery-fit" aria-label="${t('gallery_fill')}" title="${t('gallery_fill')}"><i class="ri-fullscreen-line"></i></button>
+        <a class="gallery-dl-btn" id="gallery-download" href="#" download aria-label="Download" title="Download"><i class="ri-download-line"></i></a>
       </div>
     </div>
     <div class="gallery-main-area">
       <button class="gallery-nav-btn gallery-nav-prev" id="gallery-prev" aria-label="Previous photo"><i class="ri-arrow-left-s-line"></i></button>
-      <img class="gallery-current-image" id="gallery-current-img" alt="" />
+      <img class="gallery-current-image" id="gallery-current-img" alt="" tabindex="0" aria-label="Photo: + or = zoom in, - zoom out, 0 reset to fit" title="+ / = zoom in, - zoom out, 0 reset to fit" />
+      <p class="gallery-error" id="gallery-error" role="alert" hidden>Photo could not be loaded. Try another photo or close the viewer.</p>
       <button class="gallery-nav-btn gallery-nav-next" id="gallery-next" aria-label="Next photo"><i class="ri-arrow-right-s-line"></i></button>
     </div>
     <div class="gallery-filmstrip" id="gallery-filmstrip">
@@ -151,12 +171,31 @@ function createOverlay() {
     </div>
   `;
   document.body.appendChild(ov);
+  ov.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    close();
+  });
+  const currentImg = $('#gallery-current-img');
+  currentImg.addEventListener('load', () => {
+    $('#gallery-error').hidden = true;
+    currentImg.style.visibility = '';
+    applyTransform();
+  });
+  currentImg.addEventListener('error', () => {
+    $('#gallery-error').hidden = false;
+    currentImg.style.visibility = 'hidden';
+  });
+  window.addEventListener('resize', applyTransform, { signal: scope.signal });
 
   $('#gallery-done').addEventListener('click', close);
   $('#gallery-prev').addEventListener('click', () => nav(-1));
   $('#gallery-next').addEventListener('click', () => nav(1));
+  let backdropPress = false;
+  ov.addEventListener('pointerdown', (event) => {
+    backdropPress = event.target === ov;
+  });
   ov.addEventListener('click', (e) => {
-    if (e.target === ov) close();
+    if (e.target === ov && backdropPress) close();
   });
 
   // Quality pills
@@ -169,12 +208,7 @@ function createOverlay() {
   const fitBtn = $('#gallery-fit');
   if (fitBtn) {
     fitBtn.addEventListener('click', () => {
-      const img = $('#gallery-current-img');
-      if (!img) return;
-      const fill = img.classList.toggle('fill');
-      fitBtn.setAttribute('aria-label', fill ? t('gallery_fit') : t('gallery_fill'));
-      fitBtn.setAttribute('title', fill ? t('gallery_fit') : t('gallery_fill'));
-      fitBtn.querySelector('i').className = fill ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
+      setFill(!$('#gallery-current-img').classList.contains('fill'));
     });
   }
 
@@ -185,24 +219,44 @@ function createOverlay() {
   setupGestures(ov);
 }
 
+function setFill(fill) {
+  $('#gallery-current-img').classList.toggle('fill', fill);
+  const fitBtn = $('#gallery-fit');
+  const label = fill ? t('gallery_fit') : t('gallery_fill');
+  fitBtn.setAttribute('aria-label', label);
+  fitBtn.setAttribute('title', label);
+  fitBtn.querySelector('i').className = fill ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line';
+  applyTransform();
+}
+
 /* ========== Open / Close ========== */
-function open(index) {
+function open(index, trigger) {
   state.currentIndex = index;
   state.isOpen = true;
   const ov = $('#gallery-overlay');
   if (!ov) return;
+  opener = trigger || document.activeElement;
+  previousOverflow = document.body.style.overflow;
+  ov.showModal();
   ov.classList.add('open');
   document.body.style.overflow = 'hidden';
   updateImage();
   updateQualityPills();
   renderFilmstrip();
+  $('#gallery-done').focus({ preventScroll: true });
 }
 
 function close() {
+  if (!state.isOpen) return;
   state.isOpen = false;
   const ov = $('#gallery-overlay');
-  if (ov) ov.classList.remove('open');
-  document.body.style.overflow = '';
+  if (ov) {
+    ov.classList.remove('open');
+    ov.close();
+  }
+  document.body.style.overflow = previousOverflow;
+  opener?.focus({ preventScroll: true });
+  opener = null;
 }
 
 /* ========== Navigation ========== */
@@ -219,6 +273,8 @@ function updateImage() {
   const counter = $('#gallery-counter');
   const photo = state.photos[state.currentIndex];
   if (!photo) return;
+  $('#gallery-error').hidden = true;
+  img.style.visibility = '';
   img.style.opacity = '0';
   clearTimeout(_updateTimer);
   _updateTimer = setTimeout(() => {
@@ -331,7 +387,9 @@ function renderFilmstrip() {
 
 function createThumb(i) {
   const photo = state.photos[i];
-  const div = document.createElement('div');
+  const div = document.createElement('button');
+  div.type = 'button';
+  div.setAttribute('aria-label', `View photo ${i + 1}`);
   div.className = 'filmstrip-thumb';
   div.dataset.index = i;
   const img = document.createElement('img');
@@ -370,7 +428,38 @@ function scrollFilmstrip(delta) {
 /* ========== Keyboard ========== */
 function handleKeyboard(e) {
   if (!state.isOpen) return;
+  if (e.key === 'Tab') {
+    const controls = [...$('#gallery-overlay').querySelectorAll('button, a[href], [tabindex="0"]')].filter(
+      (el) => !el.disabled && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden',
+    );
+    const first = controls[0],
+      last = controls[controls.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last?.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first?.focus();
+    }
+    return;
+  }
   switch (e.key) {
+    case '+':
+    case '=':
+      e.preventDefault();
+      zoomState.scale = Math.min(5, zoomState.scale + 0.15);
+      applyTransform();
+      break;
+    case '-':
+      e.preventDefault();
+      zoomState.scale = Math.max(1, zoomState.scale - 0.15);
+      applyTransform();
+      break;
+    case '0':
+      e.preventDefault();
+      resetZoom();
+      setFill(false);
+      break;
     case 'ArrowLeft':
       nav(-1);
       break;
@@ -394,6 +483,7 @@ function handleKeyboard(e) {
       nav(10);
       break;
     case 'Escape':
+      e.preventDefault();
       close();
       break;
     case '1':
@@ -426,6 +516,11 @@ function resetZoom() {
 function applyTransform() {
   const img = $('#gallery-current-img');
   if (!img) return;
+  const area = img.parentElement;
+  const limitX = zoomState.scale > 1 ? Math.max(0, (img.offsetWidth * zoomState.scale - area.clientWidth) / 2) : 0;
+  const limitY = zoomState.scale > 1 ? Math.max(0, (img.offsetHeight * zoomState.scale - area.clientHeight) / 2) : 0;
+  zoomState.panX = Math.max(-limitX, Math.min(limitX, zoomState.panX));
+  zoomState.panY = Math.max(-limitY, Math.min(limitY, zoomState.panY));
   // translate BEFORE scale: pan values are in screen pixels, scale doesn't amplify them
   const t = `translate(${zoomState.panX}px, ${zoomState.panY}px) scale(${zoomState.scale})`;
   img.style.transform = t;
@@ -445,6 +540,8 @@ function setupGestures(overlay) {
         touchState.cx = touchState.sx;
         touchState.cy = touchState.sy;
         touchState.active = true;
+        touchState.panX = zoomState.panX;
+        touchState.panY = zoomState.panY;
       } else if (e.touches.length === 2) {
         touchState.startDist = Math.hypot(
           e.touches[1].clientX - e.touches[0].clientX,
@@ -460,11 +557,14 @@ function setupGestures(overlay) {
   overlay.addEventListener(
     'touchmove',
     (e) => {
-      if (e.touches.length === 1 && touchState.active && zoomState.scale === 1) {
+      if (e.touches.length === 1 && touchState.active) {
         touchState.cx = e.touches[0].clientX;
         touchState.cy = e.touches[0].clientY;
-        const img = $('#gallery-current-img');
-        if (img) img.style.transform = zoomState.scale > 1 ? '' : `translateX(${touchState.cx - touchState.sx}px)`;
+        if (zoomState.scale > 1) {
+          zoomState.panX = touchState.panX + touchState.cx - touchState.sx;
+          zoomState.panY = touchState.panY + touchState.cy - touchState.sy;
+          applyTransform();
+        }
       } else if (e.touches.length === 2) {
         const dist = Math.hypot(
           e.touches[1].clientX - e.touches[0].clientX,
@@ -480,7 +580,7 @@ function setupGestures(overlay) {
           cy = midY - (imgRect.top + imgRect.height / 2);
         if (touchState.startDist > 0) {
           const oldScale = zoomState.scale;
-          const newScale = Math.max(0.5, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
+          const newScale = Math.max(1, Math.min(5, touchState.startScale * (dist / touchState.startDist)));
           // Keep the content point under the pinch center stationary: with
           // center = boxCenter + pan, the correct update is
           // pan' = (cursor - boxCenter) - (cursor - boxCenter - pan) * ratio.
@@ -502,6 +602,7 @@ function setupGestures(overlay) {
       if (Math.abs(dx) > 80) nav(dx > 0 ? -1 : 1);
     }
     touchState.fingers = 0;
+    touchState.active = false;
   });
 
   // --- Mouse wheel zoom (centered on cursor) ---
@@ -515,7 +616,7 @@ function setupGestures(overlay) {
       const cx = e.clientX - (imgRect.left + imgRect.width / 2);
       const cy = e.clientY - (imgRect.top + imgRect.height / 2);
       const oldScale = zoomState.scale;
-      const newScale = Math.max(0.5, Math.min(5, oldScale + (e.deltaY > 0 ? -0.15 : 0.15)));
+      const newScale = Math.max(1, Math.min(5, oldScale + (e.deltaY > 0 ? -0.15 : 0.15)));
       const ratio = newScale / oldScale;
       // pan' = (cursor - boxCenter) - (cursor - boxCenter - pan) * ratio
       //      = (cx + pan) - cx * ratio
@@ -537,29 +638,37 @@ function setupGestures(overlay) {
       dragStart = { x: e.clientX - zoomState.panX, y: e.clientY - zoomState.panY };
       img.style.cursor = 'grabbing';
     });
-    document.addEventListener('mousemove', (e) => {
-      if (!dragStart) return;
-      zoomState.panX = e.clientX - dragStart.x;
-      zoomState.panY = e.clientY - dragStart.y;
-      applyTransform();
-    });
-    document.addEventListener('mouseup', () => {
-      if (dragStart) {
-        dragStart = null;
-        img.style.cursor = 'grab';
-      }
-    });
+    document.addEventListener(
+      'mousemove',
+      (e) => {
+        if (!dragStart || !state.isOpen || zoomState.scale <= 1) return;
+        zoomState.panX = e.clientX - dragStart.x;
+        zoomState.panY = e.clientY - dragStart.y;
+        applyTransform();
+      },
+      { signal: scope.signal },
+    );
+    document.addEventListener(
+      'mouseup',
+      () => {
+        if (dragStart) {
+          dragStart = null;
+          img.style.cursor = 'grab';
+        }
+      },
+      { signal: scope.signal },
+    );
   }
 
   // --- Double tap zoom (centered on tap point) ---
   overlay.addEventListener('dblclick', (e) => {
+    if (e.target !== img) return;
     e.preventDefault();
     if (zoomState.scale > 1.2) {
       resetZoom();
       applyTransform();
       return;
     }
-    const img = $('#gallery-current-img');
     if (!img) return;
     const imgRect = img.getBoundingClientRect();
     const cx = e.clientX - (imgRect.left + imgRect.width / 2),

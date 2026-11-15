@@ -184,16 +184,19 @@ try {
   // ── Scenario 2: nested/spaced taxonomy route, escaping, feed & sitemap ──
   const trickyTitle = 'A <B> & ]]> </script> title';
   const trickyDescription = 'Desc < > & ]]> </script> "quoted"';
-  const nested = makeSite({
-    'tech-note': markdown({
-      title: trickyTitle,
-      date: '2026-01-02T00:00:00.000Z',
-      category: 'Tech / Web',
-      tags: ['Web 开发', 'C++', 'C#'],
-      description: trickyDescription,
-    }),
-    plain: markdown({ title: 'Plain', date: '2026-01-01T00:00:00.000Z', tags: ['gif'] }),
-  });
+  const nested = makeSite(
+    {
+      'tech-note': markdown({
+        title: trickyTitle,
+        date: '2026-01-02T00:00:00.000Z',
+        category: 'Tech / Web',
+        tags: ['Web 开发', 'C++', 'C#'],
+        description: trickyDescription,
+      }),
+      plain: markdown({ title: 'Plain', date: '2026-01-01T00:00:00.000Z', tags: ['gif'] }),
+    },
+    { pageSize: 1 },
+  );
   // Inline i18n must escape "<" so translated text can never close the tag.
   writeFile(
     nested.root,
@@ -251,6 +254,19 @@ try {
   // Sitemap: well-formed and percent-encoded for non-ASCII taxonomy routes.
   const sitemap = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
   assertWellFormedXml(sitemap, 'sitemap.xml');
+  const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+  assert.ok(
+    locations.every((loc) => /^https?:\/\//.test(loc)),
+    'every sitemap location is absolute',
+  );
+  assert.deepEqual(
+    locations.filter((loc) => loc.includes('/page/')),
+    ['https://site.test/page/2/'],
+    'sitemap includes every generated home listing page, without page/1 or nonexistent pages',
+  );
+  assert.ok(fs.existsSync(path.join(dist, 'page/2/index.html')), 'listed pagination page exists');
+  assert.ok(locations.includes('https://site.test/posts/tech-note/'));
+  assert.ok(locations.includes('https://site.test/posts/plain/'));
   assert.ok(sitemap.includes('https://site.test/categories/tech/web/'));
   assert.ok(
     sitemap.includes(`https://site.test/tags/${encodeURIComponent('web-开发')}/`),
