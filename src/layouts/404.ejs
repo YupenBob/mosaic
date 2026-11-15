@@ -34,6 +34,12 @@
       stylesheets into assets/css/bundle.css (as index.ejs/post.ejs do). %>
   <link rel="stylesheet" href="<%= rp %>assets/css/bundle.css" />
   <meta name="robots" content="noindex" />
+  <meta name="description" content="<%= t('page_not_found') %>" />
+  <meta property="og:title" content="404 · <%= site.title %>" />
+  <meta property="og:description" content="<%= t('page_not_found') %>" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="<%= (site.url || '') %>/assets/og-card.png" />
+  <meta name="twitter:card" content="summary" />
 <script>window.__MOSAIC_CONFIG=<%- JSON.stringify({ components: site.components || {}, player: site.player, search: site.search, searchMinChars: site.searchMinChars, imageQuality: site.imageQuality, themeMode: site.themeMode, experience: site.experience }).replace(/</g, '\\u003c') %>;</script>
 </head>
 <body data-page="404">

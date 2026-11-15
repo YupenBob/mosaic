@@ -57,6 +57,9 @@ export function createNoteInteractions({ doc, getHost, getNote }) {
     if (!track) return;
     const index = forced ?? activeIndex();
     const host = getHost();
+    const counter = host.querySelector('.note-media-counter');
+    const position = `${index + 1} / ${track.children.length}`;
+    if (counter && counter.textContent !== position) counter.textContent = position;
     host.querySelectorAll('.note-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
     host.querySelectorAll('.note-media-nav.prev').forEach((el) => (el.disabled = index <= 0));
     host.querySelectorAll('.note-media-nav.next').forEach((el) => (el.disabled = index >= track.children.length - 1));

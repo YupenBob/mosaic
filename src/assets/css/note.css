@@ -184,8 +184,8 @@ dialog.note-modal::backdrop {
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -234,6 +234,18 @@ dialog.note-modal::backdrop {
   background: #fff;
 }
 
+.note-media-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 /* 鈹€鈹€ content column 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 .note-body-col {
   display: flex;
@@ -256,8 +268,8 @@ dialog.note-modal::backdrop {
   top: 12px;
   right: 12px;
   z-index: 3;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -437,8 +449,8 @@ dialog.note-modal::backdrop {
 }
 
 .note-music-toggle {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -580,6 +592,8 @@ dialog.note-modal::backdrop {
 }
 
 .note-action {
+  min-width: 44px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 4px;

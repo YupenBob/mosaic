@@ -67,6 +67,32 @@ export function generateSite(context) {
     generatedAt: new Date().toISOString(),
   };
   fs.writeFileSync(path.join(dist, 'build-snapshot.json'), JSON.stringify(snapshot));
+  // Cloudflare Pages `_headers`: HTML must revalidate so a deploy is visible
+  // immediately; hashed app bundles can be cached forever; other assets keep a
+  // short shared cache because their URLs are not content-addressed.
+  fs.writeFileSync(
+    path.join(dist, '_headers'),
+    [
+      '/*',
+      '  X-Content-Type-Options: nosniff',
+      '',
+      '/*.html',
+      '  Cache-Control: public, max-age=0, must-revalidate',
+      '',
+      '/',
+      '  Cache-Control: public, max-age=0, must-revalidate',
+      '',
+      '/assets/js/app.*.js',
+      '  Cache-Control: public, max-age=31536000, immutable',
+      '',
+      '/assets/*',
+      '  Cache-Control: public, max-age=3600',
+      '',
+      '/data/*',
+      '  Cache-Control: public, max-age=300',
+      '',
+    ].join('\n'),
+  );
   if (fs.existsSync(path.join(root, 'functions')))
     fs.cpSync(path.join(root, 'functions'), path.join(dist, 'functions'), { recursive: true });
   return {

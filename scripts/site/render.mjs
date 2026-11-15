@@ -46,6 +46,8 @@ export function renderSite(context, posts, indexes) {
   const compiled = new Map();
   const feedEnabled = plugins['generate-feed']?.enabled !== false;
   const sitemapEnabled = plugins['generate-sitemap']?.enabled !== false;
+  const pageSize = SITE.pageSize || 50;
+  const totalPages = Math.max(1, Math.ceil(posts.length / pageSize));
 
   function buildFeed() {
     const base = (SITE.url || '').replace(/\/+$/, '');
@@ -99,6 +101,7 @@ export function renderSite(context, posts, indexes) {
     const locs = [
       `${base}/`,
       `${base}/404.html`,
+      ...Array.from({ length: totalPages - 1 }, (_, index) => `${base}/page/${index + 2}/`),
       ...categoryPages.map((c) => `${base}/categories/${encodeRoutePath(categoryRoute(c.full))}/`),
       ...tags.map((t) => `${base}/tags/${encodeURIComponent(tagSlug(t.name))}/`),
       ...posts.map((p) => `${base}/posts/${encodeURIComponent(p.slug)}/`),
@@ -204,8 +207,6 @@ export function renderSite(context, posts, indexes) {
   }
 
   // Index page
-  const pageSize = SITE.pageSize || 50;
-  const totalPages = Math.max(1, Math.ceil(posts.length / pageSize));
   for (let page = 1; page <= totalPages; page++) {
     const pagePosts = posts.slice((page - 1) * pageSize, page * pageSize);
     renderFile('index.ejs', path.join(DIST, page === 1 ? 'index.html' : `page/${page}/index.html`), {

@@ -68,6 +68,13 @@ dialog.feed-overlay::backdrop {
   background: #000;
 }
 
+.feed-content {
+  position: absolute;
+  inset: 0;
+  width: min(100%, 56.25dvh);
+  margin-inline: auto;
+}
+
 .feed-stage {
   position: absolute;
   inset: 0;

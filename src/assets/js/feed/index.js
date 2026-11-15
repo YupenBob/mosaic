@@ -77,6 +77,25 @@ function createVerticalFeed(options) {
   let disposed = false;
   let openRequest = 0;
   let resizeTimer = 0;
+  const lifetimeAbort = new AbortController();
+
+  function syncUrl(slug) {
+    const url = new URL(window.location.href);
+    if (slug) url.searchParams.set('feed', slug);
+    else url.searchParams.delete('feed');
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, '', url);
+  }
+
+  function onPopState() {
+    const slug = new URL(window.location.href).searchParams.get('feed');
+    if (!slug) close();
+    else if (!isOpen) openFeed(slug);
+    else {
+      const index = items.findIndex((item) => item.slug === slug);
+      if (index >= 0) goTo(index);
+    }
+  }
+  window.addEventListener('popstate', onPopState, { signal: lifetimeAbort.signal });
 
   // ── entry button (injected, no template edits) ──────────────────────────
   function injectEntry() {
@@ -95,7 +114,11 @@ function createVerticalFeed(options) {
     const run = () => {
       loadFeed()
         .then((list) => {
-          if (!disposed && list.length) injectEntry();
+          if (!disposed && list.length) {
+            injectEntry();
+            const slug = new URL(window.location.href).searchParams.get('feed');
+            if (list.some((item) => item.slug === slug)) openFeed(slug);
+          }
         })
         .catch(() => {});
     };
@@ -108,7 +131,7 @@ function createVerticalFeed(options) {
     dialog = document.createElement('dialog');
     dialog.className = 'feed-overlay';
     dialog.setAttribute('aria-label', t('dialogLabel'));
-    dialog.innerHTML = overlayHTML(items);
+    dialog.innerHTML = `<div class="feed-content">${overlayHTML(items)}</div>`;
     document.body.appendChild(dialog);
     stage = dialog.querySelector('[data-feed-stage]');
     track = dialog.querySelector('[data-feed-track]');
@@ -168,6 +191,7 @@ function createVerticalFeed(options) {
       slide.classList.toggle('is-active', Number(slide.dataset.index) === active);
     });
     dialog.dataset.active = String(active);
+    syncUrl(items[active].slug);
     hud.syncActive();
     player?.activate(active).catch(() => {});
   }
@@ -202,7 +226,7 @@ function createVerticalFeed(options) {
   /** @param {MouseEvent} event */
   function onClick(event) {
     const target = /** @type {HTMLElement} */ (event.target);
-    if (target.closest('[data-feed-close]')) {
+    if (target === dialog || target.closest('[data-feed-close]')) {
       close();
       return;
     }
@@ -228,7 +252,7 @@ function createVerticalFeed(options) {
   }
 
   // ── open / close ────────────────────────────────────────────────────────
-  /** @param {number} [index] */
+  /** @param {number|string} [index] */
   async function openFeed(index = 0) {
     if (isOpen || disposed) return;
     const token = ++openRequest;
@@ -240,6 +264,10 @@ function createVerticalFeed(options) {
     }
     if (token !== openRequest || disposed || !list.length) return;
     items = list;
+    if (typeof index === 'string') {
+      index = items.findIndex((item) => item.slug === index);
+      if (index < 0) return;
+    }
     buildDialog();
     resetOverlay(dialog);
     dialog.showModal();
@@ -260,6 +288,7 @@ function createVerticalFeed(options) {
   function close() {
     if (!isOpen) return;
     isOpen = false;
+    syncUrl(null);
     openRequest += 1;
     clearTimeout(resizeTimer);
     hud?.cleanup();
@@ -293,6 +322,7 @@ function createVerticalFeed(options) {
 
   function dispose() {
     disposed = true;
+    lifetimeAbort.abort();
     close();
     entry?.remove();
     entry = null;

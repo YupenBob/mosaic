@@ -122,6 +122,7 @@ export function renderMedia(note) {
         : ''
     }
     ${dots}
+    ${multiple ? `<span class="note-media-counter" aria-live="polite" aria-atomic="true">1 / ${media.length}</span>` : ''}
   </div>`;
 }
 

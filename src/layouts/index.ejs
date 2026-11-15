@@ -62,7 +62,7 @@ const accentOptions = [
   <meta property="og:title" content="<%= pageDataTitle %>" />
   <meta property="og:description" content="<%= pageDesc %>" />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="<%= site.url || '' %>" />
+  <meta property="og:url" content="<%= canonicalUrl || site.url || '' %>" />
   <meta property="og:site_name" content="<%= site.title %>" />
   <meta property="og:image" content="<%= (site.url || '') %>/assets/og-card.png" />
   <meta name="twitter:card" content="summary" />

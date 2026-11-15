@@ -30,6 +30,40 @@ let playerState = {
 let audioElement = null;
 let _waveformInstance = null;
 let _lastSaveAt = 0;
+let playbackFailed = false;
+
+function clearPlaybackError() {
+  playbackFailed = false;
+  $$('.music-error').forEach((el) => el.remove());
+}
+
+function showPlaybackError() {
+  playbackFailed = true;
+  playerState.isPlaying = false;
+  updatePlayUI();
+  $$('.music-section').forEach((section) => {
+    let notice = section.querySelector('.music-error');
+    if (!notice) {
+      notice = document.createElement('p');
+      notice.className = 'music-error';
+      notice.setAttribute('role', 'alert');
+      section.appendChild(notice);
+    }
+    notice.textContent =
+      window.__LANG === 'en'
+        ? 'Unable to play this track. Press play to retry or choose another track.'
+        : '音频播放失败，请点击播放重试，或选择其他曲目。';
+  });
+}
+
+/** Handle rejected play promises as well as media error events. */
+function playAudio(audio) {
+  const src = audio.src;
+  audio.play().catch((error) => {
+    // Switching tracks or pausing can abort a pending play without a failure.
+    if (error.name !== 'AbortError' && audio.src === src) showPlaybackError();
+  });
+}
 
 /** Load persisted state */
 function loadState() {
@@ -111,15 +145,14 @@ function getAudio() {
       setupMediaSession();
     });
 
+    audioElement.addEventListener('playing', clearPlaybackError);
+
     audioElement.addEventListener('pause', () => {
       playerState.isPlaying = false;
       updatePlayUI();
     });
 
-    audioElement.addEventListener('error', () => {
-      playerState.isPlaying = false;
-      updatePlayUI();
-    });
+    audioElement.addEventListener('error', showPlaybackError);
   }
   return audioElement;
 }
@@ -130,6 +163,7 @@ function loadTrack(index) {
   const track = playerState.queue[index];
   if (!track) return;
 
+  clearPlaybackError();
   playerState.currentIndex = index;
   setupWaveform();
 
@@ -139,7 +173,7 @@ function loadTrack(index) {
 
   audio.src = src;
   audio.load();
-  audio.play().catch(() => {});
+  playAudio(audio);
   saveState();
 }
 
@@ -186,12 +220,13 @@ function handleTrackEnd() {
 /** Toggle play */
 function togglePlay() {
   const audio = getAudio();
-  if (!audio.src && playerState.queue.length > 0) {
+  if ((!audio.src || playbackFailed || audio.error) && playerState.queue.length > 0) {
     loadTrack(playerState.currentIndex >= 0 ? playerState.currentIndex : 0);
     return;
   }
   if (audio.paused) {
-    audio.play().catch(() => {});
+    clearPlaybackError();
+    playAudio(audio);
   } else {
     audio.pause();
   }

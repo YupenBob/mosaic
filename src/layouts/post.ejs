@@ -106,13 +106,15 @@ function renderGallery(photos, threshold) {
     // the browser skip the placeholder entirely (loading it directly).
     var attrs = 'data-src480="' + escAttr(p.src480) + '" data-src720="' + escAttr(p.src720) + '" data-src1080="' + escAttr(p.src1080) + '" data-src-orig="' + escAttr(p.srcOrig) + '" ';
     if (idx === 0) attrs += 'fetchpriority="high" ';
+    // Known aspect ratio reserves layout space before the image decodes (CLS).
+    var ratio = Number(p.aspect) > 0 ? ' style="aspect-ratio:' + Number(p.aspect) + '"' : '';
     if (single) {
       h += '<div class="gallery-single-item">';
-      h += '<img ' + attrs + 'src="' + escAttr(p.src10p) + '" alt="Photo" loading="lazy" />';
+      h += '<img ' + attrs + 'src="' + escAttr(p.src10p) + '"' + ratio + ' alt="Photo" loading="lazy" />';
       h += '</div>';
     } else {
       h += '<div class="gallery-item">';
-      h += '<img ' + attrs + 'src="' + escAttr(p.src10p) + '" alt="Photo" loading="lazy" />';
+      h += '<img ' + attrs + 'src="' + escAttr(p.src10p) + '"' + ratio + ' alt="Photo" loading="lazy" />';
       h += '</div>';
     }
   });
@@ -341,7 +343,7 @@ document.addEventListener('click', function(event) {
       <div class="related-grid">
         <% related.forEach(function(r) { %>
         <a href="<%= rp %>posts/<%= r.slug %>/" class="related-card">
-          <% if (r.cover) { %><div class="related-cover"><img src="<% if ((r.cover.startsWith('http') || r.cover.startsWith('/api/'))) { %><%= r.cover %><% } else { %><%= rp %>posts/<%= r.slug %>/<%= r.cover %><% } %>" alt="" loading="lazy" /></div><% } %>
+          <% if (r.cover) { %><% var relatedRatio = Number(r.coverAspect) > 0 ? ' style="aspect-ratio:' + Number(r.coverAspect) + '"' : ''; %><div class="related-cover"><img src="<% if ((r.cover.startsWith('http') || r.cover.startsWith('/api/'))) { %><%= r.cover %><% } else { %><%= rp %>posts/<%= r.slug %>/<%= r.cover %><% } %>"<%- relatedRatio %> alt="" loading="lazy" /></div><% } %>
           <span class="related-title"><%= r.title %></span>
         </a>
         <% }); %>

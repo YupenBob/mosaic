@@ -203,7 +203,7 @@ export function initSearch(allPosts) {
     renderCards(allPosts);
   }
 
-  /** Clear the query, restore every card and close the listbox. */
+  /** Clear the query, restore the browsing slice (unless filtered) and close the listbox. */
   function clearSearch() {
     window.clearTimeout(timer);
     updateFilterState({ searchQuery: '' });

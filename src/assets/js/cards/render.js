@@ -118,14 +118,14 @@ function mediaMarkup(post, base, priority) {
   const first = lqip || cover;
   return (
     `<div class="post-card-media" style="--cover-aspect:${aspect.toFixed(4)}">` +
-    `<img class="post-card-img${lqip ? ' is-lqip' : ''}" src="${esc(first)}"` +
+    `<img class="post-card-img${lqip ? ' is-lqip' : ''}" style="aspect-ratio:${aspect.toFixed(4)}" src="${esc(first)}"` +
     (lqip ? ` data-src="${esc(cover)}"` : '') +
     (srcset ? ` ${lqip ? 'data-srcset' : 'srcset'}="${esc(srcset)}"` : '') +
     ` sizes="${sizes}" alt="${esc(post.title || '')}"${loadingAttrs}` +
     (priority ? ' data-priority="true"' : '') +
     ' decoding="async" />' +
     (lqip
-      ? `<noscript><img class="post-card-img" src="${esc(cover)}"` +
+      ? `<noscript><img class="post-card-img" style="aspect-ratio:${aspect.toFixed(4)}" src="${esc(cover)}"` +
         (srcset ? ` srcset="${esc(srcset)}"` : '') +
         ` sizes="${sizes}" alt="${esc(post.title || '')}"${loadingAttrs} /></noscript>`
       : '') +
