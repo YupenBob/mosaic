@@ -227,3 +227,27 @@ npm run test:admin:local
 - QA 资产：`tests/ux/`（7 个旅程 spec + lib）、`scripts/qa/`（本地全量构建/runner/目录合并）、
   `docs/qa/behaviors.json` + `behavior-catalog.md`（226 条，含状态与覆盖来源）、
   每轮证据在 `qa/reports/round-N/`（gitignore）。
+
+### 2026-11-15 深入 QA 轮次 5–9：浮层交互、媒体/搜索/分页、后台写分支、安全与语义
+
+- 新增 **fixture 环境** `scripts/qa/build-fixtures.mjs`：65 篇内容的临时站点（playlist 三视频帖、双曲目音乐帖、
+  HLS/MP4/损坏 HLS 变体、嵌套与特殊字符分类、XSS 元数据帖、作者信任 HTML 帖、分页 4 页），
+  搭配合成媒体服务（多档 HLS/ts、MP4、MP3、JPEG，CORS/Range），旅程 `--target fixtures` 一键复现。
+- 行为目录扩到 **330 条（244 pass / 86 blocked / 0 fail）**，新增 11 个深测 spec（feed/note/gallery/player/
+  music/search/pagination/admin-deep/security/seo/fixture-smoke），共 22 个 spec。
+- 修复（PR #20，合并 `c593b7b`，Infrastructure + Site 均成功）：
+  - 画廊查看器改为真正的模态：焦点进入/陷阱/返回、拖拽边界钳制、`+/-/0` 键盘缩放、放大后单指平移、
+    坏图占位且导航可继续；双指缩放保持；
+  - 垂直 feed：点击背景关闭并回焦、`?feed=<slug>` 可分享/刷新恢复；
+  - 笔记弹层：关闭按钮 44px、轮播 aria-live 数字计数；
+  - 音乐播放失败显示可见错误并可重试；搜索清除后恢复首屏分页切片（过滤态仍全站搜索，已记录）；
+  - SEO：分类/标签 og:url 用页面 canonical、404 补充社交/描述元数据、sitemap 纳入 `page/N`；
+    Pages `_headers`（HTML revalidate、hashed JS immutable、CSS 1h、data 5min）；卡片/相关封面按宽高比占位；
+  - 后台：删文章需回填 slug、启动构建需确认、确认框按钮在精确文本匹配前禁用、草稿列表新增预览；
+  - Worker：公开 track 端点 8KiB 体积上限（合法超限 → 413 `PAYLOAD_TOO_LARGE`）。
+- 线上核验（`c593b7b`）：`probe.mjs` 13 passed / 4 warnings（WAF 残余同 R-0）；HTML `max-age=0, must-revalidate`、
+  哈希 JS `immutable`、CSS `max-age=14400`；合法超大 track body → 413，非法 JSON → 400；深层 404/后台只读 4/4、
+  admin 只读巡检 4/4 全绿；SEO/安全旅程在本地+生产读数 4/4 全绿。
+- 残余 backlog：86 条 blocked（后台部分写分支 mock 不足、无 Service Worker 的离线首访、音乐/多视频内容形态、
+  速率限制测试受匿名写预算限制、WAF 落地前 site-data 仍公开、legacy 相关封面仍有 960px 源）；
+  `enableBusuanzi` 第三方统计为配置选择。
