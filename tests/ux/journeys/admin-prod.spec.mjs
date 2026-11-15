@@ -128,7 +128,7 @@ export const journeys = [
       await t.page.evaluate(() => {
         location.hash = 'editor&slug=fsdfsdgsfgsd';
       });
-      await waitFor(async () => (await t.page.locator('#fm-title').inputValue()).length > 0, {
+      await waitFor(async () => t.page.evaluate(() => document.getElementById('fm-slug')?.value === 'fsdfsdgsfgsd'), {
         timeout: 25000,
         message: 'fsdfsdgsfgsd form populated',
       });
