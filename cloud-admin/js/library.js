@@ -109,11 +109,16 @@ function openAssetDetail(asset, onChanged) {
         const desc = related
           ? t('library.deleteInUse', { n: related }) + ' ' + t('library.deleteDesc')
           : t('library.deleteDesc');
-        modalConfirm(t('library.deleteTitle', { name: asset.filename }), desc, async () => {
-          await assets.delete(asset.id, true);
-          toast(t('library.deletedToast'), 'success');
-          onChanged();
-        });
+        modalConfirm(
+          t('library.deleteTitle', { name: asset.filename }),
+          desc,
+          async () => {
+            await assets.delete(asset.id, true);
+            toast(t('library.deletedToast'), 'success');
+            onChanged();
+          },
+          { requireText: related ? String(related) : asset.filename },
+        );
       },
     });
   }

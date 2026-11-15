@@ -20,6 +20,7 @@ let previewTimer = null;
 let cloudDraftTimer = null;
 let cloudDraftBusy = false;
 let editorSignal = null;
+let interruptedDraft = null;
 
 function getEditorMedia() {
   const refs = state.editor.mediaRefs;
@@ -401,6 +402,7 @@ function draftKey(slug) {
 
 export default async function renderEditor(signal) {
   editorSignal = signal;
+  const recovery = interruptedDraft?.route === JSON.stringify(state.params) ? interruptedDraft : null;
   const draftId = state.params.draft || '';
   let cloudDraft = null;
   if (draftId) {
@@ -637,7 +639,12 @@ export default async function renderEditor(signal) {
       renderSelectedMedia();
       loadSelectedAssets();
       document.querySelector('[data-open-asset-picker]')?.addEventListener('click', openAssetPicker);
-      if (!state.editor.draftMode) loadCloudDraft(signal);
+      if (recovery) {
+        state.editor.cloudDraft = recovery.payload;
+        state.editor.cloudDraftRevision = recovery.payload.revision || null;
+        applyCloudDraft(recovery.payload);
+        interruptedDraft = null;
+      } else if (!state.editor.draftMode) loadCloudDraft(signal);
       if (slug) loadExistingMedia(slug);
       state.editor.draftSnapshot = null;
       if (draft) {
@@ -727,6 +734,15 @@ function cloudDraftPayload() {
   };
 }
 
+/** Capture before auth expiry disposes the page and cancels debounced saves. */
+export function preserveEditorDraft() {
+  if (state.page !== 'editor' || !state.editorDirty || editorSignal?.aborted) return;
+  if (!document.getElementById('fm-title')) return;
+  const payload = cloudDraftPayload();
+  state.editor.cloudDraft = payload;
+  interruptedDraft = { route: JSON.stringify(state.params), payload };
+}
+
 async function refreshCloudDraftRevision(id) {
   try {
     const latest = await draftsApi.get(id);
@@ -792,16 +808,14 @@ async function loadCloudDraft(signal) {
   }
 }
 
-window.restoreCloudDraft = () => {
-  const draft = state.editor.cloudDraft;
-  if (!draft) return;
+function applyCloudDraft(draft) {
   const set = (id, value) => {
     const el = document.getElementById(id);
     if (el && value !== undefined && value !== null) el.value = value;
   };
   const fm = draft.frontMatter || {};
   set('fm-slug', draft.slug || '');
-  set('fm-title', draft.title || fm.title || '');
+  set('fm-title', draft.title ?? fm.title ?? '');
   set('fm-date', (fm.date || '').split('T')[0]);
   set('fm-category', fm.category || '');
   set('fm-tags', Array.isArray(fm.tags) ? fm.tags.join(', ') : fm.tags || '');
@@ -819,6 +833,12 @@ window.restoreCloudDraft = () => {
   updateCoverPreview();
   state.editorDirty = true;
   document.getElementById('cloud-draft-banner').hidden = true;
+}
+
+window.restoreCloudDraft = () => {
+  const draft = state.editor.cloudDraft;
+  if (!draft) return;
+  applyCloudDraft(draft);
   toast(t('editor.cloudRestored'), 'success');
 };
 

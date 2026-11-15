@@ -30,7 +30,13 @@ export async function installAdminMock(page, overrides = {}) {
   await page.route('**/api/**', async (route) => {
     const req = route.request();
     const pathname = new URL(req.url()).pathname.slice(4);
-    requests.push({ path: pathname, method: req.method(), body: req.postDataJSON?.() });
+    let bodyData;
+    try {
+      bodyData = req.postDataJSON();
+    } catch {
+      bodyData = req.postData();
+    }
+    requests.push({ path: pathname, method: req.method(), body: bodyData, url: req.url(), headers: req.headers() });
     const response = await overrides.respond?.(pathname, req);
     if (response) return route.fulfill(response);
     if (overrides.expired && pathname !== '/auth/login')

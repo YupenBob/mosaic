@@ -417,13 +417,18 @@ async function uploadFileMultipart(item) {
   try {
     started = await upload.multipartStart(slug, filename, file.size, file.type, stored?.uploadId);
   } catch (e) {
-    if (stored && stored.uploadId && e.status === 404) {
+    if (![404, 410].includes(e.status)) throw e;
+    mpClear(slug, filename);
+    if (stored?.uploadId) {
       // The upload no longer exists server-side — start a fresh one.
-      mpClear(slug, filename);
-      started = await upload.multipartStart(slug, filename, file.size, file.type);
+      try {
+        started = await upload.multipartStart(slug, filename, file.size, file.type);
+      } catch (error) {
+        if (![404, 410].includes(error.status)) throw error;
+        return false; // Endpoint absent: let the caller use the direct flow.
+      }
     } else {
-      // Transient errors keep the resume state so retry continues the parts.
-      throw e;
+      return false;
     }
   }
   const { uploadId, partSize, partCount, parts } = started;
