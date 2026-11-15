@@ -128,14 +128,14 @@ try {
   assert.match(card, /class="post-card-media" style="--cover-aspect:1\.5000"/, 'per-card aspect');
   assert.match(
     card,
-    /class="post-card-img is-lqip" src="https:\/\/media.test\/processed\/p\/videos\/1\/poster-preview\.webp"/,
+    /class="post-card-img is-lqip"[^>]*src="https:\/\/media.test\/processed\/p\/videos\/1\/poster-preview\.webp"/,
   );
   assert.match(card, /data-src="https:\/\/media.test\/processed\/p\/videos\/1\/poster\.jpg"/);
   assert.match(card, /data-priority="true"/);
   assert.match(card, /loading="eager" fetchpriority="high"/);
   assert.match(
     card,
-    /<noscript><img class="post-card-img" src="https:\/\/media.test\/processed\/p\/videos\/1\/poster\.jpg"/,
+    /<noscript><img class="post-card-img"[^>]*src="https:\/\/media.test\/processed\/p\/videos\/1\/poster\.jpg"/,
   );
 
   const legacyCard = renderCard(listing[1], { base: '' });

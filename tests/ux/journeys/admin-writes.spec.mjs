@@ -3,7 +3,7 @@ export const area = 'admin';
 export const targets = ['admin-local'];
 
 // Every API request is answered in memory; all other off-origin traffic is aborted.
-async function installAdminMock(page, overrides = {}) {
+export async function installAdminMock(page, overrides = {}) {
   const requests = [];
   let savedPost = null;
   const config = {
@@ -231,7 +231,7 @@ async function installAdminMock(page, overrides = {}) {
     },
   };
 }
-async function login(t, options = {}) {
+export async function login(t, options = {}) {
   const mock = await installAdminMock(t.page, options);
   await t.goto('/');
   await t.page.locator('#login-password').fill('fixture-password');
@@ -242,7 +242,7 @@ async function login(t, options = {}) {
   });
   return mock;
 }
-async function nav(t, name) {
+export async function nav(t, name) {
   await t.page.locator(`a.nav-item[data-page="${name}"]`).click();
   await waitFor(() => t.page.evaluate((n) => location.hash.startsWith('#' + n), name), { timeout: 10000 });
   await t.page.locator('#main-content .page-anim').first().waitFor({ timeout: 10000 });

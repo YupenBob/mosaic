@@ -43,6 +43,17 @@ async function resolveTarget(target) {
     return { base: server.base, close: server.close, guardWrites: false };
   }
   if (target === 'prod') return { base: PROD.site, close: async () => {}, guardWrites: false, readOnly: false };
+  if (target === 'fixtures') {
+    const { startFixtures } = await import('./build-fixtures.mjs');
+    const fixture = await startFixtures();
+    return {
+      base: fixture.base,
+      close: fixture.close,
+      guardWrites: false,
+      mediaUrl: fixture.mediaUrl,
+      fixtures: true,
+    };
+  }
   if (target === 'admin-local') {
     const server = await startLocalAdmin();
     return { base: server.base, close: server.close, guardWrites: false, admin: true };
