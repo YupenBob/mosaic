@@ -313,15 +313,20 @@ window.loadMorePosts = () => {
 };
 
 window.doDeletePost = (slug) => {
-  modalConfirm(t('common.deletePost', { slug }), '', async () => {
-    try {
-      await postsApi.delete(slug);
-      window.checkDirty && window.checkDirty();
-      location.reload();
-    } catch (err) {
-      toast(t('common.deleteFailed') + ': ' + err.message, 'error');
-    }
-  });
+  modalConfirm(
+    t('common.deletePost', { slug }),
+    '',
+    async () => {
+      try {
+        await postsApi.delete(slug);
+        window.checkDirty && window.checkDirty();
+        location.reload();
+      } catch (err) {
+        toast(t('common.deleteFailed') + ': ' + err.message, 'error');
+      }
+    },
+    { requireText: slug },
+  );
 };
 
 window.doDuplicatePost = (slug) => {

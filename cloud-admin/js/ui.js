@@ -191,7 +191,9 @@ export function openModal({
       closeModal();
     }
     if (e.key === 'Tab') {
-      const focusables = overlay.querySelectorAll('button, input, select, textarea, a[href]');
+      const focusables = overlay.querySelectorAll(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]',
+      );
       if (!focusables.length) return;
       const first = focusables[0],
         last = focusables[focusables.length - 1];
@@ -241,7 +243,7 @@ export function modalConfirm(title, desc, onOk, opts = {}) {
           if (requireText) {
             const input = document.getElementById('modal-confirm-input');
             const err = document.getElementById('modal-confirm-error');
-            if (!input || input.value.trim() !== requireText) {
+            if (!input || input.value !== requireText) {
               if (err) err.style.display = 'block';
               input && input.focus();
               return;
@@ -254,6 +256,16 @@ export function modalConfirm(title, desc, onOk, opts = {}) {
     ],
     focusSelector: requireText ? '#modal-confirm-input' : null,
   });
+  if (requireText) {
+    const input = overlay.querySelector('#modal-confirm-input');
+    const button = overlay.querySelector('.modal-actions button:last-child');
+    const update = () => {
+      button.disabled = input.value !== requireText;
+      overlay.querySelector('#modal-confirm-error').style.display = 'none';
+    };
+    input.addEventListener('input', update);
+    update();
+  }
   return overlay;
 }
 

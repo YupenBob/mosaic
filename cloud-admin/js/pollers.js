@@ -8,7 +8,7 @@
 import { getToken, build, config as configApi } from '../src/api.js';
 import { t } from './i18n.js?v=1';
 import { state } from './state.js?v=1';
-import { toast } from './ui.js?v=1';
+import { toast, modalConfirm } from './ui.js?v=1';
 
 let dirtyPollTimer = null;
 let buildPollTimer = null;
@@ -243,7 +243,11 @@ window.setBuildTriggerStates = (running) => {
   if (dot) dot.className = 'status-dot' + (running ? ' busy' : '');
 };
 
-window.doTriggerBuild = async () => {
+window.doTriggerBuild = () => {
+  modalConfirm(t('build.triggerConfirmTitle'), t('build.triggerConfirmBody'), triggerBuild, { danger: false });
+};
+
+async function triggerBuild() {
   const loading = t('common.loading');
   document.querySelectorAll('[data-build-trigger]').forEach((btn) => {
     if (btn.dataset.restore === undefined) btn.dataset.restore = btn.innerHTML;
@@ -279,7 +283,7 @@ window.doTriggerBuild = async () => {
       window.setBuildTriggerStates(false);
     }
   }
-};
+}
 
 // Exposed for the inline dirty-banner CTA and page modules.
 window.checkDirty = checkDirty;
