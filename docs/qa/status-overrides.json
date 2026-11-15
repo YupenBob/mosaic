@@ -162,5 +162,53 @@
   },
   "GZ-12": {
     "status": "pass"
+  },
+  "AD-09": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-09); see round-9 reports"
+  },
+  "AD-17": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-17); see round-9 reports"
+  },
+  "AD-20": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-20); see round-9 reports"
+  },
+  "AD-33": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-33); see round-9 reports"
+  },
+  "AD-34": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-34); see round-9 reports"
+  },
+  "AD-39": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-39); see round-9 reports"
+  },
+  "AD-43": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-43); see round-9 reports"
+  },
+  "AD-51": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-51); see round-9 reports"
+  },
+  "AD-57": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-57); see round-9 reports"
+  },
+  "AD-59": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-59); see round-9 reports"
+  },
+  "AD-60": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (ADR-60); see round-9 reports"
+  },
+  "C-13": {
+    "status": "pass",
+    "expected": "Verified by a deep journey (V-15); see round-9 reports"
   }
 }
