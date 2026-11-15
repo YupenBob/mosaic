@@ -37,20 +37,20 @@
     "qa:perf": "node scripts/qa/run-journeys.mjs --target prod --area perf"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1068.0",
+    "@aws-sdk/client-s3": "^3.1167.0",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.60.0",
-    "axe-core": "^4.13.0",
+    "@playwright/test": "^1.65.0",
+    "axe-core": "^4.14.0",
     "ejs": "^3.1.10",
-    "esbuild": "^0.28.1",
-    "eslint": "^10.8.0",
-    "globals": "^17.9.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
     "gray-matter": "^4.0.3",
     "marked": "^15.0.7",
     "morphicons": "^2.0.2",
     "playwright": "^1.60.0",
-    "prettier": "^3.9.6",
-    "serve": "^14.2.6",
-    "sharp": "^0.33.5"
+    "prettier": "^3.10.1",
+    "serve": "^14.2.7",
+    "sharp": "^0.35.5"
   }
 }
