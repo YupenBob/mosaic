@@ -12,7 +12,7 @@ import { state } from './state.js?v=1';
 import { toast } from './ui.js?v=1';
 import { setupUploadZone } from './upload.js?v=1';
 import { onHashChange, navigateTo, parseHash } from './router.js';
-import { updateCoverPreview } from './editor.js?v=1';
+import { updateCoverPreview, preserveEditorDraft } from './editor.js?v=1';
 import { startPollers, stopPollers } from './pollers.js';
 import { setupGlobalSearch, setupKeyboard } from './command-palette.js';
 import { setupAccountMenu, closeAccountMenu } from './account-menu.js';
@@ -20,6 +20,7 @@ import { setupAccountMenu, closeAccountMenu } from './account-menu.js';
 // ── Auth ───────────────────────────────────
 /** Show the login screen and tear down the authenticated shell. */
 function showLogin() {
+  preserveEditorDraft();
   closeAccountMenu();
   state.pageScope?.dispose();
   setNavigationSignal(null);

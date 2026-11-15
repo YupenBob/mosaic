@@ -109,6 +109,12 @@ export default async function renderTasks(signal) {
 
       const renderList = () => {
         if (signal.aborted) return;
+        const badge = document.getElementById('nav-task-badge');
+        if (badge) {
+          const failed = currentJobs.filter((job) => job.status === 'failed').length;
+          badge.textContent = String(failed);
+          badge.style.display = failed ? '' : 'none';
+        }
         const listEl = document.getElementById('tasks-list');
         if (!listEl) return;
         const list = filterJobs(currentJobs, currentFilter);

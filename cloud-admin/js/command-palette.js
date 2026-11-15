@@ -13,6 +13,7 @@ import { pages } from './router.js';
 import { isConfigDirty } from './config/form.js?v=1';
 
 let postsLoaded = false;
+let palettePreviousFocus = null;
 
 async function ensurePostsLoaded() {
   if (postsLoaded && state.posts.length) return;
@@ -144,6 +145,7 @@ export function openCommandPalette(hooks = {}) {
     closeCommandPalette();
     return;
   }
+  palettePreviousFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'cmd-overlay';
   overlay.setAttribute('role', 'dialog');
@@ -249,7 +251,7 @@ export function openCommandPalette(hooks = {}) {
   list.addEventListener('click', (event) => {
     const button = event.target.closest('.cmd-item');
     if (!button) return;
-    overlay.remove();
+    closeCommandPalette();
     currentItems[Number(button.dataset.idx)]?.go();
   });
 
@@ -273,17 +275,33 @@ export function openCommandPalette(hooks = {}) {
     } else if (event.key === 'Enter') {
       event.preventDefault();
       items.find((el) => el.classList.contains('active'))?.click();
-    } else if (event.key === 'Escape') {
-      overlay.remove();
+    }
+  });
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      if (input.value) {
+        input.value = '';
+        render('');
+        input.focus();
+      } else closeCommandPalette();
     }
   });
   overlay.addEventListener('mousedown', (event) => {
-    if (event.target === overlay) overlay.remove();
+    if (event.target === overlay) {
+      event.preventDefault();
+      closeCommandPalette();
+    }
   });
 }
 
 export function closeCommandPalette() {
-  document.querySelector('.cmd-overlay')?.remove();
+  const overlay = document.querySelector('.cmd-overlay');
+  if (!overlay) return;
+  overlay.remove();
+  if (palettePreviousFocus?.isConnected) palettePreviousFocus.focus({ preventScroll: true });
+  palettePreviousFocus = null;
 }
 
 // ── Keyboard shortcuts ─────────────────────

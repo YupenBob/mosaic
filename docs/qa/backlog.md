@@ -2,13 +2,13 @@
 
 Status: catalogued, intentionally not asserted yet. Behavior facts live in
 `docs/qa/behaviors.json` (regenerate via `node scripts/qa/merge-catalog.mjs`); this page
-is curated by hand and updated when an item moves to pass.
+is curated and updated when an item moves to pass.
 
-Total: **74** blocked across 10 areas (catalog: 330 behaviors).
+Total: **81** blocked / 344 cataloged behaviors.
 
-## admin (37)
+## admin (44)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | AD-06 | Draft body and slug payload | Draft body and slug payload |
 | AD-07 | Draft category and tags payload | Draft category and tags payload |
@@ -47,10 +47,17 @@ Total: **74** blocked across 10 areas (catalog: 330 behaviors).
 | ADR-47 | Task badge counts update | Task badge counts update |
 | ADR-56 | Session expiry no infinite spinner | Session expiry no infinite spinner |
 | ADR-58 | Post publish success toast | Post publish success toast |
+| ADX-08 | Publish success and reset | POST and navigation verified; success toast and all requested reset state not independently asserted. |
+| ADX-16 | Posts pagination and sort | Design gap: posts list renders all rows and sorts locally; no server pagination/sort request. Tracked in docs/qa/round-10-decisions.md |
+| ADX-23 | Library delete and orphan cover | Usage warning, DELETE force query and removal exercised; typed confirmation absent, orphan cover untested. |
+| ADX-24 | Direct upload progress | Presign 404 and direct POST, running and ready states exercised; row failure/retry and cancellation not exercised. |
+| ADX-30 | Category and tag deletes | Count confirmation and payloads verified; nested category with children not exercised. |
+| ADX-36 | Enhance toggle | Design gap: Enhance is a processing form, not a persistent settings toggle; tracked in docs/qa/round-10-decisions.md |
+| ADX-40 | Build polling, cancel and history | Start, refresh, cancel, history detail and 2s after leaving exercised; staged automatic polling not verified. |
 
 ## edge (10)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | E-08 | Broken card images preserve layout | Graceful degradation and recovery without crashes or unsafe reflection. |
 | E-09 | Video manifest and segment failures | Graceful degradation and recovery without crashes or unsafe reflection. |
@@ -65,7 +72,7 @@ Total: **74** blocked across 10 areas (catalog: 330 behaviors).
 
 ## media (5)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | C-12 | Playlist items listed | Playlist items listed |
 | C-14 | Playlist auto-advance | Playlist auto-advance |
@@ -75,14 +82,14 @@ Total: **74** blocked across 10 areas (catalog: 330 behaviors).
 
 ## music (2)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | MU-01 | Two fixture tracks have identical file/source metadata; active-index change was observed b | Requested coverage |
 | MU-02 | Error check tests presence of an alert/error element; no pageerror was observed. | Requested coverage |
 
 ## pagination (4)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | PG-01 | Back navigation reported scroll 133 after 500 before navigation; timing/restoration behavi | Requested coverage |
 | PG-02 | 404 checks and remaining sitemap taxonomy checks were not reached after sitemap assertion  | Requested coverage |
@@ -91,7 +98,7 @@ Total: **74** blocked across 10 areas (catalog: 330 behaviors).
 
 ## player (6)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | PL-01 | WebKit blocked: runner only provides Chromium. | Requested coverage |
 | PL-02 | Playlist auto-advance and one-playing assertion blocked by PLAYER-01. | Requested coverage |
@@ -102,20 +109,20 @@ Total: **74** blocked across 10 areas (catalog: 330 behaviors).
 
 ## post (1)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | G-106 | Music post playback | Music post can be played if one exists |
 
 ## search (2)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | SE-01 | Fixture has no 壁纸-tagged post, so matching-result part of IME check is blocked. | Requested coverage |
 | SE-02 | Keyboard Enter navigation was not reached after SEARCH-01; case counts were recorded but e | Requested coverage |
 
 ## security (5)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | E-802 | Query, route and DOM injection | Query, route and DOM injection |
 | E-806 | Media site-data privacy residual | Known residual: media-domain site-data/* stays public until the WAF rollout (needs CLOUDFLARE_ZONE_ID) |
@@ -125,7 +132,7 @@ Total: **74** blocked across 10 areas (catalog: 330 behaviors).
 
 ## visitor (2)
 
-| ID | Behavior | Unblock condition |
+| ID | Behavior | Unblock condition / decision |
 | --- | --- | --- |
 | V-51 | Empty category state | Empty category state |
 | V-76 | Locale switch | Locale switch |

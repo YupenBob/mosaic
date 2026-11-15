@@ -210,5 +210,29 @@
   "C-13": {
     "status": "pass",
     "expected": "Verified by a deep journey (V-15); see round-9 reports"
+  },
+  "ADX-12": {
+    "status": "pass",
+    "expected": "Ctrl+K palette filters/navigates pages; first Escape clears a query, second closes and restores focus"
+  },
+  "ADX-16": {
+    "status": "blocked",
+    "expected": "Design gap: posts list renders all rows and sorts locally; no server pagination/sort request. Tracked in docs/qa/round-10-decisions.md"
+  },
+  "ADX-25": {
+    "status": "pass",
+    "expected": "Multipart init 404 falls back to direct upload; other failures keep the error UI"
+  },
+  "ADX-36": {
+    "status": "blocked",
+    "expected": "Design gap: Enhance is a processing form, not a persistent settings toggle; tracked in docs/qa/round-10-decisions.md"
+  },
+  "ADX-47": {
+    "status": "pass",
+    "expected": "Tasks nav badge shows failed-job count and hides at zero; retry/cancel update row and badge"
+  },
+  "ADX-56": {
+    "status": "pass",
+    "expected": "401 on save redirects to login; re-login preserves unsaved editor fields (title) and shows no infinite spinner"
   }
 }
